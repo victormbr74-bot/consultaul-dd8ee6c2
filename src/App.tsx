@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SidebarActionsProvider } from "@/contexts/SidebarActionsContext";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -28,7 +28,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppLayout = ({ children }: { children: React.ReactNode }) => {
+const AppLayout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <SidebarActionsProvider>
       <SidebarProvider>
@@ -38,13 +38,19 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center px-4">
               <SidebarTrigger />
             </header>
-            <main className="flex-1">{children}</main>
+            <main className="flex-1">{children ?? <Outlet />}</main>
           </div>
         </div>
       </SidebarProvider>
     </SidebarActionsProvider>
   );
 };
+
+const ProtectedLayout = () => (
+  <ProtectedRoute>
+    <AppLayout />
+  </ProtectedRoute>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -55,9 +61,11 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
-            <Route path="/" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
-            <Route path="/loterica/:codUl" element={<ProtectedRoute><AppLayout><LotericaDetail /></AppLayout></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>} />
+            <Route element={<ProtectedLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/loterica/:codUl" element={<LotericaDetail />} />
+              <Route path="/admin" element={<AdminPanel />} />
+            </Route>
           </Routes>
         </AuthProvider>
       </BrowserRouter>

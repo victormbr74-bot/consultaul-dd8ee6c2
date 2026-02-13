@@ -20,11 +20,9 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
   const location = useLocation();
   const { isAdmin, profile, signOut } = useAuth();
-  const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
+  const { onExport, onImportClick, lotericaTab, setLotericaTab } = useSidebarActions();
 
   const isDashboardRoute = location.pathname === "/";
-  const isLotericaRoute = location.pathname.startsWith("/loterica/");
-  const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
@@ -64,26 +62,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {shouldShowLotericaTabs && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {lotericaTabs.map((tab) => (
-                  <SidebarMenuItem key={tab.id}>
-                    <SidebarMenuButton
-                      onClick={() => setLotericaTab(tab.id)}
-                      className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
-                    >
-                      <tab.icon className="mr-2 h-4 w-4" />
-                      <span>{tab.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        <SidebarGroup>
+          <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {lotericaTabs.map((tab) => (
+                <SidebarMenuItem key={tab.id}>
+                  <SidebarMenuButton
+                    onClick={() => setLotericaTab(tab.id)}
+                    className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                  >
+                    <tab.icon className="mr-2 h-4 w-4" />
+                    <span>{tab.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupLabel>Dados</SidebarGroupLabel>

@@ -1,6 +1,7 @@
-import { MapPin, Search, Shield, LogOut, User } from "lucide-react";
+import { MapPin, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +18,14 @@ import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const { isAdmin, profile, signOut } = useAuth();
+  const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
+
+  const lotericaTabs = [
+    { id: "consulta", label: "Consulta", icon: Search },
+    { id: "mascara", label: "Máscara", icon: FileText },
+    { id: "testes", label: "Testes", icon: Terminal },
+    { id: "ping99", label: "Ping 99", icon: Wifi },
+  ];
 
   return (
     <Sidebar>
@@ -45,19 +54,72 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {isAdmin && (
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {showLotericaTabs && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Lotérica</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {lotericaTabs.map((tab) => (
+                  <SidebarMenuItem key={tab.id}>
+                    <SidebarMenuButton
+                      onClick={() => setLotericaTab(tab.id)}
+                      className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                    >
+                      <tab.icon className="mr-2 h-4 w-4" />
+                      <span>{tab.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Dados</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {onImportClick && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink to="/admin" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <Shield className="mr-2 h-4 w-4" />
-                      <span>Painel Admin</span>
-                    </NavLink>
+                  <SidebarMenuButton onClick={onImportClick}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    <span>Importar</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {onExport && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={onExport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    <span>Exportar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Gerência de Usuários</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">

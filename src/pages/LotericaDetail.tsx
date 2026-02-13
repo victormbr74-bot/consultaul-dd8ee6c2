@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, History, Search, FileText, Terminal, Wifi } from "lucide-react";
+import { ArrowLeft, Save, History } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
@@ -15,12 +15,20 @@ const LotericaDetail = () => {
   const { codUl } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { lotericaTab, setShowLotericaTabs, setOnExport, setOnImportClick } = useSidebarActions();
   const [loterica, setLoterica] = useState<any>(null);
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    setShowLotericaTabs(true);
+    setOnExport(undefined);
+    setOnImportClick(undefined);
+    return () => { setShowLotericaTabs(false); };
+  }, []);
 
   useEffect(() => {
     const fetch = async () => {
@@ -48,7 +56,6 @@ const LotericaDetail = () => {
     const { error } = await supabase.from("lotericas")
       .update({ ...updateData, updated_by: user?.id, updated_at: new Date().toISOString() })
       .eq("cod_ul", codUl);
-
     if (error) {
       alert("Erro ao salvar: " + error.message);
     } else {
@@ -63,7 +70,7 @@ const LotericaDetail = () => {
 
   return (
     <div className="bg-background">
-      <div className="container flex items-center justify-between h-12 px-4">
+      <div className="container flex items-center justify-between h-12 px-4 border-b">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
@@ -82,42 +89,10 @@ const LotericaDetail = () => {
       </div>
 
       <main className="container px-4 py-6 max-w-5xl">
-        <Tabs defaultValue="consulta" className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="consulta" className="gap-1.5">
-              <Search className="w-4 h-4" />
-              <span className="hidden sm:inline">Consulta</span>
-            </TabsTrigger>
-            <TabsTrigger value="mascara" className="gap-1.5">
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Máscara</span>
-            </TabsTrigger>
-            <TabsTrigger value="testes" className="gap-1.5">
-              <Terminal className="w-4 h-4" />
-              <span className="hidden sm:inline">Testes</span>
-            </TabsTrigger>
-            <TabsTrigger value="ping99" className="gap-1.5">
-              <Wifi className="w-4 h-4" />
-              <span className="hidden sm:inline">Ping 99</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="consulta">
-            <ConsultaTab form={form} setForm={setForm} />
-          </TabsContent>
-
-          <TabsContent value="mascara">
-            <MascaraTab form={form} />
-          </TabsContent>
-
-          <TabsContent value="testes">
-            <TestesTab form={form} />
-          </TabsContent>
-
-          <TabsContent value="ping99">
-            <Ping99Tab form={form} />
-          </TabsContent>
-        </Tabs>
+        {lotericaTab === "consulta" && <ConsultaTab form={form} setForm={setForm} />}
+        {lotericaTab === "mascara" && <MascaraTab form={form} />}
+        {lotericaTab === "testes" && <TestesTab form={form} />}
+        {lotericaTab === "ping99" && <Ping99Tab form={form} />}
 
         {showHistory && (
           <Card className="mt-6 animate-fade-in">

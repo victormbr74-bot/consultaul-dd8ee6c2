@@ -1,39 +1,36 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, MapPin, Download, Upload, ChevronLeft, ChevronRight, LogOut, Shield, RefreshCw } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 
 const PAGE_SIZE = 20;
 
 const Dashboard = () => {
-  const { user, isAdmin, profile, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const { setOnExport, setOnImportClick, setShowLotericaTabs } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const fetchLotericas = useCallback(async () => {
     setLoading(true);
     let query = supabase.from("lotericas").select("*", { count: "exact" });
-
     if (search.trim()) {
       const s = `%${search.trim()}%`;
       query = query.or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`);
     }
-
-    const { data, count } = await query
-      .order("cod_ul")
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
+    const { data, count } = await query.order("cod_ul").range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     setLotericas(data || []);
     setTotal(count || 0);
     setLoading(false);
@@ -59,13 +56,11 @@ const Dashboard = () => {
     const wb = XLSX.read(data);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws);
-
     const { data: { session } } = await supabase.auth.getSession();
     const res = await supabase.functions.invoke("import-lotericas", {
       body: { rows },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
-
     if (res.error) {
       alert("Erro na importação: " + res.error.message);
     } else {
@@ -75,6 +70,14 @@ const Dashboard = () => {
     setImporting(false);
     e.target.value = "";
   };
+
+  // Register sidebar actions
+  useEffect(() => {
+    setShowLotericaTabs(false);
+    setOnExport(() => handleExport);
+    setOnImportClick(() => () => importRef.current?.click());
+    return () => { setOnExport(undefined); setOnImportClick(undefined); };
+  }, []);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -87,41 +90,23 @@ const Dashboard = () => {
 
   return (
     <div className="bg-background">
+      <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
       <main className="container px-4 py-6 max-w-6xl">
-        {/* Search & Actions */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por código, nome, CCTO ou cidade..."
-              className="pl-10"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <Input placeholder="Buscar por código, nome, CCTO ou cidade..." className="pl-10" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-1" /> Exportar
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <label className="cursor-pointer">
-                <Upload className="w-4 h-4 mr-1" /> {importing ? "Importando..." : "Importar"}
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
-              </label>
-            </Button>
-            <Button variant="ghost" size="icon" onClick={fetchLotericas}>
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={fetchLotericas}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
         </div>
 
-        {/* Stats */}
         <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
           <span>{total} lotéricas encontradas</span>
           <span>Página {page + 1} de {totalPages || 1}</span>
         </div>
 
-        {/* Table */}
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -143,20 +128,14 @@ const Dashboard = () => {
                     <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhuma lotérica encontrada</td></tr>
                   ) : (
                     lotericas.map(l => (
-                      <tr
-                        key={l.cod_ul}
-                        className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`)}
-                      >
+                      <tr key={l.cod_ul} className="border-b hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`)}>
                         <td className="p-3 font-mono text-xs font-medium">{l.cod_ul}</td>
                         <td className="p-3 font-medium">{l.nome_loterica}</td>
                         <td className="p-3 font-mono text-xs hidden md:table-cell">{l.ccto_oi}</td>
                         <td className="p-3 hidden lg:table-cell">{l.cidade} - {l.uf}</td>
                         <td className="p-3 hidden lg:table-cell">{l.operadora}</td>
                         <td className="p-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(l.status)}`}>
-                            {l.status}
-                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(l.status)}`}>{l.status}</span>
                         </td>
                       </tr>
                     ))
@@ -167,15 +146,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="text-sm text-muted-foreground">
-              {page + 1} / {totalPages}
-            </span>
+            <span className="text-sm text-muted-foreground">{page + 1} / {totalPages}</span>
             <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
               <ChevronRight className="w-4 h-4" />
             </Button>

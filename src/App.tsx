@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SidebarActionsProvider } from "@/contexts/SidebarActionsContext";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import AuthPage from "./pages/AuthPage";
@@ -29,17 +30,19 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center px-4">
-            <SidebarTrigger />
-          </header>
-          <main className="flex-1">{children}</main>
+    <SidebarActionsProvider>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center px-4">
+              <SidebarTrigger />
+            </header>
+            <main className="flex-1">{children}</main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </SidebarActionsProvider>
   );
 };
 

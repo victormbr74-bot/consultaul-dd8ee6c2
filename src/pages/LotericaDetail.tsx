@@ -62,26 +62,24 @@ const LotericaDetail = () => {
   if (!loterica) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Lotérica não encontrada</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="container flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-            </Button>
-            <span className="font-mono text-sm font-medium text-foreground">{codUl}</span>
-            <span className="text-sm text-muted-foreground hidden sm:inline">— {form.nome_loterica}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchHistory}>
-              <History className="w-4 h-4 mr-1" /> Histórico
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
+    <div className="bg-background">
+      <div className="container flex items-center justify-between h-12 px-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
+          </Button>
+          <span className="font-mono text-sm font-medium text-foreground">{codUl}</span>
+          <span className="text-sm text-muted-foreground hidden sm:inline">— {form.nome_loterica}</span>
         </div>
-      </header>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchHistory}>
+            <History className="w-4 h-4 mr-1" /> Histórico
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </div>
 
       <main className="container px-4 py-6 max-w-5xl">
         <Tabs defaultValue="consulta" className="space-y-4">

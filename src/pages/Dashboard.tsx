@@ -86,30 +86,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="container flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <MapPin className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-foreground hidden sm:inline">Consulta Lotéricas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
-                <Shield className="w-3.5 h-3.5 mr-1" /> Admin
-              </Button>
-            )}
-            <span className="text-xs text-muted-foreground hidden sm:inline">{profile?.name}</span>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <div className="bg-background">
       <main className="container px-4 py-6 max-w-6xl">
         {/* Search & Actions */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">

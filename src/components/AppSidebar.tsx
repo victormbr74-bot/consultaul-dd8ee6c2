@@ -1,4 +1,5 @@
 import { MapPin, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
@@ -17,12 +18,17 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
+  const location = useLocation();
   const { isAdmin, profile, signOut } = useAuth();
   const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
 
+  const isDashboardRoute = location.pathname === "/";
+  const isLotericaRoute = location.pathname.startsWith("/loterica/");
+  const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
+
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
-    { id: "mascara", label: "Máscara", icon: FileText },
+    { id: "mascara", label: "M\u00E1scara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
   ];
@@ -35,15 +41,15 @@ export function AppSidebar() {
             <MapPin className="w-4 h-4 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotéricas</span>
-            <span className="text-[10px] text-sidebar-foreground/50">Gestão de unidades</span>
+            <span className="font-bold text-sm text-sidebar-foreground">{"Consulta Lot\u00E9ricas"}</span>
+            <span className="text-[10px] text-sidebar-foreground/50">{"Gest\u00E3o de unidades"}</span>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
+          <SidebarGroupLabel>{"Navega\u00E7\u00E3o"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -58,9 +64,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {showLotericaTabs && (
+        {shouldShowLotericaTabs && (
           <SidebarGroup>
-            <SidebarGroupLabel>Lotérica</SidebarGroupLabel>
+            <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {lotericaTabs.map((tab) => (
@@ -83,17 +89,17 @@ export function AppSidebar() {
           <SidebarGroupLabel>Dados</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {onImportClick && (
+              {(isDashboardRoute || onImportClick) && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={onImportClick}>
+                  <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
                     <span>Importar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {onExport && (
+              {(isDashboardRoute || onExport) && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={onExport}>
+                  <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
                     <Download className="mr-2 h-4 w-4" />
                     <span>Exportar</span>
                   </SidebarMenuButton>
@@ -105,14 +111,14 @@ export function AppSidebar() {
 
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupLabel>{"Administra\u00E7\u00E3o"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Users className="mr-2 h-4 w-4" />
-                      <span>Gerência de Usuários</span>
+                      <span>{"Ger\u00EAncia de Usu\u00E1rios"}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -129,7 +135,7 @@ export function AppSidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
-            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usuário"}</p>
+            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usu\u00E1rio"}</p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
             <LogOut className="w-4 h-4" />

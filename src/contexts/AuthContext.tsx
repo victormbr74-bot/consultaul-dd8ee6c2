@@ -23,35 +23,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<{ name: string; user_code: string | null } | null>(null);
 
   const fetchUserData = async (userId: string) => {
-    const [{ data: roles }, { data: prof }] = await Promise.all([
+    const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("profiles").select("name, user_code").eq("id", userId).single(),
     ]);
-    setIsAdmin(roles?.some((r: any) => r.role === "admin") ?? false);
-    setProfile(prof);
+
+    if (rolesError || profileError) {
+      console.error("Failed to fetch user data", { rolesError, profileError });
+    }
+
+    return {
+      isAdmin: roles?.some((r) => r.role === "admin") ?? false,
+      profile: prof ?? null,
+    };
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => fetchUserData(session.user.id), 0);
+    let active = true;
+
+    const applySession = async (nextSession: Session | null) => {
+      if (!active) return;
+
+      setSession(nextSession);
+      const nextUser = nextSession?.user ?? null;
+      setUser(nextUser);
+
+      if (nextUser) {
+        const userData = await fetchUserData(nextUser.id);
+        if (!active) return;
+        setIsAdmin(userData.isAdmin);
+        setProfile(userData.profile);
       } else {
         setIsAdmin(false);
         setProfile(null);
       }
-      setLoading(false);
+
+      if (active) setLoading(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void applySession(nextSession);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchUserData(session.user.id);
-      setLoading(false);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      void applySession(currentSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

@@ -9,15 +9,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Users, Shield } from "lucide-react";
 
 const AdminPanel = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin) { navigate("/"); return; }
+    if (authLoading) return;
+    if (!isAdmin) {
+      navigate("/");
+      return;
+    }
     fetchUsers();
-  }, [isAdmin]);
+  }, [authLoading, isAdmin, navigate]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -44,6 +48,7 @@ const AdminPanel = () => {
     fetchUsers();
   };
 
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
   if (!isAdmin) return null;
 
   return (

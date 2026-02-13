@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,12 +23,16 @@ const LotericaDetail = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setShowLotericaTabs(true);
     setOnExport(undefined);
     setOnImportClick(undefined);
-    return () => { setShowLotericaTabs(false); };
-  }, []);
+    return () => {
+      setShowLotericaTabs(false);
+      setOnExport(undefined);
+      setOnImportClick(undefined);
+    };
+  }, [setShowLotericaTabs, setOnExport, setOnImportClick]);
 
   useEffect(() => {
     const fetch = async () => {

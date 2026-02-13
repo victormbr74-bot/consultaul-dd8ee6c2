@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
@@ -39,14 +39,14 @@ const Dashboard = () => {
   useEffect(() => { fetchLotericas(); }, [fetchLotericas]);
   useEffect(() => { setPage(0); }, [search]);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     const { data } = await supabase.from("lotericas").select("*").order("cod_ul");
     if (!data) return;
     const ws = XLSX.utils.json_to_sheet(data.map(({ raw_data, ...rest }) => rest));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Lotéricas");
+    XLSX.utils.book_append_sheet(wb, ws, "Lot\u00E9ricas");
     XLSX.writeFile(wb, "lotericas_export.xlsx");
-  };
+  }, []);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,12 +72,16 @@ const Dashboard = () => {
   };
 
   // Register sidebar actions
-  useEffect(() => {
+  useLayoutEffect(() => {
     setShowLotericaTabs(false);
     setOnExport(() => handleExport);
     setOnImportClick(() => () => importRef.current?.click());
-    return () => { setOnExport(undefined); setOnImportClick(undefined); };
-  }, []);
+    return () => {
+      setShowLotericaTabs(false);
+      setOnExport(undefined);
+      setOnImportClick(undefined);
+    };
+  }, [handleExport, setOnExport, setOnImportClick, setShowLotericaTabs]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 

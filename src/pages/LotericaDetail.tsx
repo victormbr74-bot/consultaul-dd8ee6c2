@@ -35,42 +35,99 @@ const LotericaDetail = () => {
   }, [setShowLotericaTabs, setOnExport, setOnImportClick]);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase.from("lotericas").select("*").eq("cod_ul", codUl).single();
-      if (data) { setLoterica(data); setForm(data); }
-      setLoading(false);
+    const fetchLoterica = async () => {
+      setLoading(true);
+      try {
+        if (!codUl) {
+          setLoterica(null);
+          setForm({});
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("lotericas")
+          .select("*")
+          .eq("cod_ul", codUl)
+          .single();
+
+        if (error) {
+          console.error("Erro ao carregar loterica", error);
+          setLoterica(null);
+          setForm({});
+          return;
+        }
+
+        setLoterica(data);
+        setForm(data);
+      } catch (error) {
+        console.error("Falha inesperada ao carregar loterica", error);
+        setLoterica(null);
+        setForm({});
+      } finally {
+        setLoading(false);
+      }
     };
-    fetch();
+
+    void fetchLoterica();
   }, [codUl]);
 
   const fetchHistory = async () => {
-    const { data } = await supabase
-      .from("loterica_history")
-      .select("*, profiles:changed_by(name)")
-      .eq("cod_ul", codUl)
-      .order("changed_at", { ascending: false })
-      .limit(20);
-    setHistory(data || []);
-    setShowHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from("loterica_history")
+        .select("*, profiles:changed_by(name)")
+        .eq("cod_ul", codUl)
+        .order("changed_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error("Erro ao carregar historico", error);
+        alert("Erro ao carregar historico.");
+        return;
+      }
+
+      setHistory(data || []);
+      setShowHistory(true);
+    } catch (error) {
+      console.error("Falha inesperada ao carregar historico", error);
+      alert("Falha inesperada ao carregar historico.");
+    }
   };
 
   const handleSave = async () => {
     setSaving(true);
-    const { raw_data, updated_at, ...updateData } = form;
-    const { error } = await supabase.from("lotericas")
-      .update({ ...updateData, updated_by: user?.id, updated_at: new Date().toISOString() })
-      .eq("cod_ul", codUl);
-    if (error) {
-      alert("Erro ao salvar: " + error.message);
-    } else {
-      alert("Salvo com sucesso!");
-      setLoterica(form);
+    try {
+      const { raw_data, updated_at, ...updateData } = form;
+      const { error } = await supabase
+        .from("lotericas")
+        .update({ ...updateData, updated_by: user?.id, updated_at: new Date().toISOString() })
+        .eq("cod_ul", codUl);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+      } else {
+        alert("Salvo com sucesso!");
+        setLoterica(form);
+      }
+    } catch (error) {
+      console.error("Falha inesperada ao salvar loterica", error);
+      alert("Falha inesperada ao salvar.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
-  if (!loterica) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Lotérica não encontrada</div>;
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
+  }
+
+  if (!loterica) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+        {"Lot\u00E9rica n\u00E3o encontrada"}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background">
@@ -80,11 +137,11 @@ const LotericaDetail = () => {
             <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
           <span className="font-mono text-sm font-medium text-foreground">{codUl}</span>
-          <span className="text-sm text-muted-foreground hidden sm:inline">— {form.nome_loterica}</span>
+          <span className="text-sm text-muted-foreground hidden sm:inline"> - {form.nome_loterica}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fetchHistory}>
-            <History className="w-4 h-4 mr-1" /> Histórico
+            <History className="w-4 h-4 mr-1" /> {"Hist\u00F3rico"}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving}>
             <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}
@@ -101,14 +158,14 @@ const LotericaDetail = () => {
         {showHistory && (
           <Card className="mt-6 animate-fade-in">
             <CardHeader>
-              <CardTitle className="text-lg">Histórico de Alterações</CardTitle>
+              <CardTitle className="text-lg">{"Hist\u00F3rico de Altera\u00E7\u00F5es"}</CardTitle>
             </CardHeader>
             <CardContent>
               {history.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma alteração registrada.</p>
+                <p className="text-sm text-muted-foreground">{"Nenhuma altera\u00E7\u00E3o registrada."}</p>
               ) : (
                 <div className="space-y-3">
-                  {history.map(h => (
+                  {history.map((h) => (
                     <div key={h.id} className="border rounded-lg p-3 text-sm">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">{(h as any).profiles?.name || "Desconhecido"}</span>
@@ -117,16 +174,20 @@ const LotericaDetail = () => {
                       <div className="text-xs text-muted-foreground">
                         {h.before_data && h.after_data && (
                           <div className="space-y-1">
-                            {Object.keys(h.after_data).filter(k =>
-                              k !== "raw_data" && k !== "updated_at" && k !== "updated_by" &&
-                              JSON.stringify(h.before_data[k]) !== JSON.stringify(h.after_data[k])
-                            ).map(k => (
-                              <div key={k}>
-                                <span className="font-medium text-foreground">{k}:</span>{" "}
-                                <span className="text-destructive line-through">{String(h.before_data[k] ?? "")}</span>{" → "}
-                                <span className="text-green-600">{String(h.after_data[k] ?? "")}</span>
-                              </div>
-                            ))}
+                            {Object.keys(h.after_data)
+                              .filter((k) =>
+                                k !== "raw_data" &&
+                                k !== "updated_at" &&
+                                k !== "updated_by" &&
+                                JSON.stringify(h.before_data[k]) !== JSON.stringify(h.after_data[k]),
+                              )
+                              .map((k) => (
+                                <div key={k}>
+                                  <span className="font-medium text-foreground">{k}:</span>{" "}
+                                  <span className="text-destructive line-through">{String(h.before_data[k] ?? "")}</span>{" -> "}
+                                  <span className="text-green-600">{String(h.after_data[k] ?? "")}</span>
+                                </div>
+                              ))}
                           </div>
                         )}
                       </div>

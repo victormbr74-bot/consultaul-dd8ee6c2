@@ -23,19 +23,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<{ name: string; user_code: string | null } | null>(null);
 
   const fetchUserData = async (userId: string) => {
-    const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("profiles").select("name, user_code").eq("id", userId).single(),
-    ]);
+    try {
+      const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+        supabase.from("profiles").select("name, user_code").eq("id", userId).single(),
+      ]);
 
-    if (rolesError || profileError) {
-      console.error("Failed to fetch user data", { rolesError, profileError });
+      if (rolesError || profileError) {
+        console.error("Failed to fetch user data", { rolesError, profileError });
+      }
+
+      return {
+        isAdmin: roles?.some((r) => r.role === "admin") ?? false,
+        profile: prof ?? null,
+      };
+    } catch (error) {
+      console.error("Unexpected error while fetching user data", error);
+      return {
+        isAdmin: false,
+        profile: null,
+      };
     }
-
-    return {
-      isAdmin: roles?.some((r) => r.role === "admin") ?? false,
-      profile: prof ?? null,
-    };
   };
 
   useEffect(() => {
@@ -44,30 +52,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const applySession = async (nextSession: Session | null) => {
       if (!active) return;
 
-      setSession(nextSession);
-      const nextUser = nextSession?.user ?? null;
-      setUser(nextUser);
+      try {
+        setSession(nextSession);
+        const nextUser = nextSession?.user ?? null;
+        setUser(nextUser);
 
-      if (nextUser) {
-        const userData = await fetchUserData(nextUser.id);
+        if (nextUser) {
+          const userData = await fetchUserData(nextUser.id);
+          if (!active) return;
+          setIsAdmin(userData.isAdmin);
+          setProfile(userData.profile);
+        } else {
+          setIsAdmin(false);
+          setProfile(null);
+        }
+      } catch (error) {
+        console.error("Failed to apply auth session", error);
         if (!active) return;
-        setIsAdmin(userData.isAdmin);
-        setProfile(userData.profile);
-      } else {
         setIsAdmin(false);
         setProfile(null);
+      } finally {
+        if (active) setLoading(false);
       }
-
-      if (active) setLoading(false);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       void applySession(nextSession);
     });
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      void applySession(currentSession);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        void applySession(currentSession);
+      })
+      .catch((error) => {
+        console.error("Failed to get auth session", error);
+        if (active) {
+          setUser(null);
+          setSession(null);
+          setIsAdmin(false);
+          setProfile(null);
+          setLoading(false);
+        }
+      });
 
     return () => {
       active = false;

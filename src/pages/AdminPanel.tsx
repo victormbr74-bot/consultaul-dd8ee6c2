@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Users, Shield } from "lucide-react";
+import { Users } from "lucide-react";
 
 const AdminPanel = () => {
   const { isAdmin, loading: authLoading } = useAuth();
@@ -25,15 +25,27 @@ const AdminPanel = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data: profiles } = await supabase.from("profiles").select("*");
-    const { data: roles } = await supabase.from("user_roles").select("*");
+    try {
+      const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*");
+      const { data: roles, error: rolesError } = await supabase.from("user_roles").select("*");
 
-    const merged = (profiles || []).map(p => ({
-      ...p,
-      role: roles?.find(r => r.user_id === p.id)?.role || "user",
-    }));
-    setUsers(merged);
-    setLoading(false);
+      if (profilesError || rolesError) {
+        console.error("Erro ao carregar usuarios", { profilesError, rolesError });
+        setUsers([]);
+        return;
+      }
+
+      const merged = (profiles || []).map((p) => ({
+        ...p,
+        role: roles?.find((r) => r.user_id === p.id)?.role || "user",
+      }));
+      setUsers(merged);
+    } catch (error) {
+      console.error("Falha inesperada ao carregar usuarios", error);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateRole = async (userId: string, newRole: string) => {

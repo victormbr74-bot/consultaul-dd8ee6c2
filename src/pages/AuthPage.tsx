@@ -102,13 +102,6 @@ const AuthPage = () => {
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>
-                <div className="mt-4 p-3 rounded-md bg-muted text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Shield className="w-3 h-3" /> <span className="font-medium">Admin padrão</span>
-                  </div>
-                  <p>ID: 418118</p>
-                  <p>Senha: Oi@12345</p>
-                </div>
               </TabsContent>
 
               <TabsContent value="signup" className="mt-0">

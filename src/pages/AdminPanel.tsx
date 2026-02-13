@@ -47,17 +47,7 @@ const AdminPanel = () => {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="container flex items-center h-14 px-4 gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-          </Button>
-          <Shield className="w-4 h-4 text-primary" />
-          <span className="font-bold text-foreground">Painel Admin</span>
-        </div>
-      </header>
-
+    <div className="bg-background">
       <main className="container px-4 py-6 max-w-4xl">
         <Card className="animate-fade-in">
           <CardHeader>

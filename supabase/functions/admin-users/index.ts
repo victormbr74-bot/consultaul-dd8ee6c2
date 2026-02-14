@@ -59,7 +59,7 @@ const findAuthUserIdByEmail = async (adminClient: any, email: string) => {
     if (error) throw new Error(error.message);
 
     const users = data.users || [];
-    const found = users.find((u) => (u.email || "").toLowerCase() === email.toLowerCase());
+    const found = users.find((u: any) => (u.email || "").toLowerCase() === email.toLowerCase());
     if (found) return found.id;
 
     if (users.length < perPage) return null;

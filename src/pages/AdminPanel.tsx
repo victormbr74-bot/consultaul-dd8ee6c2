@@ -388,7 +388,7 @@ const AdminPanel = () => {
 
   const seedDefaultUsers = async () => {
     const confirmSeed = window.confirm(
-      "Importar a lista padrão de usuários agora? Usuários existentes serão atualizados e novos serão criados.",
+      "Importar a lista padrao de usuarios agora? Usuarios existentes serao atualizados, novos serao criados e a senha dos nao-admin sera redefinida para Oi@12345.",
     );
     if (!confirmSeed) return;
 
@@ -398,7 +398,7 @@ const AdminPanel = () => {
         action: "seed_users",
         payload: {
           users: DEFAULT_USER_SEED,
-          default_password: "Lvh@2026",
+          default_password: "Oi@12345",
         },
       });
       await fetchUsers();

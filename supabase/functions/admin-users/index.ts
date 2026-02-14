@@ -110,7 +110,11 @@ Deno.serve(async (req) => {
       const name = String(p.name || "").trim();
       const userCode = normalizeUserCode(p.user_code);
       const role = normalizeRole(p.role);
-      const password = String(p.password || "").trim() || `${userCode}@Lvh`;
+      const rawPassword = typeof p.password === "string" ? p.password.trim() : "";
+      if (role === "admin" && !rawPassword) {
+        return json({ error: "Senha obrigatoria para usuarios admin." }, 400);
+      }
+      const password = rawPassword || "Oi@12345";
 
       if (!name || !userCode) return json({ error: "Nome e código do usuário são obrigatórios." }, 400);
 
@@ -178,7 +182,7 @@ Deno.serve(async (req) => {
     if (action === "seed_users") {
       const p = payload as SeedPayload;
       const users = Array.isArray(p.users) ? p.users : [];
-      const defaultPassword = String(p.default_password || "").trim() || "Lvh@2026";
+      const defaultPassword = String(p.default_password || "").trim() || "Oi@12345";
 
       let created = 0;
       let updated = 0;
@@ -206,6 +210,9 @@ Deno.serve(async (req) => {
           if (existingProfile?.id) {
             userId = existingProfile.id;
           } else {
+            if (role === "admin") {
+              throw new Error("Seed nao cria usuario admin sem senha explicita. Crie o admin manualmente.");
+            }
             const email = buildEmail(userCode);
             const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
               email,
@@ -236,6 +243,14 @@ Deno.serve(async (req) => {
           if (profileUpdateError) throw new Error(profileUpdateError.message);
 
           await applyRole(adminClient, userId, role);
+
+          // Reset password for non-admin users (keep admins untouched).
+          if (role !== "admin") {
+            const { error: passError } = await adminClient.auth.admin.updateUserById(userId, {
+              password: defaultPassword,
+            });
+            if (passError) throw new Error(passError.message);
+          }
           updated += 1;
         } catch (error) {
           failed.push({

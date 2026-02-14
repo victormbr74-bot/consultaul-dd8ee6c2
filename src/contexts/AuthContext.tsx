@@ -52,26 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to fetch user profile", profileResult.reason);
     }
 
-    // Bootstrap admin for collaborator 418118 if DB is missing the admin role.
-    // The SQL function is safe: it only promotes the current user when user_code == 418118.
-    if (profile?.user_code === "418118" && !isAdmin) {
-      try {
-        const { data: bootstrapped, error: bootstrapError } = await supabase.rpc("bootstrap_my_admin");
-        if (bootstrapError) {
-          // If migration not applied yet, ignore and keep current state.
-          console.warn("bootstrap_my_admin unavailable", bootstrapError);
-        } else if (bootstrapped) {
-          const { data: roles2, error: roles2Error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-          if (roles2Error) {
-            console.error("Failed to re-fetch user roles", roles2Error);
-          } else {
-            isAdmin = roles2?.some((r) => r.role === "admin") ?? false;
-          }
-        }
-      } catch (error) {
-        console.warn("bootstrap_my_admin failed", error);
-      }
-    }
 
     return { isAdmin, profile };
   };

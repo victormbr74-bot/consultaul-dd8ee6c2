@@ -149,6 +149,7 @@ const LotericaDetail = () => {
         ["REDE LAN"],
         ["IP SWITCH", "LOOPBACK SWITCH"],
         ["TFL", "TFLs"],
+        ["EMPRESA OEMP"],
         ["TIPO LOTERICA", "TIPO UL"],
         ["PERIMETRO", "PER\u00CDMETRO"],
         ["TECNOLOGIA"],

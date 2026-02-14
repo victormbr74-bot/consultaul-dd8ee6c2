@@ -23,6 +23,7 @@ const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
   { label: "Rede LAN", keys: ["REDE LAN"], mono: true },
   { label: "IP Switch", keys: ["IP SWITCH", "LOOPBACK SWITCH"], mono: true },
   { label: "TFL", keys: ["TFL", "TFLs"], mono: true },
+  { label: "Empresa OEMP", keys: ["EMPRESA OEMP"] },
   { label: "Tipo UL", keys: ["TIPO LOTERICA", "TIPO UL"] },
   { label: "Per\u00EDmetro", keys: ["PERIMETRO", "PER\u00CDMETRO"] },
   { label: "Tecnologia", keys: ["TECNOLOGIA"] },
@@ -63,7 +64,7 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Dados Edit\u00E1veis</CardTitle>
+          <CardTitle className="text-lg">{"Dados Edit\u00E1veis"}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -106,4 +107,3 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
 };
 
 export default ConsultaTab;
-

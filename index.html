@@ -8,19 +8,36 @@
     <meta name="author" content="Consulta Lotericas" />
 
     <link
+      id="app-favicon"
       rel="icon"
       type="image/svg+xml"
       href="/favicon-light.svg?v=20260214"
-      media="(prefers-color-scheme: light)"
+      data-href-light="/favicon-light.svg?v=20260214"
+      data-href-dark="/favicon-dark.svg?v=20260214"
     />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/favicon-dark.svg?v=20260214"
-      media="(prefers-color-scheme: dark)"
-    />
-    <!-- Fallback for browsers that don't apply the `media` attribute on favicons. -->
-    <link rel="icon" type="image/svg+xml" href="/favicon-light.svg?v=20260214" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("lvh:theme-mode");
+          const mode =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+
+          const link = document.getElementById("app-favicon");
+          if (!link) return;
+
+          const href =
+            mode === "dark" ? link.getAttribute("data-href-dark") : link.getAttribute("data-href-light");
+          if (href) link.setAttribute("href", href);
+        } catch {
+          // ignore
+        }
+      })();
+    </script>
 
     <meta property="og:title" content="Consulta Lotericas" />
     <meta property="og:description" content="Sistema de gestao de unidades lotericas" />

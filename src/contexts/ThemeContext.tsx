@@ -43,10 +43,23 @@ const readInitialColor = (): ThemeColor => {
   }
 };
 
+const applyFavicon = (mode: ThemeMode) => {
+  const link = document.getElementById("app-favicon") as HTMLLinkElement | null;
+  if (!link) return;
+
+  const nextHref = mode === "dark" ? link.dataset.hrefDark : link.dataset.hrefLight;
+  if (!nextHref) return;
+
+  if (link.getAttribute("href") !== nextHref) {
+    link.setAttribute("href", nextHref);
+  }
+};
+
 const applyToDom = (mode: ThemeMode, color: ThemeColor) => {
   const root = document.documentElement;
   root.classList.toggle("dark", mode === "dark");
   root.dataset.color = color;
+  applyFavicon(mode);
 };
 
 type ThemeContextValue = {
@@ -95,4 +108,3 @@ export const useTheme = () => {
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 };
-

@@ -85,7 +85,16 @@ const AdminPanel = () => {
         .limit(200);
 
       if (error) {
-        throw new Error(error.message);
+        const msg = String((error as any)?.message || "");
+        if (msg.includes("loterica_change_requests") && msg.includes("Could not find the table")) {
+          setChangeRequests([]);
+          setChangesError(
+            "Banco desatualizado: falta a tabela loterica_change_requests.\n" +
+              "Aplique a migracao Supabase '20260213173000_approval_workflow_and_loopback_fix.sql'.",
+          );
+          return;
+        }
+        throw new Error(msg);
       }
 
       const base = (reqs || []) as unknown as ChangeRequestRow[];

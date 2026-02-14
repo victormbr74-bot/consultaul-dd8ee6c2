@@ -219,11 +219,19 @@ const LotericaDetail = () => {
       } as any);
 
       if (reqError) {
-        alert("Erro ao enviar para aprovação: " + reqError.message);
+        const msg = String((reqError as any)?.message || "");
+        if (msg.includes("loterica_change_requests") && msg.includes("Could not find the table")) {
+          alert(
+            "Banco desatualizado: falta a tabela loterica_change_requests.\n" +
+              "Aplique a migracao Supabase '20260213173000_approval_workflow_and_loopback_fix.sql' e tente novamente.",
+          );
+        } else {
+          alert("Erro ao enviar para aprovacao: " + msg);
+        }
         return;
       }
 
-      alert("Alteração enviada para aprovação do ADM.");
+      alert("Alteracao enviada para aprovacao do ADM.");
       // Como ainda não foi aplicado no banco, volta o formulário ao estado atual salvo.
       setForm(loterica);
     } catch (error) {

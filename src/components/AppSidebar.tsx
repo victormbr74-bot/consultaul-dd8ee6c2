@@ -116,7 +116,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Users className="mr-2 h-4 w-4" />
-                      <span>{"Ger\u00EAncia de Usu\u00E1rios"}</span>
+                      <span>{"Gerenciar Usu\u00E1rios"}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

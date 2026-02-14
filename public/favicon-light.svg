@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Consulta Lotericas</title>
+  <g fill="none" stroke="#0e3e81" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 24L16 12h32l6 12" />
+    <path d="M14 24v28a4 4 0 0 0 4 4h28a4 4 0 0 0 4-4V24" />
+    <path d="M14 24h36" />
+    <path d="M20 24v8M28 24v8M36 24v8M44 24v8" />
+    <path d="M26 56V36h12v20" />
+  </g>
+</svg>
+

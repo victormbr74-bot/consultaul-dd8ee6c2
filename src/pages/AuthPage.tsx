@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, Shield, User } from "lucide-react";
+import { Store, Shield, User } from "lucide-react";
 
 const AuthPage = () => {
   const { signIn, signUp } = useAuth();
@@ -31,7 +31,7 @@ const AuthPage = () => {
       });
 
       if (fnError || data?.error) {
-        setError(data?.error || "Usuário não encontrado");
+        setError(data?.error || "Usuario nao encontrado");
         setLoading(false);
         return;
       }
@@ -49,7 +49,7 @@ const AuthPage = () => {
     setLoading(true); setError(""); setSuccess("");
     const { error } = await signUp(signupEmail, signupPassword, signupName);
     if (error) setError(error);
-    else setSuccess("Conta criada com sucesso! Faça login.");
+    else setSuccess("Conta criada com sucesso! Faca login.");
     setLoading(false);
   };
 
@@ -59,11 +59,11 @@ const AuthPage = () => {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-primary-foreground" />
+              <Store className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Consulta Lotéricas</h1>
+            <h1 className="text-2xl font-bold text-foreground">Consulta Lotericas</h1>
           </div>
-          <p className="text-muted-foreground text-sm">Sistema de gestão de unidades lotéricas</p>
+          <p className="text-muted-foreground text-sm">Sistema de gestao de unidades lotericas</p>
         </div>
 
         <Card>
@@ -81,7 +81,7 @@ const AuthPage = () => {
               <TabsContent value="login" className="mt-0">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-id">ID do Usuário</Label>
+                    <Label htmlFor="login-id">ID do Usuario</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input

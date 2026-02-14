@@ -1,4 +1,4 @@
-import { MapPin, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette } from "lucide-react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,10 +38,10 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <MapPin className="w-4 h-4 text-primary-foreground" />
+            <Store className="w-4 h-4 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm text-sidebar-foreground">{"Consulta Lot\u00E9ricas"}</span>
+            <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>
             <span className="text-[10px] text-sidebar-foreground/50">{"Gest\u00E3o de unidades"}</span>
           </div>
         </div>

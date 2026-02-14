@@ -14,7 +14,7 @@ import Ping99Tab from "@/components/loterica/Ping99Tab";
 const LotericaDetail = () => {
   const { codUl } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { lotericaTab, setShowLotericaTabs, setOnExport, setOnImportClick } = useSidebarActions();
   const [loterica, setLoterica] = useState<any>(null);
   const [form, setForm] = useState<any>({});
@@ -57,8 +57,21 @@ const LotericaDetail = () => {
           return;
         }
 
-        setLoterica(data);
-        setForm(data);
+        const raw = (data as any)?.raw_data || {};
+        const rawRedeLan = String(raw["REDE LAN"] || "").trim();
+        const rawLoopbackSec = String(raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUNDÁRIO"] || "").trim();
+        const currentLoopbackLan = String((data as any)?.loopback_lan || "").trim();
+
+        // Normaliza registros importados com bug: loopback_lan veio como "REDE LAN".
+        const normalized =
+          rawLoopbackSec &&
+          (!currentLoopbackLan || currentLoopbackLan === rawRedeLan) &&
+          rawLoopbackSec !== rawRedeLan
+            ? { ...data, loopback_lan: rawLoopbackSec }
+            : data;
+
+        setLoterica(normalized);
+        setForm(normalized);
       } catch (error) {
         console.error("Falha inesperada ao carregar loterica", error);
         setLoterica(null);
@@ -97,18 +110,84 @@ const LotericaDetail = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { raw_data, updated_at, ...updateData } = form;
-      const { error } = await supabase
-        .from("lotericas")
-        .update({ ...updateData, updated_by: user?.id, updated_at: new Date().toISOString() })
-        .eq("cod_ul", codUl);
+      const editableKeys = [
+        "nome_loterica",
+        "ccto_oi",
+        "ccto_oemp",
+        "designacao_nova",
+        "operadora",
+        "ip_nat",
+        "ip_wan",
+        "loopback_wan",
+        "loopback_lan",
+        "endereco",
+        "contato",
+        "status",
+        "cidade",
+        "uf",
+      ] as const;
 
-      if (error) {
-        alert("Erro ao salvar: " + error.message);
-      } else {
-        alert("Salvo com sucesso!");
-        setLoterica(form);
+      const beforeData: Record<string, unknown> = {};
+      const afterData: Record<string, unknown> = {};
+      for (const key of editableKeys) {
+        beforeData[key] = loterica?.[key] ?? null;
+        afterData[key] = form?.[key] ?? null;
       }
+
+      const changes: Record<string, unknown> = {};
+      const beforeChanges: Record<string, unknown> = {};
+      for (const key of editableKeys) {
+        const b = beforeData[key];
+        const a = afterData[key];
+        if (JSON.stringify(b) !== JSON.stringify(a)) {
+          changes[key] = a;
+          beforeChanges[key] = b;
+        }
+      }
+
+      if (Object.keys(changes).length === 0) {
+        alert("Nenhuma alteração para salvar.");
+        return;
+      }
+
+      if (!user?.id) {
+        alert("Sessão inválida. Faça login novamente.");
+        return;
+      }
+
+      if (isAdmin) {
+        const { error } = await supabase
+          .from("lotericas")
+          .update({ ...changes, updated_by: user.id, updated_at: new Date().toISOString() })
+          .eq("cod_ul", codUl);
+
+        if (error) {
+          alert("Erro ao salvar: " + error.message);
+          return;
+        }
+
+        alert("Salvo com sucesso!");
+        setLoterica({ ...loterica, ...changes, updated_by: user.id, updated_at: new Date().toISOString() });
+        return;
+      }
+
+      // Usuario nao-admin: cria solicitacao de alteracao para aprovacao do ADM.
+      const { error: reqError } = await supabase.from("loterica_change_requests").insert({
+        cod_ul: codUl,
+        proposed_by: user.id,
+        before_data: beforeChanges,
+        after_data: changes,
+        status: "pending",
+      } as any);
+
+      if (reqError) {
+        alert("Erro ao enviar para aprovação: " + reqError.message);
+        return;
+      }
+
+      alert("Alteração enviada para aprovação do ADM.");
+      // Como ainda não foi aplicado no banco, volta o formulário ao estado atual salvo.
+      setForm(loterica);
     } catch (error) {
       console.error("Falha inesperada ao salvar loterica", error);
       alert("Falha inesperada ao salvar.");
@@ -144,7 +223,7 @@ const LotericaDetail = () => {
             <History className="w-4 h-4 mr-1" /> {"Hist\u00F3rico"}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}
+            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : isAdmin ? "Salvar" : "Enviar p/ Aprovação"}
           </Button>
         </div>
       </div>

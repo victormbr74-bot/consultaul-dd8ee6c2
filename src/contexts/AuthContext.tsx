@@ -14,6 +14,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AUTH_LOADING_TIMEOUT_MS = 8000;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -23,31 +24,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<{ name: string; user_code: string | null } | null>(null);
 
   const fetchUserData = async (userId: string) => {
-    try {
-      const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", userId),
-        supabase.from("profiles").select("name, user_code").eq("id", userId).single(),
-      ]);
+    const [rolesResult, profileResult] = await Promise.allSettled([
+      supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase.from("profiles").select("name, user_code").eq("id", userId).maybeSingle(),
+    ]);
 
-      if (rolesError || profileError) {
-        console.error("Failed to fetch user data", { rolesError, profileError });
+    let isAdmin = false;
+    let profile: { name: string; user_code: string | null } | null = null;
+
+    if (rolesResult.status === "fulfilled") {
+      if (rolesResult.value.error) {
+        console.error("Failed to fetch user roles", rolesResult.value.error);
+      } else {
+        isAdmin = rolesResult.value.data?.some((r) => r.role === "admin") ?? false;
       }
-
-      return {
-        isAdmin: roles?.some((r) => r.role === "admin") ?? false,
-        profile: prof ?? null,
-      };
-    } catch (error) {
-      console.error("Unexpected error while fetching user data", error);
-      return {
-        isAdmin: false,
-        profile: null,
-      };
+    } else {
+      console.error("Failed to fetch user roles", rolesResult.reason);
     }
+
+    if (profileResult.status === "fulfilled") {
+      if (profileResult.value.error) {
+        console.error("Failed to fetch user profile", profileResult.value.error);
+      } else {
+        profile = profileResult.value.data ?? null;
+      }
+    } else {
+      console.error("Failed to fetch user profile", profileResult.reason);
+    }
+
+    return { isAdmin, profile };
   };
 
   useEffect(() => {
     let active = true;
+    const timeoutId = window.setTimeout(() => {
+      if (active) {
+        setLoading(false);
+      }
+    }, AUTH_LOADING_TIMEOUT_MS);
 
     const applySession = async (nextSession: Session | null) => {
       if (!active) return;
@@ -56,6 +70,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(nextSession);
         const nextUser = nextSession?.user ?? null;
         setUser(nextUser);
+        // Never block the UI waiting for profile/roles network round trips.
+        setLoading(false);
 
         if (nextUser) {
           const userData = await fetchUserData(nextUser.id);
@@ -71,8 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!active) return;
         setIsAdmin(false);
         setProfile(null);
-      } finally {
-        if (active) setLoading(false);
       }
     };
 
@@ -97,6 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       active = false;
+      window.clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

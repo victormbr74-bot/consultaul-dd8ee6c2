@@ -1,4 +1,4 @@
-import { MapPin, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload } from "lucide-react";
+import { MapPin, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,9 +20,11 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
   const location = useLocation();
   const { isAdmin, profile, signOut } = useAuth();
-  const { onExport, onImportClick, lotericaTab, setLotericaTab } = useSidebarActions();
+  const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
 
   const isDashboardRoute = location.pathname === "/";
+  const isLotericaRoute = location.pathname.startsWith("/loterica/");
+  const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
@@ -62,48 +64,48 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {lotericaTabs.map((tab) => (
-                <SidebarMenuItem key={tab.id}>
-                  <SidebarMenuButton
-                    onClick={() => setLotericaTab(tab.id)}
-                    className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
-                  >
-                    <tab.icon className="mr-2 h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {shouldShowLotericaTabs && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {lotericaTabs.map((tab) => (
+                  <SidebarMenuItem key={tab.id}>
+                    <SidebarMenuButton
+                      onClick={() => setLotericaTab(tab.id)}
+                      className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                    >
+                      <tab.icon className="mr-2 h-4 w-4" />
+                      <span>{tab.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Dados</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {(isDashboardRoute || onImportClick) && (
+        {isDashboardRoute && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Dados</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
                     <span>Importar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )}
-              {(isDashboardRoute || onExport) && (
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
                     <Download className="mr-2 h-4 w-4" />
                     <span>Exportar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {isAdmin && (
           <SidebarGroup>
@@ -122,6 +124,30 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Conta</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/temas" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Palette className="mr-2 h-4 w-4" />
+                    <span>Aparência</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/senha" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    <span>Trocar Senha</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">

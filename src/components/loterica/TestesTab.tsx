@@ -17,7 +17,17 @@ const TestesTab = ({ form }: TestesTabProps) => {
 
   const raw = form.raw_data || {};
   const loopbackPrimario = String(form.loopback_wan || raw["LOOPBACK PRINCIPAL"] || "");
-  const loopbackSecundario = String(form.loopback_lan || raw["LOOPBACK SECUNDARIO"] || "");
+  const rawRedeLan = String(raw["REDE LAN"] || "");
+  const rawLoopbackSec = String(raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUNDÁRIO"] || "");
+  const formLoopbackSec = String(form.loopback_lan || "");
+
+  // BUGFIX: alguns registros vieram com loopback secundario igual a "REDE LAN".
+  // Preferir o valor correto do raw_data quando disponível.
+  const loopbackSecundario = String(
+    rawLoopbackSec && formLoopbackSec && formLoopbackSec.trim() === rawRedeLan.trim()
+      ? rawLoopbackSec
+      : formLoopbackSec || rawLoopbackSec || "",
+  );
   const ipNat = String(form.ip_nat || raw["IP NAT"] || "");
 
   const acessoNat = useMemo(() => {

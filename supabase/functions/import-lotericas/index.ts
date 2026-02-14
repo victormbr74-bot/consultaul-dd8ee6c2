@@ -46,7 +46,9 @@ Deno.serve(async (req) => {
       ip_nat: row["IP NAT"] || row["ip_nat"] || "",
       ip_wan: row["IP WAN"] || row["ip_wan"] || "",
       loopback_wan: row["LOOPBACK PRINCIPAL"] || row["loopback_wan"] || "",
-      loopback_lan: row["REDE LAN"] || row["loopback_lan"] || "",
+      // BUGFIX: "Loopback secundario" was mistakenly mapped from "REDE LAN".
+      // Keep "REDE LAN" only in raw_data; map loopback_lan from the proper column.
+      loopback_lan: row["LOOPBACK SECUNDARIO"] || row["LOOPBACK SECUND?RIO"] || row["loopback_lan"] || "",
       endereco: row["ENDEREÇO"] || row["endereco"] || "",
       contato: row["CONTATO"] || row["contato"] || "",
       status: row["STATUS UL"] || row["status"] || "",

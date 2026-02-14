@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @layer base {
   :root {
@@ -85,6 +85,143 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
+  }
+
+  /* Palette selector: set `data-color` on <html> */
+  :root[data-color="blue"] {
+    --primary: 215 80% 28%;
+    --ring: 215 80% 28%;
+    --sidebar-background: 215 80% 22%;
+    --sidebar-accent: 215 70% 30%;
+    --sidebar-border: 215 60% 30%;
+    --sidebar-ring: 215 80% 50%;
+  }
+  .dark[data-color="blue"] {
+    --primary: 215 80% 50%;
+    --ring: 215 80% 50%;
+    --sidebar-background: 215 45% 8%;
+    --sidebar-accent: 215 35% 14%;
+    --sidebar-border: 215 30% 18%;
+    --sidebar-ring: 215 80% 50%;
+  }
+
+  :root[data-color="red"] {
+    --primary: 0 72% 45%;
+    --ring: 0 72% 45%;
+    --sidebar-background: 0 70% 22%;
+    --sidebar-accent: 0 60% 30%;
+    --sidebar-border: 0 55% 30%;
+    --sidebar-ring: 0 72% 58%;
+  }
+  .dark[data-color="red"] {
+    --primary: 0 72% 58%;
+    --ring: 0 72% 58%;
+    --sidebar-background: 0 45% 8%;
+    --sidebar-accent: 0 35% 14%;
+    --sidebar-border: 0 30% 18%;
+    --sidebar-ring: 0 72% 58%;
+  }
+
+  :root[data-color="green"] {
+    --primary: 142 55% 32%;
+    --ring: 142 55% 32%;
+    --sidebar-background: 142 55% 20%;
+    --sidebar-accent: 142 45% 28%;
+    --sidebar-border: 142 40% 28%;
+    --sidebar-ring: 142 55% 45%;
+  }
+  .dark[data-color="green"] {
+    --primary: 142 55% 45%;
+    --ring: 142 55% 45%;
+    --sidebar-background: 142 35% 8%;
+    --sidebar-accent: 142 25% 14%;
+    --sidebar-border: 142 20% 18%;
+    --sidebar-ring: 142 55% 45%;
+  }
+
+  :root[data-color="purple"] {
+    --primary: 270 75% 35%;
+    --ring: 270 75% 35%;
+    --sidebar-background: 270 60% 22%;
+    --sidebar-accent: 270 50% 30%;
+    --sidebar-border: 270 45% 30%;
+    --sidebar-ring: 270 80% 60%;
+  }
+  .dark[data-color="purple"] {
+    --primary: 270 80% 60%;
+    --ring: 270 80% 60%;
+    --sidebar-background: 270 35% 9%;
+    --sidebar-accent: 270 25% 14%;
+    --sidebar-border: 270 20% 18%;
+    --sidebar-ring: 270 80% 60%;
+  }
+
+  :root[data-color="pink"] {
+    --primary: 330 80% 36%;
+    --ring: 330 80% 36%;
+    --sidebar-background: 330 65% 22%;
+    --sidebar-accent: 330 55% 30%;
+    --sidebar-border: 330 45% 30%;
+    --sidebar-ring: 330 85% 60%;
+  }
+  .dark[data-color="pink"] {
+    --primary: 330 85% 60%;
+    --ring: 330 85% 60%;
+    --sidebar-background: 330 35% 9%;
+    --sidebar-accent: 330 25% 14%;
+    --sidebar-border: 330 20% 18%;
+    --sidebar-ring: 330 85% 60%;
+  }
+
+  :root[data-color="sky"] {
+    --primary: 198 90% 32%;
+    --ring: 198 90% 32%;
+    --sidebar-background: 198 70% 22%;
+    --sidebar-accent: 198 60% 30%;
+    --sidebar-border: 198 50% 30%;
+    --sidebar-ring: 198 90% 55%;
+  }
+  .dark[data-color="sky"] {
+    --primary: 198 90% 55%;
+    --ring: 198 90% 55%;
+    --sidebar-background: 198 35% 8%;
+    --sidebar-accent: 198 25% 14%;
+    --sidebar-border: 198 20% 18%;
+    --sidebar-ring: 198 90% 55%;
+  }
+
+  :root[data-color="orange"] {
+    --primary: 24 95% 35%;
+    --ring: 24 95% 35%;
+    --sidebar-background: 24 80% 22%;
+    --sidebar-accent: 24 65% 30%;
+    --sidebar-border: 24 55% 30%;
+    --sidebar-ring: 24 95% 55%;
+  }
+  .dark[data-color="orange"] {
+    --primary: 24 95% 55%;
+    --ring: 24 95% 55%;
+    --sidebar-background: 24 35% 8%;
+    --sidebar-accent: 24 25% 14%;
+    --sidebar-border: 24 20% 18%;
+    --sidebar-ring: 24 95% 55%;
+  }
+
+  :root[data-color="gray"] {
+    --primary: 220 10% 25%;
+    --ring: 220 10% 25%;
+    --sidebar-background: 220 10% 16%;
+    --sidebar-accent: 220 10% 24%;
+    --sidebar-border: 220 10% 24%;
+    --sidebar-ring: 220 10% 65%;
+  }
+  .dark[data-color="gray"] {
+    --primary: 220 10% 70%;
+    --ring: 220 10% 70%;
+    --sidebar-background: 220 10% 7%;
+    --sidebar-accent: 220 10% 13%;
+    --sidebar-border: 220 10% 18%;
+    --sidebar-ring: 220 10% 70%;
   }
 }
 

@@ -40,7 +40,8 @@ const normalizeUserCode = (value: unknown) => String(value ?? "").replace(/\D/g,
 const normalizeRole = (value: unknown): AppRole => (value === "admin" ? "admin" : "user");
 const buildEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
 
-const applyRole = async (adminClient: ReturnType<typeof createClient>, userId: string, role: AppRole) => {
+// deno-lint-ignore no-explicit-any
+const applyRole = async (adminClient: any, userId: string, role: AppRole) => {
   const { error: deleteError } = await adminClient.from("user_roles").delete().eq("user_id", userId);
   if (deleteError) throw new Error(deleteError.message);
 
@@ -48,7 +49,8 @@ const applyRole = async (adminClient: ReturnType<typeof createClient>, userId: s
   if (insertError) throw new Error(insertError.message);
 };
 
-const findAuthUserIdByEmail = async (adminClient: ReturnType<typeof createClient>, email: string) => {
+// deno-lint-ignore no-explicit-any
+const findAuthUserIdByEmail = async (adminClient: any, email: string) => {
   let page = 1;
   const perPage = 1000;
 

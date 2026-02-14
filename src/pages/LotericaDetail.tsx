@@ -172,7 +172,7 @@ const LotericaDetail = () => {
       }
 
       // Usuario nao-admin: cria solicitacao de alteracao para aprovacao do ADM.
-      const { error: reqError } = await supabase.from("loterica_change_requests").insert({
+      const { error: reqError } = await (supabase as any).from("loterica_change_requests").insert({
         cod_ul: codUl,
         proposed_by: user.id,
         before_data: beforeChanges,

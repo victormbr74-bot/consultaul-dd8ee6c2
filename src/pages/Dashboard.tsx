@@ -60,6 +60,55 @@ const Dashboard = () => {
     setPage(0);
   }, [search]);
 
+  const goToFirstResult = useCallback(async () => {
+    const term = search.trim();
+    if (!term) return;
+
+    try {
+      // Prefer exact match by codigo (cod_ul) to avoid jumping to unrelated results.
+      const { data: exact, error: exactError } = await supabase
+        .from("lotericas")
+        .select("cod_ul")
+        .eq("cod_ul", term)
+        .maybeSingle();
+
+      if (exactError) {
+        console.error("Erro ao buscar loterica por codigo", exactError);
+      }
+
+      const codUl = exact?.cod_ul;
+      if (codUl) {
+        navigate(`/loterica/${encodeURIComponent(codUl)}`);
+        return;
+      }
+
+      const s = `%${term}%`;
+      const { data, error } = await supabase
+        .from("lotericas")
+        .select("cod_ul")
+        .or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`)
+        .order("cod_ul")
+        .limit(1);
+
+      if (error) {
+        console.error("Erro ao buscar lotericas (atalho Enter)", error);
+        alert("Erro ao buscar lot\u00E9ricas.");
+        return;
+      }
+
+      const first = data?.[0]?.cod_ul;
+      if (!first) {
+        alert("Nenhuma lot\u00E9rica encontrada.");
+        return;
+      }
+
+      navigate(`/loterica/${encodeURIComponent(first)}`);
+    } catch (error) {
+      console.error("Falha inesperada ao buscar lotericas (atalho Enter)", error);
+      alert("Falha inesperada ao buscar lot\u00E9ricas.");
+    }
+  }, [navigate, search]);
+
   const handleExport = useCallback(async () => {
     try {
       const { data, error } = await supabase.from("lotericas").select("*").order("cod_ul");
@@ -151,6 +200,12 @@ const Dashboard = () => {
               className="pl-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void goToFirstResult();
+                }
+              }}
             />
           </div>
           <Button variant="ghost" size="icon" onClick={() => void fetchLotericas()}>

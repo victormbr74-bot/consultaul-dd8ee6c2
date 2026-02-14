@@ -144,6 +144,44 @@ const LotericaDetail = () => {
           beforeChanges[key] = b;
         }
       }
+      // raw_data: permite edicao dos campos extras ("Dados Adicionais").
+      const rawEditableKeys: string[][] = [
+        ["REDE LAN"],
+        ["IP SWITCH", "LOOPBACK SWITCH"],
+        ["TFL", "TFLs"],
+        ["TIPO LOTERICA", "TIPO UL"],
+        ["PERIMETRO", "PER\u00CDMETRO"],
+        ["TECNOLOGIA"],
+        ["MODELO ROTEADOR"],
+        ["SIM CARD 4G"],
+        ["OWNER"],
+        ["RESP BACKUP"],
+        ["REGIAO", "REGI\u00C3O"],
+        ["CEP"],
+        ["MIGRACAO", "MIGRA\u00C7\u00C3O"],
+        ["HOMOLOGADO"],
+      ];
+
+      const rawBefore = loterica?.raw_data && typeof loterica.raw_data === "object" ? loterica.raw_data : {};
+      const rawAfter = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
+
+      const getRaw = (obj: any, keys: string[]) => {
+        for (const k of keys) {
+          if (obj && Object.prototype.hasOwnProperty.call(obj, k)) return obj[k];
+        }
+        return undefined;
+      };
+
+      const rawChanged = rawEditableKeys.some((keys) => {
+        const b = getRaw(rawBefore, keys);
+        const a = getRaw(rawAfter, keys);
+        return JSON.stringify(b ?? null) !== JSON.stringify(a ?? null);
+      });
+
+      if (rawChanged) {
+        changes.raw_data = rawAfter;
+        beforeChanges.raw_data = rawBefore;
+      }
 
       if (Object.keys(changes).length === 0) {
         alert("Nenhuma alteração para salvar.");

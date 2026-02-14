@@ -120,8 +120,28 @@ const AdminPanel = () => {
 
       const view: ChangeRequestViewRow[] = base.map((r) => {
         const proposer = profileMap.get(r.proposed_by);
+        const before = r.before_data && typeof r.before_data === "object" ? r.before_data : {};
         const after = r.after_data && typeof r.after_data === "object" ? r.after_data : {};
-        const changedFields = Object.keys(after || {});
+        const changedFields: string[] = [];
+
+        for (const key of Object.keys(after || {})) {
+          if (key !== "raw_data") {
+            changedFields.push(key);
+            continue;
+          }
+
+          const beforeRaw = (before as any).raw_data && typeof (before as any).raw_data === "object" ? (before as any).raw_data : {};
+          const afterRaw = (after as any).raw_data && typeof (after as any).raw_data === "object" ? (after as any).raw_data : {};
+          const allRawKeys = Array.from(new Set([...Object.keys(beforeRaw), ...Object.keys(afterRaw)])).sort((a, b) =>
+            a.localeCompare(b, "pt-BR"),
+          );
+
+          for (const rawKey of allRawKeys) {
+            if (JSON.stringify(beforeRaw[rawKey]) !== JSON.stringify(afterRaw[rawKey])) {
+              changedFields.push(`raw_data.${rawKey}`);
+            }
+          }
+        }
         return {
           ...r,
           proposer_name: proposer?.name || "",
@@ -480,21 +500,31 @@ const AdminPanel = () => {
                                   {(r.changed_fields || []).length === 0 ? (
                                     <div className="text-sm text-muted-foreground">Sem detalhes de alteração.</div>
                                   ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {(r.changed_fields || []).map((k) => (
-                                        <div key={k} className="rounded-lg border bg-background p-3">
-                                          <div className="text-xs font-medium text-foreground">{k}</div>
-                                          <div className="mt-1 text-xs text-muted-foreground">
-                                            <span className="text-destructive line-through">
-                                              {String((r.before_data || {})[k] ?? "") || "-"}
-                                            </span>
-                                            {" -> "}
-                                            <span className="text-green-700">
-                                              {String((r.after_data || {})[k] ?? "") || "-"}
-                                            </span>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {(r.changed_fields || []).map((k) => {
+                                        const isRaw = k.startsWith("raw_data.");
+                                        const rawKey = isRaw ? k.slice("raw_data.".length) : "";
+                                        const beforeObj = r.before_data && typeof r.before_data === "object" ? r.before_data : {};
+                                        const afterObj = r.after_data && typeof r.after_data === "object" ? r.after_data : {};
+                                        const beforeVal = isRaw ? (beforeObj as any)?.raw_data?.[rawKey] : (beforeObj as any)?.[k];
+                                        const afterVal = isRaw ? (afterObj as any)?.raw_data?.[rawKey] : (afterObj as any)?.[k];
+                                        const label = isRaw ? `raw_data: ${rawKey}` : k;
+
+                                        return (
+                                          <div key={k} className="rounded-lg border bg-background p-3">
+                                            <div className="text-xs font-medium text-foreground">{label}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                              <span className="text-destructive line-through">
+                                                {String(beforeVal ?? "") || "-"}
+                                              </span>
+                                              {" -> "}
+                                              <span className="text-green-700">
+                                                {String(afterVal ?? "") || "-"}
+                                              </span>
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </td>

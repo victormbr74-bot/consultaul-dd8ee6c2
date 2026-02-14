@@ -1,22 +1,39 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const FIELDS: Array<{ key: string; label: string; mono?: boolean }> = [
   { key: "nome_loterica", label: "Nome" },
   { key: "ccto_oi", label: "CCTO OI" },
   { key: "ccto_oemp", label: "CCTO OEMP" },
-  { key: "designacao_nova", label: "Designação Nova" },
+  { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
   { key: "operadora", label: "Operadora" },
   { key: "ip_nat", label: "IP NAT", mono: true },
   { key: "ip_wan", label: "IP WAN", mono: true },
   { key: "loopback_wan", label: "Loopback Principal", mono: true },
-  { key: "loopback_lan", label: "Loopback Secundário", mono: true },
-  { key: "endereco", label: "Endereço" },
+  { key: "loopback_lan", label: "Loopback Secund\u00E1rio", mono: true },
+  { key: "endereco", label: "Endere\u00E7o" },
   { key: "contato", label: "Contato" },
   { key: "status", label: "Status" },
   { key: "cidade", label: "Cidade" },
   { key: "uf", label: "UF" },
+];
+
+const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
+  { label: "Rede LAN", keys: ["REDE LAN"], mono: true },
+  { label: "IP Switch", keys: ["IP SWITCH", "LOOPBACK SWITCH"], mono: true },
+  { label: "TFL", keys: ["TFL", "TFLs"], mono: true },
+  { label: "Tipo UL", keys: ["TIPO LOTERICA", "TIPO UL"] },
+  { label: "Per\u00EDmetro", keys: ["PERIMETRO", "PER\u00CDMETRO"] },
+  { label: "Tecnologia", keys: ["TECNOLOGIA"] },
+  { label: "Modelo Roteador", keys: ["MODELO ROTEADOR"] },
+  { label: "SIM Card 4G", keys: ["SIM CARD 4G"], mono: true },
+  { label: "Owner", keys: ["OWNER"] },
+  { label: "Resp. Backup", keys: ["RESP BACKUP"] },
+  { label: "Regi\u00E3o", keys: ["REGIAO", "REGI\u00C3O"] },
+  { label: "CEP", keys: ["CEP"], mono: true },
+  { label: "Migra\u00E7\u00E3o", keys: ["MIGRACAO", "MIGRA\u00C7\u00C3O"] },
+  { label: "Homologado", keys: ["HOMOLOGADO"] },
 ];
 
 interface ConsultaTabProps {
@@ -25,40 +42,38 @@ interface ConsultaTabProps {
 }
 
 const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
-  const raw = form.raw_data || {};
+  const raw = (form?.raw_data && typeof form.raw_data === "object") ? form.raw_data : {};
 
-  const extraFields = [
-    { label: "Rede LAN", value: raw["REDE LAN"], mono: true },
-    { label: "IP Switch", value: raw["IP SWITCH"], mono: true },
-    { label: "TFL", value: raw["TFL"] },
-    { label: "Tipo UL", value: raw["TIPO LOTERICA"] },
-    { label: "Perímetro", value: raw["PERIMETRO"] },
-    { label: "Tecnologia", value: raw["TECNOLOGIA"] },
-    { label: "Modelo Roteador", value: raw["MODELO ROTEADOR"] },
-    { label: "SIM Card 4G", value: raw["SIM CARD 4G"], mono: true },
-    { label: "Owner", value: raw["OWNER"] },
-    { label: "Resp. Backup", value: raw["RESP BACKUP"] },
-    { label: "Região", value: raw["REGIÃO"] },
-    { label: "CEP", value: raw["CEP"] },
-    { label: "Migração", value: raw["MIGRAÇÃO"] },
-    { label: "Homologado", value: raw["HOMOLOGADO"] },
-  ];
+  const getRawValue = (keys: string[]) => {
+    for (const k of keys) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) return raw[k];
+    }
+    return undefined;
+  };
+
+  const setRawValue = (keys: string[], value: string) => {
+    const current = (form?.raw_data && typeof form.raw_data === "object") ? form.raw_data : {};
+    const next: Record<string, unknown> = { ...current };
+    const targetKey = keys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || keys[0];
+    next[targetKey] = value;
+    setForm({ ...form, raw_data: next });
+  };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Dados Editáveis</CardTitle>
+          <CardTitle className="text-lg">Dados Edit\u00E1veis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {FIELDS.map(f => (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {FIELDS.map((f) => (
               <div key={f.key} className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{f.label}</Label>
                 <Input
                   className={f.mono ? "font-mono text-xs" : ""}
-                  value={form[f.key] || ""}
-                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                  value={form?.[f.key] || ""}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                 />
               </div>
             ))}
@@ -68,16 +83,19 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Dados Adicionais (somente leitura)</CardTitle>
+          <CardTitle className="text-lg">Dados Adicionais</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {extraFields.map(f => (
-              <div key={f.label} className="space-y-1">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {EXTRA_FIELDS.map((f) => (
+              <div key={f.label} className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                <div className={`text-sm p-2 rounded bg-muted/50 min-h-[36px] ${f.mono ? "font-mono text-xs" : ""}`}>
-                  {f.value || "—"}
-                </div>
+                <Input
+                  className={f.mono ? "font-mono text-xs" : ""}
+                  value={String(getRawValue(f.keys) ?? "")}
+                  placeholder="-"
+                  onChange={(e) => setRawValue(f.keys, e.target.value)}
+                />
               </div>
             ))}
           </div>
@@ -88,3 +106,4 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
 };
 
 export default ConsultaTab;
+

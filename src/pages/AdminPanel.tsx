@@ -77,7 +77,7 @@ const AdminPanel = () => {
     setChangesLoading(true);
     setChangesError(null);
     try {
-      const { data: reqs, error } = await supabase
+      const { data: reqs, error } = await (supabase as any)
         .from("loterica_change_requests")
         .select("*")
         .eq("status", "pending")
@@ -218,7 +218,7 @@ const AdminPanel = () => {
 
       if (updateError) throw new Error(updateError.message);
 
-      const { error: reqError } = await supabase
+      const { error: reqError } = await (supabase as any)
         .from("loterica_change_requests")
         .update({
           status: "approved",
@@ -251,7 +251,7 @@ const AdminPanel = () => {
 
     setChangesSaving(true);
     try {
-      const { error: reqError } = await supabase
+      const { error: reqError } = await (supabase as any)
         .from("loterica_change_requests")
         .update({
           status: "rejected",

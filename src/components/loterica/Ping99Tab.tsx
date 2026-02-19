@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Copy, Check, Wifi } from "lucide-react";
 
 interface Ping99TabProps {
-  form: any;
+  form: {
+    cod_ul?: unknown;
+    tfl?: unknown;
+    raw_data?: Record<string, unknown> | null;
+  };
 }
 
 type PingIp = {
@@ -12,35 +16,73 @@ type PingIp = {
   padded: string;
 };
 
-const START_HOST = 241;
-const END_HOST = 255;
+const SEQUENCE_SIZE = 16;
+const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;
 
 const padOctet = (value: string) => value.padStart(3, "0");
+const normalizeText = (value: unknown) => String(value ?? "").trim();
+
+const getRawString = (raw: Record<string, unknown>, keys: readonly string[]) => {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const value = normalizeText(raw[key]);
+    if (value) return value;
+  }
+  return "";
+};
+
+const parseLanIp = (value: string) => {
+  const fullMatch = value.match(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/);
+  if (!fullMatch) return null;
+
+  const octets = fullMatch.slice(1, 5).map((part) => Number.parseInt(part, 10));
+  if (octets.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) return null;
+
+  return {
+    octets,
+    subnet: `${octets[0]}.${octets[1]}.${octets[2]}.0/24`,
+  };
+};
+
+const incrementIp = (octets: number[]) => {
+  const next = [...octets];
+  for (let i = 3; i >= 0; i--) {
+    if (next[i] < 255) {
+      next[i] += 1;
+      for (let j = i + 1; j <= 3; j++) next[j] = 0;
+      return next;
+    }
+  }
+  return null;
+};
 
 const Ping99Tab = ({ form }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
-  const raw = form.raw_data || {};
+  const raw = useMemo(
+    () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
+    [form?.raw_data],
+  );
 
-  const redeLan = String(raw["REDE LAN"] || "");
-  const codUl = String(form.cod_ul || "");
-  const tfl = String(raw["TFL"] || form.tfl || "");
+  const redeLan = getRawString(raw, REDE_LAN_KEYS);
+  const codUl = normalizeText(form?.cod_ul);
+  const tfl = normalizeText(raw["TFL"] ?? raw["TFLs"] ?? form?.tfl);
 
   const base = useMemo(() => {
-    const parts = redeLan.split(".");
-    if (parts.length < 3) return null;
-    return {
-      normal: `${parts[0]}.${parts[1]}.${parts[2]}`,
-      padded: `${padOctet(parts[0])}.${padOctet(parts[1])}.${padOctet(parts[2])}`,
-    };
+    if (!redeLan) return null;
+    return parseLanIp(redeLan);
   }, [redeLan]);
 
   const ips = useMemo<PingIp[]>(() => {
     if (!base) return [];
     const result: PingIp[] = [];
-    for (let host = START_HOST; host <= END_HOST; host++) {
+    let current = base.octets;
+    for (let i = 0; i < SEQUENCE_SIZE; i++) {
+      const next = incrementIp(current);
+      if (!next) break;
+      current = next;
       result.push({
-        normal: `${base.normal}.${host}`,
-        padded: `${base.padded}.${String(host).padStart(3, "0")}`,
+        normal: next.join("."),
+        padded: next.map((octet) => padOctet(String(octet))).join("."),
       });
     }
     return result;
@@ -88,7 +130,7 @@ ${comandos}
             </div>
             <div>
               <span className="text-xs text-muted-foreground">Subnet</span>
-              <div className="font-mono">{base ? `${base.normal}.0/24` : "-"}</div>
+              <div className="font-mono">{base ? base.subnet : "-"}</div>
             </div>
           </div>
         </CardContent>
@@ -116,7 +158,7 @@ ${comandos}
       {!!ips.length && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">IPs da Rede LAN (241-255)</CardTitle>
+            <CardTitle className="text-lg">IPs da Rede LAN (+1 ate 16 IPs)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">

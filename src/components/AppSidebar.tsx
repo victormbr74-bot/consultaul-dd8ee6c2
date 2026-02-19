@@ -1,8 +1,10 @@
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -21,10 +23,12 @@ export function AppSidebar() {
   const location = useLocation();
   const { isAdmin, profile, signOut } = useAuth();
   const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
+  const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
   const isDashboardRoute = location.pathname === "/";
   const isLotericaRoute = location.pathname.startsWith("/loterica/");
   const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
+  const hasPendingChanges = pendingChangeCount > 0;
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
@@ -32,6 +36,66 @@ export function AppSidebar() {
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
   ];
+
+  const fetchPendingChangeCount = useCallback(async () => {
+    if (!isAdmin) {
+      setPendingChangeCount(0);
+      return;
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from("loterica_change_requests" as never)
+        .select("id", { head: true, count: "exact" })
+        .eq("status", "pending");
+
+      if (error) {
+        const msg =
+          error && typeof error === "object" && "message" in error
+            ? String((error as { message?: string }).message || "")
+            : "";
+        if (!(msg.includes("loterica_change_requests") && msg.includes("Could not find the table"))) {
+          console.error("Erro ao carregar pendencias de alteracao", error);
+        }
+        setPendingChangeCount(0);
+        return;
+      }
+
+      setPendingChangeCount(count || 0);
+    } catch (error) {
+      console.error("Falha inesperada ao carregar pendencias de alteracao", error);
+      setPendingChangeCount(0);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setPendingChangeCount(0);
+      return;
+    }
+
+    void fetchPendingChangeCount();
+
+    const intervalId = window.setInterval(() => {
+      void fetchPendingChangeCount();
+    }, 30000);
+
+    const channel = supabase
+      .channel("sidebar-loterica-change-requests")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loterica_change_requests" },
+        () => {
+          void fetchPendingChangeCount();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(intervalId);
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchPendingChangeCount, isAdmin]);
 
   return (
     <Sidebar>
@@ -114,7 +178,20 @@ export function AppSidebar() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <NavLink to="/admin" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <NavLink to="/admin/dados" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                      <Database className="mr-2 h-4 w-4" />
+                      <span>{"Gerenciar Dados"}</span>
+                      {hasPendingChanges && (
+                        <span className="ml-auto inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                          {pendingChangeCount > 99 ? "99+" : pendingChangeCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin/usuarios" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Users className="mr-2 h-4 w-4" />
                       <span>{"Gerenciar Usu\u00E1rios"}</span>
                     </NavLink>

@@ -72,7 +72,9 @@ const App = () => (
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/loterica/:codUl" element={<LotericaDetail />} />
-                <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/admin" element={<Navigate to="/admin/dados" replace />} />
+                <Route path="/admin/dados" element={<AdminPanel section="data" />} />
+                <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
                 <Route path="/senha" element={<ChangePassword />} />
                 <Route path="/aparencia" element={<Appearance />} />
                 <Route path="/temas" element={<Appearance />} />

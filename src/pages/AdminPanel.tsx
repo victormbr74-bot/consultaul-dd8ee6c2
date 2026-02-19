@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye } from "lucide-react";
 
 type UserRow = {
@@ -47,7 +47,7 @@ type ChangeRequestViewRow = ChangeRequestRow & {
   changed_fields?: string[];
 };
 
-const AdminPanel = () => {
+const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const { isAdmin, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -176,9 +176,12 @@ const AdminPanel = () => {
       navigate("/");
       return;
     }
-    void fetchUsers();
-    void fetchChangeRequests();
-  }, [authLoading, isAdmin, navigate]);
+    if (section === "users") {
+      void fetchUsers();
+    } else {
+      void fetchChangeRequests();
+    }
+  }, [authLoading, isAdmin, navigate, section]);
 
   const sortedUsers = useMemo(
     () => [...users].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
@@ -421,11 +424,7 @@ const AdminPanel = () => {
   return (
     <div className="bg-background">
       <main className="container px-4 py-6 max-w-6xl">
-        <Tabs defaultValue="approvals" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="approvals">Aprovações</TabsTrigger>
-            <TabsTrigger value="users">Usuários</TabsTrigger>
-          </TabsList>
+        <Tabs value={section === "data" ? "approvals" : "users"} className="space-y-4">
 
           <TabsContent value="approvals" className="space-y-4">
             <Card>

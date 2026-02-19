@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
+const EXPORT_BATCH_SIZE = 1000;
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -111,15 +112,44 @@ const Dashboard = () => {
 
   const handleExport = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from("lotericas").select("*").order("cod_ul");
-      if (error) {
-        console.error("Erro ao exportar lotericas", error);
-        alert("Erro ao exportar os dados.");
+      const allRows: Array<Record<string, unknown>> = [];
+      let from = 0;
+
+      while (true) {
+        const to = from + EXPORT_BATCH_SIZE - 1;
+        const { data, error } = await supabase.from("lotericas").select("*").order("cod_ul").range(from, to);
+        if (error) {
+          console.error("Erro ao exportar lotericas", error);
+          alert("Erro ao exportar os dados.");
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        allRows.push(...data);
+        if (data.length < EXPORT_BATCH_SIZE) {
+          break;
+        }
+
+        from += EXPORT_BATCH_SIZE;
+      }
+
+      if (allRows.length === 0) {
+        alert("Nenhum dado encontrado para exportacao.");
         return;
       }
-      if (!data) return;
 
-      const ws = XLSX.utils.json_to_sheet(data.map(({ raw_data, ...rest }) => rest));
+      const ws = XLSX.utils.json_to_sheet(
+        allRows.map((row) => ({
+          ...row,
+          raw_data:
+            row.raw_data && typeof row.raw_data === "object"
+              ? JSON.stringify(row.raw_data)
+              : row.raw_data ?? "",
+        })),
+      );
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Lot\u00E9ricas");
       XLSX.writeFile(wb, "lotericas_export.xlsx");

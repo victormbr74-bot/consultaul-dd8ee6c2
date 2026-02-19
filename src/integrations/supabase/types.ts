@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      loterica_change_requests: {
+        Row: {
+          after_data: Json | null
+          before_data: Json | null
+          cod_ul: string
+          id: string
+          proposed_at: string
+          proposed_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          after_data?: Json | null
+          before_data?: Json | null
+          cod_ul: string
+          id?: string
+          proposed_at?: string
+          proposed_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          after_data?: Json | null
+          before_data?: Json | null
+          cod_ul?: string
+          id?: string
+          proposed_at?: string
+          proposed_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loterica_change_requests_cod_ul_fkey"
+            columns: ["cod_ul"]
+            isOneToOne: false
+            referencedRelation: "lotericas"
+            referencedColumns: ["cod_ul"]
+          },
+        ]
+      }
       loterica_history: {
         Row: {
           action: string

@@ -142,13 +142,43 @@ const Dashboard = () => {
       }
 
       const ws = XLSX.utils.json_to_sheet(
-        allRows.map((row) => ({
-          ...row,
-          raw_data:
-            row.raw_data && typeof row.raw_data === "object"
-              ? JSON.stringify(row.raw_data)
-              : row.raw_data ?? "",
-        })),
+        allRows.map((row) => {
+          const raw = (row.raw_data && typeof row.raw_data === "object") ? row.raw_data as Record<string, unknown> : {};
+          return {
+            "Código UL": row.cod_ul,
+            "Nome Lotérica": row.nome_loterica,
+            "CCTO OI": row.ccto_oi,
+            "CCTO OEMP": row.ccto_oemp,
+            "Designação Nova": row.designacao_nova,
+            "Operadora": row.operadora,
+            "IP NAT": row.ip_nat,
+            "IP WAN": row.ip_wan,
+            "Loopback Principal": row.loopback_wan,
+            "Loopback Secundário": row.loopback_lan,
+            "Endereço": row.endereco,
+            "Contato": row.contato,
+            "Status": row.status,
+            "Cidade": row.cidade,
+            "UF": row.uf,
+            // Campos extraídos do raw_data
+            "Rede LAN": raw["REDE LAN"] ?? "",
+            "IP Switch": raw["IP SWITCH"] ?? raw["LOOPBACK SWITCH"] ?? "",
+            "TFL": raw["TFL"] ?? raw["TFLs"] ?? "",
+            "Empresa OEMP": raw["EMPRESA OEMP"] ?? "",
+            "Tipo UL": raw["TIPO LOTERICA"] ?? raw["TIPO UL"] ?? "",
+            "Perímetro": raw["PERIMETRO"] ?? raw["PERÍMETRO"] ?? "",
+            "Tecnologia": raw["TECNOLOGIA"] ?? "",
+            "Modelo Roteador": raw["MODELO ROTEADOR"] ?? "",
+            "SIM Card 4G": raw["SIM CARD 4G"] ?? "",
+            "Owner": raw["OWNER"] ?? "",
+            "Resp. Backup": raw["RESP BACKUP"] ?? "",
+            "Região": raw["REGIAO"] ?? raw["REGIÃO"] ?? "",
+            "CEP": raw["CEP"] ?? "",
+            "Migração": raw["MIGRACAO"] ?? raw["MIGRAÇÃO"] ?? "",
+            "Homologado": raw["HOMOLOGADO"] ?? "",
+            "Atualizado em": row.updated_at,
+          };
+        }),
       );
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Lot\u00E9ricas");

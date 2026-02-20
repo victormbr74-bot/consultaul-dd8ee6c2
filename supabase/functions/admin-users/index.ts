@@ -73,6 +73,82 @@ const findAuthUserIdByEmail = async (adminClient: any, email: string) => {
   }
 };
 
+// deno-lint-ignore no-explicit-any
+const listAllAuthUserIds = async (adminClient: any) => {
+  const ids: string[] = [];
+  let page = 1;
+  const perPage = 1000;
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(error.message);
+
+    const users = data.users || [];
+    for (const u of users) {
+      const id = String(u?.id || "").trim();
+      if (id) ids.push(id);
+    }
+
+    if (users.length < perPage) break;
+    page += 1;
+  }
+
+  return ids;
+};
+
+// deno-lint-ignore no-explicit-any
+const listAllProfileUserIds = async (adminClient: any) => {
+  const ids: string[] = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await adminClient.from("profiles").select("id").range(from, to);
+    if (error) throw new Error(error.message);
+
+    const rows = data || [];
+    for (const row of rows) {
+      const id = String((row as { id?: string }).id || "").trim();
+      if (id) ids.push(id);
+    }
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return ids;
+};
+
+// deno-lint-ignore no-explicit-any
+const resetPasswordsInBatches = async (adminClient: any, userIds: string[], password: string) => {
+  const batchSize = 20;
+  let updated = 0;
+  const failed: Array<{ user_id: string; reason: string }> = [];
+
+  for (let i = 0; i < userIds.length; i += batchSize) {
+    const chunk = userIds.slice(i, i + batchSize);
+    const results = await Promise.all(
+      chunk.map(async (targetUserId) => {
+        const { error } = await adminClient.auth.admin.updateUserById(targetUserId, {
+          password,
+        });
+        return { targetUserId, error };
+      }),
+    );
+
+    for (const result of results) {
+      if (result.error) {
+        failed.push({ user_id: result.targetUserId, reason: result.error.message });
+      } else {
+        updated += 1;
+      }
+    }
+  }
+
+  return { updated, failed };
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -288,36 +364,26 @@ Deno.serve(async (req) => {
       }
 
       if (!resetAll) {
-        const { error: passError } = await adminClient.auth.admin.updateUserById(userId, {
-          password: defaultPassword,
-        });
-        if (passError) return json({ error: passError.message }, 400);
+        const result = await resetPasswordsInBatches(adminClient, [userId], defaultPassword);
+        if (result.failed.length) {
+          return json({ error: result.failed[0].reason }, 400);
+        }
         return json({ success: true, total: 1, updated: 1, failed: 0, failures: [] });
       }
 
-      const { data: profiles, error: profilesError } = await adminClient.from("profiles").select("id");
-      if (profilesError) return json({ error: profilesError.message }, 400);
+      const [profileIds, authUserIds] = await Promise.all([
+        listAllProfileUserIds(adminClient),
+        listAllAuthUserIds(adminClient),
+      ]);
 
-      let updated = 0;
-      const failed: Array<{ user_id: string; reason: string }> = [];
+      const profileSet = new Set(profileIds);
+      const targetIds = authUserIds.filter((id) => profileSet.has(id));
 
-      for (const profile of profiles || []) {
-        const targetUserId = String((profile as { id?: string }).id || "").trim();
-        if (!targetUserId) continue;
-
-        const { error: passError } = await adminClient.auth.admin.updateUserById(targetUserId, {
-          password: defaultPassword,
-        });
-        if (passError) {
-          failed.push({ user_id: targetUserId, reason: passError.message });
-        } else {
-          updated += 1;
-        }
-      }
+      const { updated, failed } = await resetPasswordsInBatches(adminClient, targetIds, defaultPassword);
 
       return json({
         success: true,
-        total: (profiles || []).length,
+        total: targetIds.length,
         updated,
         failed: failed.length,
         failures: failed,

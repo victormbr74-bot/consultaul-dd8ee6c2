@@ -23,6 +23,7 @@ const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
   { label: "Rede LAN", keys: ["REDE LAN"], mono: true },
   { label: "IP Switch", keys: ["IP SWITCH", "LOOPBACK SWITCH"], mono: true },
   { label: "TFL", keys: ["TFL", "TFLs"], mono: true },
+  { label: "Circuitos Meraki", keys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
   { label: "Empresa OEMP", keys: ["EMPRESA OEMP"] },
   { label: "Tipo UL", keys: ["TIPO LOTERICA", "TIPO UL"] },
   { label: "Per\u00EDmetro", keys: ["PERIMETRO", "PER\u00CDMETRO"] },

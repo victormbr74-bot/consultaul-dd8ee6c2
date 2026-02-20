@@ -164,6 +164,7 @@ const Dashboard = () => {
             "IP Switch": raw["IP SWITCH"] ?? raw["LOOPBACK SWITCH"] ?? "",
             "TFL": raw["TFL"] ?? raw["TFLs"] ?? "",
             "Circuito OEMP": raw["CIRCUITO OEMP"] ?? "",
+            "Circuitos Meraki": raw["CIRCUITO MERAKI"] ?? raw["CIRCUITOS MERAKI"] ?? raw["MERAKI"] ?? "",
             "Empresa OEMP": raw["EMPRESA OEMP"] ?? "",
             "Tipo UL": raw["TIPO LOTERICA"] ?? raw["TIPO UL"] ?? "",
             "Perímetro": raw["PERIMETRO"] ?? raw["PERÍMETRO"] ?? "",

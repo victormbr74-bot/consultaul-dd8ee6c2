@@ -25,9 +25,15 @@ type SeedPayload = {
   default_password?: string;
 };
 
+type ResetPasswordPayload = {
+  user_id?: string;
+  reset_all?: boolean;
+  default_password?: string;
+};
+
 type RequestPayload = {
-  action?: "create_user" | "update_user" | "delete_user" | "seed_users";
-  payload?: UserPayload | SeedPayload;
+  action?: "create_user" | "update_user" | "delete_user" | "seed_users" | "reset_passwords";
+  payload?: UserPayload | SeedPayload | ResetPasswordPayload;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -265,6 +271,53 @@ Deno.serve(async (req) => {
         success: true,
         total: users.length,
         created,
+        updated,
+        failed: failed.length,
+        failures: failed,
+      });
+    }
+
+    if (action === "reset_passwords") {
+      const p = payload as ResetPasswordPayload;
+      const defaultPassword = String(p.default_password || "").trim() || "Oi@12345";
+      const resetAll = p.reset_all === true;
+      const userId = String(p.user_id || "").trim();
+
+      if (!resetAll && !userId) {
+        return json({ error: "ID do usuario e obrigatorio para reset individual." }, 400);
+      }
+
+      if (!resetAll) {
+        const { error: passError } = await adminClient.auth.admin.updateUserById(userId, {
+          password: defaultPassword,
+        });
+        if (passError) return json({ error: passError.message }, 400);
+        return json({ success: true, total: 1, updated: 1, failed: 0, failures: [] });
+      }
+
+      const { data: profiles, error: profilesError } = await adminClient.from("profiles").select("id");
+      if (profilesError) return json({ error: profilesError.message }, 400);
+
+      let updated = 0;
+      const failed: Array<{ user_id: string; reason: string }> = [];
+
+      for (const profile of profiles || []) {
+        const targetUserId = String((profile as { id?: string }).id || "").trim();
+        if (!targetUserId) continue;
+
+        const { error: passError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+          password: defaultPassword,
+        });
+        if (passError) {
+          failed.push({ user_id: targetUserId, reason: passError.message });
+        } else {
+          updated += 1;
+        }
+      }
+
+      return json({
+        success: true,
+        total: (profiles || []).length,
         updated,
         failed: failed.length,
         failures: failed,

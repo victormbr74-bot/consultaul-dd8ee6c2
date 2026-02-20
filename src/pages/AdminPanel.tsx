@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye } from "lucide-react";
+import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound } from "lucide-react";
 
 type UserRow = {
   id: string;
@@ -25,7 +25,8 @@ type AdminAction =
   | { action: "create_user"; payload: { name: string; user_code: string; role: "admin" | "user"; password?: string } }
   | { action: "update_user"; payload: { user_id: string; name?: string; user_code?: string; role?: "admin" | "user"; active?: boolean; password?: string } }
   | { action: "delete_user"; payload: { user_id: string } }
-  | { action: "seed_users"; payload: { users: Array<{ name: string; user_code: string; role?: "admin" | "user" }>; default_password?: string } };
+  | { action: "seed_users"; payload: { users: Array<{ name: string; user_code: string; role?: "admin" | "user" }>; default_password?: string } }
+  | { action: "reset_passwords"; payload: { user_id?: string; reset_all?: boolean; default_password?: string } };
 
 type ChangeRequestRow = {
   id: string;
@@ -47,6 +48,8 @@ type ChangeRequestViewRow = ChangeRequestRow & {
   changed_fields?: string[];
 };
 
+const DEFAULT_PASSWORD = "Oi@12345";
+
 const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const { isAdmin, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
@@ -54,6 +57,8 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [seedLoading, setSeedLoading] = useState(false);
+  const [resetAllLoading, setResetAllLoading] = useState(false);
+  const [resetUserIdLoading, setResetUserIdLoading] = useState<string | null>(null);
 
   const [changeRequests, setChangeRequests] = useState<ChangeRequestViewRow[]>([]);
   const [changesLoading, setChangesLoading] = useState(true);
@@ -401,7 +406,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         action: "seed_users",
         payload: {
           users: DEFAULT_USER_SEED,
-          default_password: "Oi@12345",
+          default_password: DEFAULT_PASSWORD,
         },
       });
       await fetchUsers();
@@ -412,6 +417,55 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       alert(error instanceof Error ? error.message : "Erro ao importar usuários.");
     } finally {
       setSeedLoading(false);
+    }
+  };
+
+  const resetSinglePassword = async (target: UserRow) => {
+    const confirmReset = window.confirm(
+      `Resetar senha do usuario ${target.name} (${target.user_code || "-"}) para ${DEFAULT_PASSWORD}?`,
+    );
+    if (!confirmReset) return;
+
+    setResetUserIdLoading(target.id);
+    try {
+      await invokeAdminUsers({
+        action: "reset_passwords",
+        payload: {
+          user_id: target.id,
+          default_password: DEFAULT_PASSWORD,
+        },
+      });
+      alert(`Senha de ${target.name} redefinida para ${DEFAULT_PASSWORD}.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao resetar senha do usuario.");
+    } finally {
+      setResetUserIdLoading(null);
+    }
+  };
+
+  const resetAllPasswords = async () => {
+    const confirmReset = window.confirm(
+      `Resetar senha de TODOS os usuarios para ${DEFAULT_PASSWORD}? Essa acao nao pode ser desfeita.`,
+    );
+    if (!confirmReset) return;
+
+    setResetAllLoading(true);
+    try {
+      const result = await invokeAdminUsers({
+        action: "reset_passwords",
+        payload: {
+          reset_all: true,
+          default_password: DEFAULT_PASSWORD,
+        },
+      });
+
+      alert(
+        `Reset concluido.\nTotal: ${result.total}\nAtualizados: ${result.updated}\nFalhas: ${result.failed}`,
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao resetar senha de todos os usuarios.");
+    } finally {
+      setResetAllLoading(false);
     }
   };
 
@@ -554,9 +608,15 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" /> Gerenciamento de Usuários ({users.length})
                 </CardTitle>
-                <Button variant="outline" onClick={seedDefaultUsers} disabled={seedLoading || saving}>
-                  {seedLoading ? "Importando..." : "Importar Lista Base"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={seedDefaultUsers} disabled={seedLoading || saving || resetAllLoading}>
+                    {seedLoading ? "Importando..." : "Importar Lista Base"}
+                  </Button>
+                  <Button variant="destructive" onClick={resetAllPasswords} disabled={resetAllLoading || saving || seedLoading}>
+                    <KeyRound className="w-4 h-4 mr-1" />
+                    {resetAllLoading ? "Resetando..." : "Resetar Senha de Todos"}
+                  </Button>
+                </div>
               </CardHeader>
             </Card>
 
@@ -677,10 +737,13 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
                               </>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <Button size="sm" variant="outline" onClick={() => startEdit(u)}>
+                                <Button size="sm" variant="secondary" onClick={() => void resetSinglePassword(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
+                                  <KeyRound className="w-4 h-4 mr-1" /> {resetUserIdLoading === u.id ? "Resetando..." : "Resetar Senha"}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => startEdit(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
                                   <Pencil className="w-4 h-4 mr-1" /> Editar
                                 </Button>
-                                <Button size="sm" variant="destructive" onClick={() => removeUser(u)}>
+                                <Button size="sm" variant="destructive" onClick={() => removeUser(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
                                   <Trash2 className="w-4 h-4 mr-1" /> Excluir
                                 </Button>
                               </div>

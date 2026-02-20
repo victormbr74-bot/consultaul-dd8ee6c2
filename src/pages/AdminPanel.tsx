@@ -200,15 +200,61 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     if (!err?.context) return fallback;
 
     try {
-      const body = await err.context.json();
+      const body = await err.context.clone().json();
       if (body && typeof body === "object" && "error" in body && body.error) {
-        return String(body.error);
+        return `${fallback} (HTTP ${err.context.status}): ${String(body.error)}`;
       }
     } catch {
-      // Ignore parse errors and keep fallback message.
+      try {
+        const text = (await err.context.clone().text()).trim();
+        if (text) {
+          return `${fallback} (HTTP ${err.context.status}): ${text}`;
+        }
+      } catch {
+        // Ignore parse errors and keep fallback message.
+      }
     }
 
-    return fallback;
+    return `${fallback} (HTTP ${err.context.status})`;
+  };
+
+  const resetAllPasswordsFallback = async (targetUsers: UserRow[]) => {
+    const batchSize = 10;
+    let updated = 0;
+    const failed: Array<{ user_id: string; name: string; reason: string }> = [];
+
+    for (let i = 0; i < targetUsers.length; i += batchSize) {
+      const chunk = targetUsers.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        chunk.map((u) =>
+          invokeAdminUsers({
+            action: "update_user",
+            payload: {
+              user_id: u.id,
+              password: DEFAULT_PASSWORD,
+            },
+          }),
+        ),
+      );
+
+      for (let j = 0; j < results.length; j += 1) {
+        const result = results[j];
+        const target = chunk[j];
+
+        if (result.status === "fulfilled") {
+          updated += 1;
+          continue;
+        }
+
+        failed.push({
+          user_id: target.id,
+          name: target.name,
+          reason: result.reason instanceof Error ? result.reason.message : "Falha desconhecida",
+        });
+      }
+    }
+
+    return { total: targetUsers.length, updated, failed };
   };
 
   const invokeAdminUsers = async (request: AdminAction) => {
@@ -453,7 +499,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
           default_password: DEFAULT_PASSWORD,
         },
       });
-      alert(`Senha de ${target.name} redefinida para ${DEFAULT_PASSWORD}.`);
+      alert(`Reset concluido.\nTotal: 1\nSenhas alteradas: 1\nFalhas: 0\nUsuario: ${target.name}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Erro ao resetar senha do usuario.");
     } finally {
@@ -468,6 +514,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     if (!confirmReset) return;
 
     setResetAllLoading(true);
+    const targets = users.filter((u) => !!u.id);
     try {
       const result = await invokeAdminUsers({
         action: "reset_passwords",
@@ -484,10 +531,20 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
           : "";
 
       alert(
-        `Reset concluido.\nTotal: ${result.total}\nAtualizados: ${result.updated}\nFalhas: ${result.failed}${failureDetails}`,
+        `Reset concluido.\nTotal: ${result.total}\nSenhas alteradas: ${result.updated}\nFalhas: ${result.failed}${failureDetails}`,
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Erro ao resetar senha de todos os usuarios.");
+      const fallbackResult = await resetAllPasswordsFallback(targets);
+      const sampleFailures = fallbackResult.failed.slice(0, 3);
+      const failureDetails =
+        sampleFailures.length > 0
+          ? `\nExemplos de falha:\n${sampleFailures.map((f) => `- ${f.name} (${f.user_id}): ${f.reason}`).join("\n")}`
+          : "";
+
+      const primaryError = error instanceof Error ? error.message : "Erro ao resetar senha de todos os usuarios.";
+      alert(
+        `Reset concluido via fallback.\nTotal: ${fallbackResult.total}\nSenhas alteradas: ${fallbackResult.updated}\nFalhas: ${fallbackResult.failed.length}${failureDetails}\n\nMotivo do fallback: ${primaryError}`,
+      );
     } finally {
       setResetAllLoading(false);
     }

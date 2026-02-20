@@ -219,12 +219,20 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   };
 
   const resetAllPasswordsFallback = async (targetUsers: UserRow[]) => {
+    const currentUserId = user?.id || null;
+    const orderedTargets = currentUserId
+      ? [
+          ...targetUsers.filter((u) => u.id && u.id !== currentUserId),
+          ...targetUsers.filter((u) => u.id === currentUserId),
+        ]
+      : targetUsers;
+
     const batchSize = 10;
     let updated = 0;
     const failed: Array<{ user_id: string; name: string; reason: string }> = [];
 
-    for (let i = 0; i < targetUsers.length; i += batchSize) {
-      const chunk = targetUsers.slice(i, i + batchSize);
+    for (let i = 0; i < orderedTargets.length; i += batchSize) {
+      const chunk = orderedTargets.slice(i, i + batchSize);
       const results = await Promise.allSettled(
         chunk.map((u) =>
           invokeAdminUsers({
@@ -254,14 +262,26 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       }
     }
 
-    return { total: targetUsers.length, updated, failed };
+    return { total: orderedTargets.length, updated, failed };
+  };
+
+  const getAccessToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return session.access_token;
+
+    const { data: refreshed, error } = await supabase.auth.refreshSession();
+    if (error || !refreshed.session?.access_token) {
+      throw new Error("Sessao expirada. Faca login novamente.");
+    }
+
+    return refreshed.session.access_token;
   };
 
   const invokeAdminUsers = async (request: AdminAction) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = await getAccessToken();
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: request,
-      headers: { Authorization: `Bearer ${session?.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (error) throw new Error(await resolveFunctionError(error));
     if (data?.error) throw new Error(data.error);

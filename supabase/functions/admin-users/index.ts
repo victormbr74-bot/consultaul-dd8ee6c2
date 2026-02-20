@@ -58,7 +58,7 @@ const applyRole = async (adminClient: any, userId: string, role: AppRole) => {
 // deno-lint-ignore no-explicit-any
 const findAuthUserIdByEmail = async (adminClient: any, email: string) => {
   let page = 1;
-  const perPage = 1000;
+  const perPage = 100;
 
   while (true) {
     const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
@@ -71,29 +71,6 @@ const findAuthUserIdByEmail = async (adminClient: any, email: string) => {
     if (users.length < perPage) return null;
     page += 1;
   }
-};
-
-// deno-lint-ignore no-explicit-any
-const listAllAuthUserIds = async (adminClient: any) => {
-  const ids: string[] = [];
-  let page = 1;
-  const perPage = 1000;
-
-  while (true) {
-    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message);
-
-    const users = data.users || [];
-    for (const u of users) {
-      const id = String(u?.id || "").trim();
-      if (id) ids.push(id);
-    }
-
-    if (users.length < perPage) break;
-    page += 1;
-  }
-
-  return ids;
 };
 
 // deno-lint-ignore no-explicit-any
@@ -371,14 +348,7 @@ Deno.serve(async (req) => {
         return json({ success: true, total: 1, updated: 1, failed: 0, failures: [] });
       }
 
-      const [profileIds, authUserIds] = await Promise.all([
-        listAllProfileUserIds(adminClient),
-        listAllAuthUserIds(adminClient),
-      ]);
-
-      const profileSet = new Set(profileIds);
-      const targetIds = authUserIds.filter((id) => profileSet.has(id));
-
+      const targetIds = await listAllProfileUserIds(adminClient);
       const { updated, failed } = await resetPasswordsInBatches(adminClient, targetIds, defaultPassword);
 
       return json({

@@ -193,13 +193,31 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     [users],
   );
 
+  const resolveFunctionError = async (error: unknown) => {
+    const err = error as { message?: string; context?: Response };
+    const fallback = err?.message || "Falha ao executar a edge function.";
+
+    if (!err?.context) return fallback;
+
+    try {
+      const body = await err.context.json();
+      if (body && typeof body === "object" && "error" in body && body.error) {
+        return String(body.error);
+      }
+    } catch {
+      // Ignore parse errors and keep fallback message.
+    }
+
+    return fallback;
+  };
+
   const invokeAdminUsers = async (request: AdminAction) => {
     const { data: { session } } = await supabase.auth.getSession();
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: request,
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await resolveFunctionError(error));
     if (data?.error) throw new Error(data.error);
     return data;
   };
@@ -459,8 +477,14 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         },
       });
 
+      const sampleFailures = Array.isArray(result.failures) ? result.failures.slice(0, 3) : [];
+      const failureDetails =
+        sampleFailures.length > 0
+          ? `\nExemplos de falha:\n${sampleFailures.map((f: { user_id?: string; reason?: string }) => `- ${f.user_id || "?"}: ${f.reason || "erro"}`).join("\n")}`
+          : "";
+
       alert(
-        `Reset concluido.\nTotal: ${result.total}\nAtualizados: ${result.updated}\nFalhas: ${result.failed}`,
+        `Reset concluido.\nTotal: ${result.total}\nAtualizados: ${result.updated}\nFalhas: ${result.failed}${failureDetails}`,
       );
     } catch (error) {
       alert(error instanceof Error ? error.message : "Erro ao resetar senha de todos os usuarios.");

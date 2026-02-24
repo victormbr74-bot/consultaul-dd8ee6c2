@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { isTemporaryConsultaPublicAccessEnabled } from "@/lib/temporaryAccess";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save, History } from "lucide-react";
@@ -191,7 +192,24 @@ const LotericaDetail = () => {
       }
 
       if (!user?.id) {
-        alert("SessÃ£o invÃ¡lida. FaÃ§a login novamente.");
+        if (!isTemporaryConsultaPublicAccessEnabled()) {
+          alert("SessÃ£o invÃ¡lida. FaÃ§a login novamente.");
+          return;
+        }
+
+        const guestTimestamp = new Date().toISOString();
+        const { error } = await supabase
+          .from("lotericas")
+          .update({ ...changes, updated_by: null, updated_at: guestTimestamp })
+          .eq("cod_ul", codUl);
+
+        if (error) {
+          alert("Erro ao salvar (modo temporÃ¡rio): " + error.message);
+          return;
+        }
+
+        alert("Salvo com sucesso (modo temporÃ¡rio)!");
+        setLoterica({ ...loterica, ...changes, updated_by: null, updated_at: guestTimestamp });
         return;
       }
 
@@ -267,18 +285,14 @@ const LotericaDetail = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline"> - {form.nome_loterica}</span>
         </div>
         <div className="flex items-center gap-2">
-          {user ? (
-            <>
-              <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> {"Histórico"}
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : isAdmin ? "Salvar" : "Enviar p/ Aprovação"}
-              </Button>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">Consulta pública temporária</span>
+          {user && (
+            <Button variant="outline" size="sm" onClick={fetchHistory}>
+              <History className="w-4 h-4 mr-1" /> {"Histórico"}
+            </Button>
           )}
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : user ? (isAdmin ? "Salvar" : "Enviar p/ Aprovação") : "Salvar (temporário)"}
+          </Button>
         </div>
       </div>
 

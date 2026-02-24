@@ -97,12 +97,12 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, []);
 
-  // Auto-calculate normalization time when in auto mode
+  // Auto-calculate: subtract duration from normalization time to get fault time
   useEffect(() => {
     if (!normAutoMode) return;
-    const falhaDate = parseDateBr(horaFalhaEnc);
-    if (!falhaDate) {
-      setHoraNormalizacaoEnc("");
+    const normDate = parseDateBr(horaNormalizacaoEnc);
+    if (!normDate) {
+      setHoraFalhaEnc("");
       return;
     }
     // Parse duration "HH:MM" or just hours
@@ -114,16 +114,16 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     } else if (hoursOnly) {
       totalMinutes = Number(hoursOnly[1]) * 60;
     } else {
-      setHoraNormalizacaoEnc("");
+      setHoraFalhaEnc("");
       return;
     }
     if (totalMinutes <= 0) {
-      setHoraNormalizacaoEnc("");
+      setHoraFalhaEnc("");
       return;
     }
-    const normDate = new Date(falhaDate.getTime() + totalMinutes * 60 * 1000);
-    setHoraNormalizacaoEnc(formatDateBr(normDate));
-  }, [normAutoMode, horaFalhaEnc, duracaoHoras, parseDateBr, formatDateBr]);
+    const falhaDate = new Date(normDate.getTime() - totalMinutes * 60 * 1000);
+    setHoraFalhaEnc(formatDateBr(falhaDate));
+  }, [normAutoMode, horaNormalizacaoEnc, duracaoHoras, parseDateBr, formatDateBr]);
 
   const raw = form.raw_data || {};
   const codUl = form.cod_ul || "";
@@ -325,32 +325,13 @@ Contato de Autorizacao: ${contatoEnc}`;
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-xs">Horário da falha</Label>
-                <Input value={horaFalhaEnc} onChange={(e) => setHoraFalhaEnc(e.target.value)} placeholder="Ex: 26/11/2024 14:45" />
-              </div>
-
               {/* Auto/Manual toggle */}
               <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-md bg-muted/50">
                 <Switch checked={normAutoMode} onCheckedChange={setNormAutoMode} id="norm-mode" />
                 <Label htmlFor="norm-mode" className="text-xs cursor-pointer">
-                  {normAutoMode ? "Automático — calcular normalização pela duração" : "Manual — digitar horário de normalização"}
+                  {normAutoMode ? "Automático — calcular horário da falha pela duração" : "Manual — digitar todos os horários"}
                 </Label>
               </div>
-
-              {normAutoMode ? (
-                <div>
-                  <Label className="text-xs">Duração (HH:MM)</Label>
-                  <Input
-                    value={duracaoHoras}
-                    onChange={(e) => setDuracaoHoras(e.target.value)}
-                    placeholder="Ex: 48:00"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    Soma à data da falha. Ex: 48:00 = +2 dias
-                  </p>
-                </div>
-              ) : null}
 
               <div>
                 <Label className="text-xs">Horário de normalização</Label>
@@ -358,10 +339,33 @@ Contato de Autorizacao: ${contatoEnc}`;
                   value={horaNormalizacaoEnc}
                   onChange={(e) => setHoraNormalizacaoEnc(e.target.value)}
                   placeholder="Ex: 26/11/2024 17:12"
+                />
+              </div>
+
+              {normAutoMode ? (
+                <div>
+                  <Label className="text-xs">Duração da falha (HH:MM)</Label>
+                  <Input
+                    value={duracaoHoras}
+                    onChange={(e) => setDuracaoHoras(e.target.value)}
+                    placeholder="Ex: 48:00"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Subtrai da normalização. Ex: 48:00 = 2 dias antes
+                  </p>
+                </div>
+              ) : null}
+
+              <div>
+                <Label className="text-xs">Horário da falha</Label>
+                <Input
+                  value={horaFalhaEnc}
+                  onChange={(e) => setHoraFalhaEnc(e.target.value)}
+                  placeholder="Ex: 26/11/2024 14:45"
                   disabled={normAutoMode}
                   className={normAutoMode ? "bg-muted" : ""}
                 />
-                {normAutoMode && horaNormalizacaoEnc && (
+                {normAutoMode && horaFalhaEnc && (
                   <p className="text-[10px] text-muted-foreground mt-1">Calculado automaticamente</p>
                 )}
               </div>

@@ -19,6 +19,9 @@ const AuthPage = () => {
     setLoading(true); setError("");
 
     try {
+      // Clear any stale session/cache before attempting login
+      await supabase.auth.signOut().catch(() => {});
+
       const { data, error: fnError } = await supabase.functions.invoke("lookup-user", {
         body: { user_code: loginId.trim() },
       });

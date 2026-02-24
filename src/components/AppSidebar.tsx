@@ -21,10 +21,9 @@ import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const location = useLocation();
-  const { user, isAdmin, profile, signOut } = useAuth();
+  const { isAdmin, profile, signOut } = useAuth();
   const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
-  const isAuthenticated = !!user;
 
   const isDashboardRoute = location.pathname === "/";
   const isLotericaRoute = location.pathname.startsWith("/loterica/");
@@ -33,7 +32,7 @@ export function AppSidebar() {
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
-    { id: "mascara", label: "M\u00E1scara", icon: FileText },
+    { id: "mascara", label: "Máscara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
   ];
@@ -107,14 +106,14 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>
-            <span className="text-[10px] text-sidebar-foreground/50">{"Gest\u00E3o de unidades"}</span>
+            <span className="text-[10px] text-sidebar-foreground/50">{"Gestão de unidades"}</span>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>{"Navega\u00E7\u00E3o"}</SidebarGroupLabel>
+          <SidebarGroupLabel>{"Navegação"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -131,7 +130,7 @@ export function AppSidebar() {
 
         {shouldShowLotericaTabs && (
           <SidebarGroup>
-            <SidebarGroupLabel>{"Lot\u00E9rica"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{"Lotérica"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {lotericaTabs.map((tab) => (
@@ -150,7 +149,7 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isDashboardRoute && isAuthenticated && (
+        {isDashboardRoute && (
           <SidebarGroup>
             <SidebarGroupLabel>Dados</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -174,7 +173,7 @@ export function AppSidebar() {
 
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>{"Administra\u00E7\u00E3o"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{"Administração"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -194,7 +193,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin/usuarios" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Users className="mr-2 h-4 w-4" />
-                      <span>{"Gerenciar Usu\u00E1rios"}</span>
+                      <span>{"Gerenciar Usuários"}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -203,10 +202,9 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isAuthenticated && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Conta</SidebarGroupLabel>
-            <SidebarGroupContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Conta</SidebarGroupLabel>
+          <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
@@ -225,28 +223,23 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">
-        {isAuthenticated ? (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <User className="w-4 h-4 text-sidebar-accent-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
-              <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usu\u00E1rio"}</p>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </Button>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
+            <User className="w-4 h-4 text-sidebar-accent-foreground" />
           </div>
-        ) : (
-          <div className="text-xs text-sidebar-foreground/70">Consulta pública temporária ativa</div>
-        )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
+            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usuário"}</p>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

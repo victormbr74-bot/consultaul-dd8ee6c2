@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Copy, Check } from "lucide-react";
 
 interface MascaraTabProps {
@@ -78,6 +79,51 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const [horaNormalizacaoEnc, setHoraNormalizacaoEnc] = useState("");
   const [causaEnc, setCausaEnc] = useState("");
   const [contatoEnc, setContatoEnc] = useState("Manoel Victor - 61 3464-9700");
+  const [normAutoMode, setNormAutoMode] = useState(false);
+  const [duracaoHoras, setDuracaoHoras] = useState("");
+
+  // Parse "dd/MM/yyyy HH:mm" to Date
+  const parseDateBr = useCallback((str: string): Date | null => {
+    const m = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+    if (!m) return null;
+    const [, dd, mm, yyyy, hh, min] = m;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+    return isNaN(d.getTime()) ? null : d;
+  }, []);
+
+  // Format Date to "dd/MM/yyyy HH:mm"
+  const formatDateBr = useCallback((d: Date): string => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }, []);
+
+  // Auto-calculate normalization time when in auto mode
+  useEffect(() => {
+    if (!normAutoMode) return;
+    const falhaDate = parseDateBr(horaFalhaEnc);
+    if (!falhaDate) {
+      setHoraNormalizacaoEnc("");
+      return;
+    }
+    // Parse duration "HH:MM" or just hours
+    const durMatch = duracaoHoras.trim().match(/^(\d+):(\d{2})$/);
+    const hoursOnly = duracaoHoras.trim().match(/^(\d+)$/);
+    let totalMinutes = 0;
+    if (durMatch) {
+      totalMinutes = Number(durMatch[1]) * 60 + Number(durMatch[2]);
+    } else if (hoursOnly) {
+      totalMinutes = Number(hoursOnly[1]) * 60;
+    } else {
+      setHoraNormalizacaoEnc("");
+      return;
+    }
+    if (totalMinutes <= 0) {
+      setHoraNormalizacaoEnc("");
+      return;
+    }
+    const normDate = new Date(falhaDate.getTime() + totalMinutes * 60 * 1000);
+    setHoraNormalizacaoEnc(formatDateBr(normDate));
+  }, [normAutoMode, horaFalhaEnc, duracaoHoras, parseDateBr, formatDateBr]);
 
   const raw = form.raw_data || {};
   const codUl = form.cod_ul || "";
@@ -280,15 +326,48 @@ Contato de Autorizacao: ${contatoEnc}`;
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Horario da falha</Label>
+                <Label className="text-xs">Horário da falha</Label>
                 <Input value={horaFalhaEnc} onChange={(e) => setHoraFalhaEnc(e.target.value)} placeholder="Ex: 26/11/2024 14:45" />
               </div>
-              <div>
-                <Label className="text-xs">Horario de normalizacao</Label>
-                <Input value={horaNormalizacaoEnc} onChange={(e) => setHoraNormalizacaoEnc(e.target.value)} placeholder="Ex: 26/11/2024 17:12" />
+
+              {/* Auto/Manual toggle */}
+              <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                <Switch checked={normAutoMode} onCheckedChange={setNormAutoMode} id="norm-mode" />
+                <Label htmlFor="norm-mode" className="text-xs cursor-pointer">
+                  {normAutoMode ? "Automático — calcular normalização pela duração" : "Manual — digitar horário de normalização"}
+                </Label>
               </div>
+
+              {normAutoMode ? (
+                <div>
+                  <Label className="text-xs">Duração (HH:MM)</Label>
+                  <Input
+                    value={duracaoHoras}
+                    onChange={(e) => setDuracaoHoras(e.target.value)}
+                    placeholder="Ex: 48:00"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Soma à data da falha. Ex: 48:00 = +2 dias
+                  </p>
+                </div>
+              ) : null}
+
+              <div>
+                <Label className="text-xs">Horário de normalização</Label>
+                <Input
+                  value={horaNormalizacaoEnc}
+                  onChange={(e) => setHoraNormalizacaoEnc(e.target.value)}
+                  placeholder="Ex: 26/11/2024 17:12"
+                  disabled={normAutoMode}
+                  className={normAutoMode ? "bg-muted" : ""}
+                />
+                {normAutoMode && horaNormalizacaoEnc && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Calculado automaticamente</p>
+                )}
+              </div>
+
               <div className="md:col-span-2">
-                <Label className="text-xs">Causa/Solucao</Label>
+                <Label className="text-xs">Causa/Solução</Label>
                 <Select value={causaEnc} onValueChange={setCausaEnc}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
@@ -299,7 +378,7 @@ Contato de Autorizacao: ${contatoEnc}`;
                 </Select>
               </div>
               <div className="md:col-span-2">
-                <Label className="text-xs">Contato de Autorizacao</Label>
+                <Label className="text-xs">Contato de Autorização</Label>
                 <Input value={contatoEnc} onChange={(e) => setContatoEnc(e.target.value)} />
               </div>
             </div>

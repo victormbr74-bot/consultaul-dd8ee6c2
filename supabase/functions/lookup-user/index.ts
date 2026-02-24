@@ -6,13 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const normalizeUserCode = (value: unknown) => String(value ?? "").replace(/\D/g, "");
+const buildEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const { user_code } = await req.json();
-  if (!user_code) {
+  const body = await req.json().catch(() => ({}));
+  const userCode = normalizeUserCode((body as { user_code?: unknown }).user_code);
+  if (!userCode) {
     return new Response(JSON.stringify({ error: "user_code required" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -21,28 +26,30 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const { data, error } = await supabase
+  const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("id")
-    .eq("user_code", user_code)
-    .single();
+    .select("id, active, created_at")
+    .eq("user_code", userCode)
+    .order("active", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(20);
 
-  if (error || !data) {
-    return new Response(JSON.stringify({ error: "Usuário não encontrado" }), {
-      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  if (!error && Array.isArray(profiles) && profiles.length > 0) {
+    for (const row of profiles) {
+      const profileId = String((row as { id?: string }).id || "").trim();
+      if (!profileId) continue;
+
+      const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(profileId);
+      if (!authError && authUser?.user?.email) {
+        return new Response(JSON.stringify({ email: authUser.user.email }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
   }
 
-  // Get email from auth.users
-  const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(data.id);
-
-  if (authError || !authUser?.user?.email) {
-    return new Response(JSON.stringify({ error: "Usuário não encontrado" }), {
-      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  return new Response(JSON.stringify({ email: authUser.user.email }), {
+  // Fallback: evita falso negativo quando houver inconsistência entre profiles e auth.users.
+  return new Response(JSON.stringify({ email: buildEmail(userCode) }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

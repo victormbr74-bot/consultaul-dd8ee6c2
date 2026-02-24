@@ -45,6 +45,23 @@ const json = (body: unknown, status = 200) =>
 const normalizeUserCode = (value: unknown) => String(value ?? "").replace(/\D/g, "");
 const normalizeRole = (value: unknown): AppRole => (value === "admin" ? "admin" : "user");
 const buildEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
+const isMissingTableError = (message: string) =>
+  message.includes("Could not find the table") ||
+  (message.toLowerCase().includes("relation") && message.toLowerCase().includes("does not exist"));
+
+// deno-lint-ignore no-explicit-any
+const upsertProfile = async (adminClient: any, userId: string, data: { name: string; user_code: string; active?: boolean }) => {
+  const { error } = await adminClient
+    .from("profiles")
+    .upsert({
+      id: userId,
+      name: data.name,
+      user_code: data.user_code,
+      active: typeof data.active === "boolean" ? data.active : true,
+    }, { onConflict: "id" });
+
+  if (error) throw new Error(error.message);
+};
 
 // deno-lint-ignore no-explicit-any
 const applyRole = async (adminClient: any, userId: string, role: AppRole) => {
@@ -126,6 +143,26 @@ const resetPasswordsInBatches = async (adminClient: any, userIds: string[], pass
   return { updated, failed };
 };
 
+// deno-lint-ignore no-explicit-any
+const cleanupNullableUserRefsBeforeDelete = async (adminClient: any, userId: string) => {
+  const cleanupTargets = [
+    { table: "lotericas", column: "updated_by" },
+    { table: "loterica_history", column: "changed_by" },
+    { table: "loterica_change_requests", column: "reviewed_by" },
+  ] as const;
+
+  for (const target of cleanupTargets) {
+    const { error } = await adminClient
+      .from(target.table)
+      .update({ [target.column]: null })
+      .eq(target.column, userId);
+
+    if (error && !isMissingTableError(error.message)) {
+      throw new Error(`Falha ao limpar referência em ${target.table}.${target.column}: ${error.message}`);
+    }
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -188,12 +225,7 @@ Deno.serve(async (req) => {
       if (createError || !created.user?.id) return json({ error: createError?.message || "Falha ao criar usuário." }, 400);
 
       const userId = created.user.id;
-      const { error: profileError } = await adminClient
-        .from("profiles")
-        .update({ name, user_code: userCode, active: true })
-        .eq("id", userId);
-
-      if (profileError) return json({ error: profileError.message }, 400);
+      await upsertProfile(adminClient, userId, { name, user_code: userCode, active: true });
       await applyRole(adminClient, userId, role);
 
       return json({ success: true, user_id: userId, email });
@@ -206,7 +238,11 @@ Deno.serve(async (req) => {
 
       const updates: Record<string, unknown> = {};
       if (typeof p.name === "string") updates.name = p.name.trim();
-      if (typeof p.user_code !== "undefined") updates.user_code = normalizeUserCode(p.user_code);
+      if (typeof p.user_code !== "undefined") {
+        const normalizedCode = normalizeUserCode(p.user_code);
+        if (!normalizedCode) return json({ error: "Codigo do usuario invalido." }, 400);
+        updates.user_code = normalizedCode;
+      }
       if (typeof p.active === "boolean") updates.active = p.active;
 
       if (Object.keys(updates).length) {
@@ -233,6 +269,10 @@ Deno.serve(async (req) => {
       const userId = String(p.user_id || "").trim();
       if (!userId) return json({ error: "ID do usuário é obrigatório." }, 400);
 
+      if (userId === authData.user.id) {
+        return json({ error: "Nao e permitido excluir o proprio usuario logado." }, 400);
+      }
+      await cleanupNullableUserRefsBeforeDelete(adminClient, userId);
       const { error } = await adminClient.auth.admin.deleteUser(userId);
       if (error) return json({ error: error.message }, 400);
       return json({ success: true });
@@ -294,12 +334,7 @@ Deno.serve(async (req) => {
 
           if (!userId) throw new Error("Não foi possível resolver o ID do usuário.");
 
-          const { error: profileUpdateError } = await adminClient
-            .from("profiles")
-            .update({ name, user_code: userCode, active: true })
-            .eq("id", userId);
-
-          if (profileUpdateError) throw new Error(profileUpdateError.message);
+          await upsertProfile(adminClient, userId, { name, user_code: userCode, active: true });
 
           await applyRole(adminClient, userId, role);
 

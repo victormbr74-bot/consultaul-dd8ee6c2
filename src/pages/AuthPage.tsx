@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, User } from "lucide-react";
 
+const normalizeUserCode = (value: string) => value.replace(/\D/g, "");
+const buildUserEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
+
 const AuthPage = () => {
   const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -16,27 +19,41 @@ const AuthPage = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
+
+    const normalizedLoginId = normalizeUserCode(loginId);
+    if (!normalizedLoginId) {
+      setError("Informe um ID de usuário válido.");
+      setLoading(false);
+      return;
+    }
 
     try {
       // Clear any stale session/cache before attempting login
       await supabase.auth.signOut().catch(() => {});
 
+      let email = buildUserEmail(normalizedLoginId);
       const { data, error: fnError } = await supabase.functions.invoke("lookup-user", {
-        body: { user_code: loginId.trim() },
+        body: { user_code: normalizedLoginId },
       });
 
-      if (fnError || data?.error) {
-        setError(data?.error || "Usuário não encontrado");
-        setLoading(false);
-        return;
+      if (!fnError && data?.email) {
+        email = data.email;
       }
 
-      const { error } = await signIn(data.email, loginPassword);
-      if (error) setError(error);
+      const { error: signInError } = await signIn(email, loginPassword);
+      if (signInError) {
+        if (signInError.toLowerCase().includes("invalid login credentials")) {
+          setError("Usuário ou senha inválidos.");
+        } else {
+          setError(signInError);
+        }
+      }
     } catch {
       setError("Erro ao conectar. Tente novamente.");
     }
+
     setLoading(false);
   };
 
@@ -70,14 +87,20 @@ const AuthPage = () => {
                     placeholder="Ex: 418118"
                     className="pl-10"
                     value={loginId}
-                    onChange={e => setLoginId(e.target.value)}
+                    onChange={(e) => setLoginId(normalizeUserCode(e.target.value))}
                     required
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="login-password">Senha</Label>
-                <Input id="login-password" type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+                <Input
+                  id="login-password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Entrando..." : "Entrar"}

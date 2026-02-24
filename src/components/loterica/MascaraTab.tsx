@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -97,15 +97,12 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, []);
 
-  // Auto-calculate: subtract duration from normalization time to get fault time
-  useEffect(() => {
-    if (!normAutoMode) return;
+  // Auto-calculate for preview only (does not overwrite manual input)
+  const horaFalhaEncCalculada = useMemo(() => {
+    if (!normAutoMode) return "";
     const normDate = parseDateBr(horaNormalizacaoEnc);
-    if (!normDate) {
-      setHoraFalhaEnc("");
-      return;
-    }
-    // Parse duration "HH:MM" or just hours
+    if (!normDate) return "";
+
     const durMatch = duracaoHoras.trim().match(/^(\d+):(\d{2})$/);
     const hoursOnly = duracaoHoras.trim().match(/^(\d+)$/);
     let totalMinutes = 0;
@@ -114,16 +111,16 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     } else if (hoursOnly) {
       totalMinutes = Number(hoursOnly[1]) * 60;
     } else {
-      setHoraFalhaEnc("");
-      return;
+      return "";
     }
-    if (totalMinutes <= 0) {
-      setHoraFalhaEnc("");
-      return;
-    }
+
+    if (totalMinutes <= 0) return "";
+
     const falhaDate = new Date(normDate.getTime() - totalMinutes * 60 * 1000);
-    setHoraFalhaEnc(formatDateBr(falhaDate));
+    return formatDateBr(falhaDate);
   }, [normAutoMode, horaNormalizacaoEnc, duracaoHoras, parseDateBr, formatDateBr]);
+
+  const horaFalhaEncPreview = normAutoMode ? horaFalhaEncCalculada : horaFalhaEnc;
 
   const raw = form.raw_data || {};
   const codUl = form.cod_ul || "";
@@ -221,7 +218,7 @@ RECLAMACAO INICIAL: ${defeitoAtivaDesc}`;
 
   const mascaraEncerramento = `CEC Caixa
 Falha: ${falhaEnc}
-Horario da falha: ${horaFalhaEnc}
+Horario da falha: ${horaFalhaEncPreview}
 Horario de normalizacao: ${horaNormalizacaoEnc}
 Causa/Solucao: ${causaEnc}
 Contato de Autorizacao: ${contatoEnc}`;
@@ -359,13 +356,13 @@ Contato de Autorizacao: ${contatoEnc}`;
               <div>
                 <Label className="text-xs">Horário da falha</Label>
                 <Input
-                  value={horaFalhaEnc}
+                  value={horaFalhaEncPreview}
                   onChange={(e) => setHoraFalhaEnc(e.target.value)}
                   placeholder="Ex: 26/11/2024 14:45"
                   disabled={normAutoMode}
                   className={normAutoMode ? "bg-muted" : ""}
                 />
-                {normAutoMode && horaFalhaEnc && (
+                {normAutoMode && horaFalhaEncCalculada && (
                   <p className="text-[10px] text-muted-foreground mt-1">Calculado automaticamente</p>
                 )}
               </div>

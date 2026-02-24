@@ -273,6 +273,23 @@ Deno.serve(async (req) => {
         return json({ error: "Nao e permitido excluir o proprio usuario logado." }, 400);
       }
       await cleanupNullableUserRefsBeforeDelete(adminClient, userId);
+
+      // Delete rows from tables with non-nullable FK to auth.users
+      const { error: rolesErr } = await adminClient.from("user_roles").delete().eq("user_id", userId);
+      if (rolesErr && !isMissingTableError(rolesErr.message)) {
+        return json({ error: `Falha ao remover roles: ${rolesErr.message}` }, 400);
+      }
+
+      const { error: crErr } = await adminClient.from("loterica_change_requests").delete().eq("proposed_by", userId);
+      if (crErr && !isMissingTableError(crErr.message)) {
+        return json({ error: `Falha ao remover change requests: ${crErr.message}` }, 400);
+      }
+
+      const { error: profileErr } = await adminClient.from("profiles").delete().eq("id", userId);
+      if (profileErr && !isMissingTableError(profileErr.message)) {
+        return json({ error: `Falha ao remover perfil: ${profileErr.message}` }, 400);
+      }
+
       const { error } = await adminClient.auth.admin.deleteUser(userId);
       if (error) return json({ error: error.message }, 400);
       return json({ success: true });

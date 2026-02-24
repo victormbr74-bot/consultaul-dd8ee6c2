@@ -278,13 +278,35 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   };
 
   const invokeAdminUsers = async (request: AdminAction) => {
-    const accessToken = await getAccessToken();
+    let accessToken: string;
+    try {
+      accessToken = await getAccessToken();
+    } catch {
+      await supabase.auth.signOut();
+      navigate("/auth");
+      throw new Error("Sessão expirada. Redirecionando ao login...");
+    }
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: request,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (error) throw new Error(await resolveFunctionError(error));
-    if (data?.error) throw new Error(data.error);
+    if (error) {
+      const msg = await resolveFunctionError(error);
+      if (msg.includes("401") || msg.includes("autenticado")) {
+        await supabase.auth.signOut();
+        navigate("/auth");
+        throw new Error("Sessão expirada. Redirecionando ao login...");
+      }
+      throw new Error(msg);
+    }
+    if (data?.error) {
+      if (String(data.error).includes("autenticado")) {
+        await supabase.auth.signOut();
+        navigate("/auth");
+        throw new Error("Sessão expirada. Redirecionando ao login...");
+      }
+      throw new Error(data.error);
+    }
     return data;
   };
 

@@ -21,9 +21,10 @@ import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const location = useLocation();
-  const { isAdmin, profile, signOut } = useAuth();
+  const { user, isAdmin, profile, signOut } = useAuth();
   const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
+  const isAuthenticated = !!user;
 
   const isDashboardRoute = location.pathname === "/";
   const isLotericaRoute = location.pathname.startsWith("/loterica/");
@@ -149,7 +150,7 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isDashboardRoute && (
+        {isDashboardRoute && isAuthenticated && (
           <SidebarGroup>
             <SidebarGroupLabel>Dados</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -202,9 +203,10 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Conta</SidebarGroupLabel>
-          <SidebarGroupContent>
+        {isAuthenticated && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Conta</SidebarGroupLabel>
+            <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
@@ -223,23 +225,28 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <User className="w-4 h-4 text-sidebar-accent-foreground" />
+        {isAuthenticated ? (
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
+              <User className="w-4 h-4 text-sidebar-accent-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
+              <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usu\u00E1rio"}</p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
-            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usu\u00E1rio"}</p>
-          </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
+        ) : (
+          <div className="text-xs text-sidebar-foreground/70">Consulta pública temporária ativa</div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

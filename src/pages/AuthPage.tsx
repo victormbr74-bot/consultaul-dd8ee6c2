@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { TEMP_LOGIN_RETURN_AT } from "@/lib/temporaryAccess";
 
 const normalizeUserCode = (value: string) => value.replace(/\D/g, "");
 const buildUserEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
-const LOGIN_RETURN_AT = new Date(2026, 1, 27, 0, 0, 0);
 
 const formatCountdown = (msRemaining: number) => {
   const totalSeconds = Math.max(0, Math.floor(msRemaining / 1000));
@@ -23,11 +24,13 @@ const formatCountdown = (msRemaining: number) => {
 
 const AuthPage = () => {
   const { signIn } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [loginId, setLoginId] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [now, setNow] = useState(() => new Date());
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -37,11 +40,28 @@ const AuthPage = () => {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const maintenanceActive = now.getTime() < LOGIN_RETURN_AT.getTime();
+  const maintenanceActive = now.getTime() < TEMP_LOGIN_RETURN_AT.getTime();
   const countdown = useMemo(
-    () => formatCountdown(LOGIN_RETURN_AT.getTime() - now.getTime()),
+    () => formatCountdown(TEMP_LOGIN_RETURN_AT.getTime() - now.getTime()),
     [now],
   );
+
+  useEffect(() => {
+    if (!maintenanceActive) return;
+
+    setRedirectCountdown(3);
+    const timeoutId = window.setTimeout(() => {
+      navigate("/", { replace: true });
+    }, 3000);
+    const intervalId = window.setInterval(() => {
+      setRedirectCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [maintenanceActive, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +129,9 @@ const AuthPage = () => {
                   A página de login foi removida temporariamente e volta automaticamente em{" "}
                   <strong>27/02/2026</strong>.
                 </div>
+                <div className="text-center text-sm text-muted-foreground">
+                  Redirecionando para consultas em {redirectCountdown}s...
+                </div>
                 <div className="grid grid-cols-4 gap-2 text-center">
                   <div className="rounded-md border p-2">
                     <div className="text-xl font-semibold">{String(countdown.days).padStart(2, "0")}</div>
@@ -128,7 +151,7 @@ const AuthPage = () => {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Retorno previsto: {LOGIN_RETURN_AT.toLocaleString("pt-BR")}
+                  Retorno previsto: {TEMP_LOGIN_RETURN_AT.toLocaleString("pt-BR")}
                 </p>
               </div>
             ) : (

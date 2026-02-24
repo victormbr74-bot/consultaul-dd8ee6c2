@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SidebarActionsProvider } from "@/contexts/SidebarActionsContext";
@@ -15,11 +15,16 @@ import LotericaDetail from "./pages/LotericaDetail";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Appearance from "./pages/Appearance";
+import { canAccessConsultaWithoutLogin, isTemporaryConsultaPublicAccessEnabled } from "@/lib/temporaryAccess";
 
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const publicConsultaAccess = !user && canAccessConsultaWithoutLogin(location.pathname);
+
+  if (publicConsultaAccess) return <>{children}</>;
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
@@ -27,7 +32,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
+  const temporaryPublicMode = isTemporaryConsultaPublicAccessEnabled();
+  if (loading && !temporaryPublicMode) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
+  }
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 };

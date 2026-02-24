@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from "react";
+﻿import { useState, useEffect, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -59,7 +59,7 @@ const LotericaDetail = () => {
 
         const raw = (data as any)?.raw_data || {};
         const rawRedeLan = String(raw["REDE LAN"] || "").trim();
-        const rawLoopbackSec = String(raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUNDÁRIO"] || "").trim();
+        const rawLoopbackSec = String(raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUNDÃRIO"] || "").trim();
         const currentLoopbackLan = String((data as any)?.loopback_lan || "").trim();
 
         // Normaliza registros importados com bug: loopback_lan veio como "REDE LAN".
@@ -186,12 +186,12 @@ const LotericaDetail = () => {
       }
 
       if (Object.keys(changes).length === 0) {
-        alert("Nenhuma alteração para salvar.");
+        alert("Nenhuma alteraÃ§Ã£o para salvar.");
         return;
       }
 
       if (!user?.id) {
-        alert("Sessão inválida. Faça login novamente.");
+        alert("SessÃ£o invÃ¡lida. FaÃ§a login novamente.");
         return;
       }
 
@@ -234,7 +234,7 @@ const LotericaDetail = () => {
       }
 
       alert("Alteracao enviada para aprovacao do ADM.");
-      // Como ainda não foi aplicado no banco, volta o formulário ao estado atual salvo.
+      // Como ainda nÃ£o foi aplicado no banco, volta o formulÃ¡rio ao estado atual salvo.
       setForm(loterica);
     } catch (error) {
       console.error("Falha inesperada ao salvar loterica", error);
@@ -267,12 +267,18 @@ const LotericaDetail = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline"> - {form.nome_loterica}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchHistory}>
-            <History className="w-4 h-4 mr-1" /> {"Hist\u00F3rico"}
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : isAdmin ? "Salvar" : "Enviar p/ Aprovação"}
-          </Button>
+          {user ? (
+            <>
+              <Button variant="outline" size="sm" onClick={fetchHistory}>
+                <History className="w-4 h-4 mr-1" /> {"Histórico"}
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : isAdmin ? "Salvar" : "Enviar p/ Aprovação"}
+              </Button>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">Consulta pública temporária</span>
+          )}
         </div>
       </div>
 
@@ -331,3 +337,4 @@ const LotericaDetail = () => {
 };
 
 export default LotericaDetail;
+

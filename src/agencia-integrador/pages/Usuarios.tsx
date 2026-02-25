@@ -54,6 +54,14 @@ function getRolePriority(role: string): number {
   return 1;
 }
 
+function normalizeAppRole(role: string): AppRole {
+  if (role === 'admin') return 'admin';
+  if (role === 'operacao') return 'operacao';
+  // Compat with legacy loteria-vision-hub role value
+  if (role === 'user') return 'leitura';
+  return 'leitura';
+}
+
 function normalizeUsername(value: string) {
   return value.trim();
 }
@@ -102,10 +110,11 @@ export default function Usuarios() {
       if (rolesRes.error) throw rolesRes.error;
 
       const roleMap = new Map<string, AppRole>();
-      for (const row of (rolesRes.data ?? []) as Array<{ user_id: string; role: AppRole }>) {
+      for (const row of (rolesRes.data ?? []) as Array<{ user_id: string; role: string }>) {
+        const normalizedRole = normalizeAppRole(row.role);
         const current = roleMap.get(row.user_id);
-        if (!current || getRolePriority(row.role) > getRolePriority(current)) {
-          roleMap.set(row.user_id, row.role);
+        if (!current || getRolePriority(normalizedRole) > getRolePriority(current)) {
+          roleMap.set(row.user_id, normalizedRole);
         }
       }
 

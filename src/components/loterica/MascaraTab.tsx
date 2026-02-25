@@ -67,6 +67,33 @@ const CAUSAS_ENCERRAMENTO = [
 const HORARIO_FUNCIONAMENTO_PADRAO = "Seg a Sex: 08h as 18h Sab: 08h as 12h";
 const HORARIO_ACESSO_PADRAO = "09h as 18h";
 const CONTATO_VALIDACAO_PADRAO = "61 3464-9700";
+const MESES_BR: Record<string, number> = {
+  jan: 0,
+  janeiro: 0,
+  fev: 1,
+  fevereiro: 1,
+  mar: 2,
+  marco: 2,
+  março: 2,
+  abr: 3,
+  abril: 3,
+  mai: 4,
+  maio: 4,
+  jun: 5,
+  junho: 5,
+  jul: 6,
+  julho: 6,
+  ago: 7,
+  agosto: 7,
+  set: 8,
+  setembro: 8,
+  out: 9,
+  outubro: 9,
+  nov: 10,
+  novembro: 10,
+  dez: 11,
+  dezembro: 11,
+};
 
 const MascaraTab = ({ form }: MascaraTabProps) => {
   const [copied, setCopied] = useState<string | null>(null);
@@ -79,48 +106,89 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const [horaNormalizacaoEnc, setHoraNormalizacaoEnc] = useState("");
   const [causaEnc, setCausaEnc] = useState("");
   const [contatoEnc, setContatoEnc] = useState("Manoel Victor - 61 3464-9700");
-  const [normAutoMode, setNormAutoMode] = useState(false);
-  const [duracaoHoras, setDuracaoHoras] = useState("");
+  const [normAutoMode, setNormAutoMode] = useState(true);
+  const [tempoBgp, setTempoBgp] = useState("");
 
-  // Parse "dd/MM/yyyy HH:mm" to Date
+  // Parse "dd/MM/yyyy HH:mm[:ss]" and common PT-BR variants to Date
   const parseDateBr = useCallback((str: string): Date | null => {
-    const m = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
-    if (!m) return null;
-    const [, dd, mm, yyyy, hh, min] = m;
-    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+    const value = str.trim();
+    if (!value) return null;
+
+    const normalizeMonth = (monthText: string) =>
+      monthText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const numeric = value.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (numeric) {
+      const [, dd, mm, yyyy, hh, min, sec = "00"] = numeric;
+      const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(sec));
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const slashMes = value.match(/^(\d{2})\/([A-Za-zÀ-ÿ]+)\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (slashMes) {
+      const [, dd, mesTxt, yyyy, hh, min, sec = "00"] = slashMes;
+      const mes = MESES_BR[normalizeMonth(mesTxt)];
+      if (mes == null) return null;
+      const d = new Date(Number(yyyy), mes, Number(dd), Number(hh), Number(min), Number(sec));
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const extenso = value.match(
+      /^(\d{1,2})\s+de\s+([A-Za-zÀ-ÿ]+)\s+de\s+(\d{4})\s+(?:às|as)\s+(\d{2}):(\d{2})(?::(\d{2}))?$/i,
+    );
+    if (!extenso) return null;
+
+    const [, dd, mesTxt, yyyy, hh, min, sec = "00"] = extenso;
+    const mes = MESES_BR[normalizeMonth(mesTxt)];
+    if (mes == null) return null;
+    const d = new Date(Number(yyyy), mes, Number(dd), Number(hh), Number(min), Number(sec));
     return isNaN(d.getTime()) ? null : d;
   }, []);
 
-  // Format Date to "dd/MM/yyyy HH:mm"
+  // Format Date to "dd/MM/yyyy HH:mm:ss"
   const formatDateBr = useCallback((d: Date): string => {
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }, []);
+
+  const parseTempoBgp = useCallback((str: string): number | null => {
+    const value = str.trim();
+    if (!value) return null;
+
+    const hms = value.match(/^(\d+):(\d{2}):(\d{2})$/);
+    if (hms) {
+      const [, hh, mm, ss] = hms;
+      return ((Number(hh) * 60 + Number(mm)) * 60 + Number(ss)) * 1000;
+    }
+
+    const hm = value.match(/^(\d+):(\d{2})$/);
+    if (hm) {
+      const [, hh, mm] = hm;
+      return ((Number(hh) * 60 + Number(mm)) * 60) * 1000;
+    }
+
+    const hoursOnly = value.match(/^(\d+)$/);
+    if (hoursOnly) {
+      return Number(hoursOnly[1]) * 60 * 60 * 1000;
+    }
+
+    return null;
   }, []);
 
   // Auto-calculate for preview only (does not overwrite manual input)
-  const horaFalhaEncCalculada = useMemo(() => {
+  const horaNormalizacaoEncCalculada = useMemo(() => {
     if (!normAutoMode) return "";
-    const normDate = parseDateBr(horaNormalizacaoEnc);
-    if (!normDate) return "";
+    const falhaDate = parseDateBr(horaFalhaEnc);
+    if (!falhaDate) return "";
 
-    const durMatch = duracaoHoras.trim().match(/^(\d+):(\d{2})$/);
-    const hoursOnly = duracaoHoras.trim().match(/^(\d+)$/);
-    let totalMinutes = 0;
-    if (durMatch) {
-      totalMinutes = Number(durMatch[1]) * 60 + Number(durMatch[2]);
-    } else if (hoursOnly) {
-      totalMinutes = Number(hoursOnly[1]) * 60;
-    } else {
-      return "";
-    }
+    const tempoBgpMs = parseTempoBgp(tempoBgp);
+    if (tempoBgpMs == null) return "";
 
-    if (totalMinutes <= 0) return "";
+    const normDate = new Date(falhaDate.getTime() + tempoBgpMs);
+    return formatDateBr(normDate);
+  }, [normAutoMode, horaFalhaEnc, tempoBgp, parseDateBr, parseTempoBgp, formatDateBr]);
 
-    const falhaDate = new Date(normDate.getTime() - totalMinutes * 60 * 1000);
-    return formatDateBr(falhaDate);
-  }, [normAutoMode, horaNormalizacaoEnc, duracaoHoras, parseDateBr, formatDateBr]);
-
-  const horaFalhaEncPreview = normAutoMode ? horaFalhaEncCalculada : horaFalhaEnc;
+  const horaNormalizacaoEncPreview = normAutoMode ? horaNormalizacaoEncCalculada : horaNormalizacaoEnc;
 
   const raw = form.raw_data || {};
   const codUl = form.cod_ul || "";
@@ -218,8 +286,8 @@ RECLAMACAO INICIAL: ${defeitoAtivaDesc}`;
 
   const mascaraEncerramento = `CEC Caixa
 Falha: ${falhaEnc}
-Horario da falha: ${horaFalhaEncPreview}
-Horario de normalizacao: ${horaNormalizacaoEnc}
+Horario da falha: ${horaFalhaEnc}
+Horario de normalizacao: ${horaNormalizacaoEncPreview}
 Causa/Solucao: ${causaEnc}
 Contato de Autorizacao: ${contatoEnc}`;
 
@@ -326,46 +394,46 @@ Contato de Autorizacao: ${contatoEnc}`;
               <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-md bg-muted/50">
                 <Switch checked={normAutoMode} onCheckedChange={setNormAutoMode} id="norm-mode" />
                 <Label htmlFor="norm-mode" className="text-xs cursor-pointer">
-                  {normAutoMode ? "Automático — calcular horário da falha pela duração" : "Manual — digitar todos os horários"}
+                  {normAutoMode ? "Automático — calcular normalização pelo tempo BGP" : "Manual — digitar todos os horários"}
                 </Label>
+              </div>
+
+              <div>
+                <Label className="text-xs">Horário da falha</Label>
+                <Input
+                  value={horaFalhaEnc}
+                  onChange={(e) => setHoraFalhaEnc(e.target.value)}
+                  placeholder="Ex: 26/11/2024 14:45:57"
+                />
               </div>
 
               <div>
                 <Label className="text-xs">Horário de normalização</Label>
                 <Input
-                  value={horaNormalizacaoEnc}
+                  value={horaNormalizacaoEncPreview}
                   onChange={(e) => setHoraNormalizacaoEnc(e.target.value)}
-                  placeholder="Ex: 26/11/2024 17:12"
+                  placeholder="Ex: 26/11/2024 17:12:00"
+                  disabled={normAutoMode}
+                  className={normAutoMode ? "bg-muted" : ""}
                 />
+                {normAutoMode && horaNormalizacaoEncCalculada && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Calculado automaticamente pelo tempo BGP</p>
+                )}
               </div>
 
               {normAutoMode ? (
                 <div>
-                  <Label className="text-xs">Duração da falha (HH:MM)</Label>
+                  <Label className="text-xs">Tempo BGP (HH:MM:SS)</Label>
                   <Input
-                    value={duracaoHoras}
-                    onChange={(e) => setDuracaoHoras(e.target.value)}
-                    placeholder="Ex: 48:00"
+                    value={tempoBgp}
+                    onChange={(e) => setTempoBgp(e.target.value)}
+                    placeholder="Ex: 00:00:00"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Subtrai da normalização. Ex: 48:00 = 2 dias antes
+                    Soma ao horário da falha. Ex: 48:00:00 = 2 dias depois
                   </p>
                 </div>
               ) : null}
-
-              <div>
-                <Label className="text-xs">Horário da falha</Label>
-                <Input
-                  value={horaFalhaEncPreview}
-                  onChange={(e) => setHoraFalhaEnc(e.target.value)}
-                  placeholder="Ex: 26/11/2024 14:45"
-                  disabled={normAutoMode}
-                  className={normAutoMode ? "bg-muted" : ""}
-                />
-                {normAutoMode && horaFalhaEncCalculada && (
-                  <p className="text-[10px] text-muted-foreground mt-1">Calculado automaticamente</p>
-                )}
-              </div>
 
               <div className="md:col-span-2">
                 <Label className="text-xs">Causa/Solução</Label>

@@ -178,15 +178,13 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   // Auto-calculate for preview only (does not overwrite manual input)
   const horaNormalizacaoEncCalculada = useMemo(() => {
     if (!normAutoMode) return "";
-    const falhaDate = parseDateBr(horaFalhaEnc);
-    if (!falhaDate) return "";
-
     const tempoBgpMs = parseTempoBgp(tempoBgp);
     if (tempoBgpMs == null) return "";
 
-    const normDate = new Date(falhaDate.getTime() + tempoBgpMs);
+    const agora = new Date();
+    const normDate = new Date(agora.getTime() - tempoBgpMs);
     return formatDateBr(normDate);
-  }, [normAutoMode, horaFalhaEnc, tempoBgp, parseDateBr, parseTempoBgp, formatDateBr]);
+  }, [normAutoMode, tempoBgp, parseTempoBgp, formatDateBr]);
 
   const horaNormalizacaoEncPreview = normAutoMode ? horaNormalizacaoEncCalculada : horaNormalizacaoEnc;
 
@@ -394,7 +392,7 @@ Contato de Autorizacao: ${contatoEnc}`;
               <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-md bg-muted/50">
                 <Switch checked={normAutoMode} onCheckedChange={setNormAutoMode} id="norm-mode" />
                 <Label htmlFor="norm-mode" className="text-xs cursor-pointer">
-                  {normAutoMode ? "Automático — calcular normalização pelo tempo BGP" : "Manual — digitar todos os horários"}
+                  {normAutoMode ? "Automático — calcular normalização por (agora - tempo BGP)" : "Manual — digitar todos os horários"}
                 </Label>
               </div>
 
@@ -430,7 +428,7 @@ Contato de Autorizacao: ${contatoEnc}`;
                     placeholder="Ex: 00:00:00"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Soma ao horário da falha. Ex: 48:00:00 = 2 dias depois
+                    Subtrai da data/hora atual. Ex: 48:00:00 = 2 dias antes
                   </p>
                 </div>
               ) : null}

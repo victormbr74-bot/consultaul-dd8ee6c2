@@ -35,6 +35,44 @@ const normalizeSheetName = (name: string) =>
     .replace(/[^a-z0-9]/gi, '')
     .toLowerCase();
 
+const formatImportError = (err: unknown): string => {
+  if (err instanceof Error) {
+    return err.message || 'Erro desconhecido';
+  }
+
+  if (err && typeof err === 'object') {
+    const obj = err as Record<string, unknown>;
+    const messageParts = [obj.message, obj.details, obj.hint]
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+    const code = typeof obj.code === 'string' && obj.code ? ` [${obj.code}]` : '';
+    let msg = messageParts.join(' | ');
+
+    if (!msg && typeof obj.error === 'string') msg = obj.error;
+    if (!msg) {
+      try {
+        msg = JSON.stringify(obj);
+      } catch {
+        msg = 'Erro desconhecido';
+      }
+    }
+
+    const lower = msg.toLowerCase();
+    if (
+      lower.includes('does not exist') ||
+      lower.includes('relation') ||
+      lower.includes('permission denied') ||
+      lower.includes('rls')
+    ) {
+      msg += ' | Verifique se a migration `20260225183000_agencia_integrador_schema.sql` foi aplicada no Supabase (`supabase db push`).';
+    }
+
+    return `${msg}${code}`;
+  }
+
+  return String(err);
+};
+
 const findSheetName = (sheetNames: string[], aliases: string[]) => {
   const normalizedAliases = aliases.map(normalizeSheetName);
   return sheetNames.find((sheetName) => normalizedAliases.includes(normalizeSheetName(sheetName)));
@@ -412,17 +450,30 @@ export default function ImportarExcel() {
               }
             }
 
-            newResults.push({ sheet: sheetName, count, status: 'ok' });
-            await addImportLog({ usuario: logUser, tipo: config.entityType, registros: count, arquivo: file.name });
+            let logWarning: string | undefined;
+            try {
+              await addImportLog({ usuario: logUser, tipo: config.entityType, registros: count, arquivo: file.name });
+            } catch (logErr) {
+              const msg = formatImportError(logErr);
+              console.error(`Falha ao registrar import log (${config.entityType})`, logErr);
+              logWarning = `Dados importados, mas falhou ao gravar histórico: ${msg}`;
+            }
+
+            newResults.push({ sheet: sheetName, count, status: 'ok', msg: logWarning });
           } catch (err) {
-            newResults.push({ sheet: sheetName, count: 0, status: 'error', msg: String(err) });
+            newResults.push({ sheet: sheetName, count: 0, status: 'error', msg: formatImportError(err) });
           }
         }
 
         setResults(newResults);
-        toast.success('Importacao concluida');
+        const errors = newResults.filter((r) => r.status === 'error');
+        if (errors.length > 0) {
+          toast.error(`Importacao concluida com erros (${errors.length}/${newResults.length} abas)`);
+        } else {
+          toast.success('Importacao concluida');
+        }
       } catch (err) {
-        toast.error(`Erro ao ler arquivo: ${String(err)}`);
+        toast.error(`Erro ao ler arquivo: ${formatImportError(err)}`);
       } finally {
         setImporting(false);
       }
@@ -485,9 +536,12 @@ export default function ImportarExcel() {
                 )}
                 <span className="font-mono w-28">{r.sheet}</span>
                 {r.status === 'ok' ? (
-                  <Badge variant="outline" className="bg-success/20 text-success border-success/30">
-                    {r.count} registros
-                  </Badge>
+                  <>
+                    <Badge variant="outline" className="bg-success/20 text-success border-success/30">
+                      {r.count} registros
+                    </Badge>
+                    {r.msg && <span className="text-xs text-muted-foreground">{r.msg}</span>}
+                  </>
                 ) : (
                   <span className="text-xs text-destructive">{r.msg}</span>
                 )}

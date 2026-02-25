@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useData } from '@/agencia-integrador/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,11 @@ import type { Agencia, Incidente } from '@/agencia-integrador/types';
 
 type CircuitType = 'PRIVATIVO_1' | 'PRIVATIVO_2' | 'PUBLICO' | 'WI-FI CLIENTES';
 
-const STOPWORDS = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+const STOPWORDS = new Set([
+  'da', 'de', 'do', 'das', 'dos', 'e',
+  // Prefixos comuns em nomes de agencias/pontos
+  'saa', 'agencia', 'ag', 'pab', 'posto',
+]);
 
 function normalizeText(value: string) {
   return value
@@ -29,10 +33,56 @@ function normalizeCompact(value: string) {
   return normalizeText(value).replace(/[^a-z0-9]/g, '');
 }
 
+function normalizeDigits(value: string) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function hasLetters(value: string) {
+  return /[a-z]/i.test(String(value || ''));
+}
+
+function hasDigits(value: string) {
+  return /\d/.test(String(value || ''));
+}
+
 function splitTokens(value: string) {
   return normalizeLoose(value)
     .split(/\s+/)
     .filter(Boolean);
+}
+
+function getMeaningfulAgencyNameTokens(value: string) {
+  return splitTokens(value).filter((token) => token.length >= 3 && !STOPWORDS.has(token));
+}
+
+function matchesAgencyName(value: string, search: string) {
+  const rawValue = value || '';
+  const rawSearch = search || '';
+  if (!rawValue.trim() || !rawSearch.trim()) return false;
+
+  const valueLoose = normalizeLoose(rawValue);
+  const searchLoose = normalizeLoose(rawSearch);
+  const valueCompact = normalizeCompact(rawValue);
+  const searchCompact = normalizeCompact(rawSearch);
+
+  if (!searchLoose) return false;
+
+  // Full phrase match (ignoring prefixes like SAA/AG because they remain extra tokens in value)
+  if (searchLoose.length >= 3 && valueLoose.includes(searchLoose)) return true;
+  if (searchCompact.length >= 5 && valueCompact.includes(searchCompact)) return true;
+
+  const searchTokens = getMeaningfulAgencyNameTokens(rawSearch);
+  if (!searchTokens.length) return false;
+
+  const valueTokens = new Set(getMeaningfulAgencyNameTokens(rawValue));
+
+  // Multi-word search should match all meaningful tokens to avoid random results.
+  if (searchTokens.length > 1) {
+    return searchTokens.every((token) => valueTokens.has(token));
+  }
+
+  const single = searchTokens[0];
+  return valueTokens.has(single);
 }
 
 function buildAgencyMatcher(search: string) {
@@ -80,7 +130,11 @@ function buildAgencyMatcher(search: string) {
   };
 }
 
-function matchesFlexibleText(value: string, matcher: ReturnType<typeof buildAgencyMatcher>) {
+function matchesFlexibleText(
+  value: string,
+  matcher: ReturnType<typeof buildAgencyMatcher>,
+  options?: { requireAllTokens?: boolean },
+) {
   if (!matcher.hasData) return false;
   const raw = value || '';
   if (!raw.trim()) return false;
@@ -95,12 +149,16 @@ function matchesFlexibleText(value: string, matcher: ReturnType<typeof buildAgen
   if (matcher.compactPatterns.some((p) => p && (p === compact || (p.length >= 3 && compact.includes(p))))) return true;
   if (matcher.initials.some((i) => i && (textInitials === i || compact === i || compact.includes(i)))) return true;
 
-  for (const token of matcher.tokens) {
-    if (!token || token.length < 3) continue;
-    if (tokenSet.has(token) || loose.includes(token)) return true;
+  const tokensToMatch = matcher.tokens.filter((token) => token && token.length >= 3);
+  if (!tokensToMatch.length) return false;
+
+  const tokenMatches = (token: string) => tokenSet.has(token) || loose.includes(token);
+
+  if (options?.requireAllTokens && tokensToMatch.length > 1) {
+    return tokensToMatch.every(tokenMatches);
   }
 
-  return false;
+  return tokensToMatch.some(tokenMatches);
 }
 
 const CIRCUIT_LABELS: Record<string, { label: string; icon: typeof Shield }> = {
@@ -138,40 +196,53 @@ export default function ConsultaAgencia() {
   const { agencias, incidentes } = useData();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [searchValue, setSearchValue] = useState('');
+  const deferredSearch = useDeferredValue(search);
+  const searchValue = useMemo(() => deferredSearch.trim(), [deferredSearch]);
   const agencyMatcher = useMemo(() => buildAgencyMatcher(searchValue), [searchValue]);
   const searchCompact = useMemo(() => normalizeCompact(searchValue), [searchValue]);
   const searchLoose = useMemo(() => normalizeLoose(searchValue), [searchValue]);
+  const searchDigits = useMemo(() => normalizeDigits(searchValue), [searchValue]);
+  const searchHasLetters = useMemo(() => hasLetters(searchValue), [searchValue]);
+  const searchHasDigits = useMemo(() => hasDigits(searchValue), [searchValue]);
+  const isNumericOnlySearch = searchHasDigits && !searchHasLetters;
+  const looksPointCodeSearch = useMemo(
+    () => searchHasLetters && searchHasDigits && !/\s/.test(searchValue) && searchCompact.length >= 4,
+    [searchCompact.length, searchHasDigits, searchHasLetters, searchValue],
+  );
+  const looksCircuitSearch = useMemo(
+    () => /[/-]/.test(searchValue) || (searchHasLetters && searchHasDigits && searchValue.length >= 6),
+    [searchHasDigits, searchHasLetters, searchValue],
+  );
 
   useEffect(() => {
-    const query = searchParams.get('search')?.trim();
-    if (!query) return;
+    const query = searchParams.get('search') ?? '';
     setSearch(query);
-    setSearchValue(query);
   }, [searchParams]);
 
   const handleSearch = () => {
-    setSearchValue(search.trim());
+    setSearch((prev) => prev.trim());
   };
 
   // Group agencias by nomeLogicoPonto
   const agenciasGroup = useMemo(() => {
     if (!searchValue) return null;
     const matched = agencias.filter((a) => {
-      const nameMatch =
-        matchesFlexibleText(a.nomePonto, agencyMatcher) ||
-        matchesFlexibleText(a.nomeLogicoPonto, agencyMatcher);
+      const nameMatch = searchHasLetters ? matchesAgencyName(a.nomePonto, searchValue) : false;
+      const pointCodeMatch = looksPointCodeSearch ? matchesFlexibleText(a.nomeLogicoPonto, agencyMatcher) : false;
 
-      const agencyNumberValue = a.unidade || '';
-      const agencyNumberMatch =
-        matchesFlexibleText(agencyNumberValue, agencyMatcher) ||
-        (searchCompact.length >= 2 && normalizeCompact(agencyNumberValue).includes(searchCompact));
+      const agencyNumberValue = a.cgcUnidade || a.unidade || '';
+      const agencyNumberDigits = normalizeDigits(agencyNumberValue);
+      const agencyNumberMatch = isNumericOnlySearch
+        ? (searchDigits.length >= 3 &&
+            (agencyNumberDigits === searchDigits || agencyNumberDigits.startsWith(searchDigits)))
+        : false;
 
-      const circuitMatch =
-        (searchLoose.length >= 3 && normalizeLoose(a.designacaoCircuito).includes(searchLoose)) ||
-        (searchCompact.length >= 3 && normalizeCompact(a.designacaoCircuito).includes(searchCompact));
+      const circuitMatch = looksCircuitSearch
+        ? ((searchLoose.length >= 3 && normalizeLoose(a.designacaoCircuito).includes(searchLoose)) ||
+            (searchCompact.length >= 3 && normalizeCompact(a.designacaoCircuito).includes(searchCompact)))
+        : false;
 
-      return nameMatch || agencyNumberMatch || circuitMatch;
+      return nameMatch || pointCodeMatch || agencyNumberMatch || circuitMatch;
     });
     if (matched.length === 0) return null;
 
@@ -183,7 +254,18 @@ export default function ConsultaAgencia() {
       groups.get(key)!.push(a);
     });
     return groups;
-  }, [agencias, agencyMatcher, searchCompact, searchLoose, searchValue]);
+  }, [
+    agencias,
+    agencyMatcher,
+    isNumericOnlySearch,
+    looksCircuitSearch,
+    looksPointCodeSearch,
+    searchCompact,
+    searchDigits,
+    searchHasLetters,
+    searchLoose,
+    searchValue,
+  ]);
 
   // Find alarms matching this point (column E = pontoCodigo matches nomeLogicoPonto)
   const alarmsForPoint = useMemo(() => {

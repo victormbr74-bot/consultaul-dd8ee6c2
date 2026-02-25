@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useData } from '@/agencia-integrador/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,15 +74,17 @@ function matchesAgencyName(value: string, search: string) {
   const searchTokens = getMeaningfulAgencyNameTokens(rawSearch);
   if (!searchTokens.length) return false;
 
-  const valueTokens = new Set(getMeaningfulAgencyNameTokens(rawValue));
+  const valueTokens = getMeaningfulAgencyNameTokens(rawValue);
+  const tokenMatches = (searchToken: string) =>
+    valueTokens.some((valueToken) => valueToken === searchToken || valueToken.startsWith(searchToken));
 
   // Multi-word search should match all meaningful tokens to avoid random results.
   if (searchTokens.length > 1) {
-    return searchTokens.every((token) => valueTokens.has(token));
+    return searchTokens.every(tokenMatches);
   }
 
   const single = searchTokens[0];
-  return valueTokens.has(single);
+  return tokenMatches(single);
 }
 
 function buildAgencyMatcher(search: string) {
@@ -195,9 +197,9 @@ function StatusBadge({ label, value }: { label: string; value: string }) {
 export default function ConsultaAgencia() {
   const { agencias, incidentes } = useData();
   const [searchParams] = useSearchParams();
+  const urlSearchQuery = searchParams.get('search') ?? '';
   const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search);
-  const searchValue = useMemo(() => deferredSearch.trim(), [deferredSearch]);
+  const searchValue = useMemo(() => search.trim(), [search]);
   const agencyMatcher = useMemo(() => buildAgencyMatcher(searchValue), [searchValue]);
   const searchCompact = useMemo(() => normalizeCompact(searchValue), [searchValue]);
   const searchLoose = useMemo(() => normalizeLoose(searchValue), [searchValue]);
@@ -215,9 +217,8 @@ export default function ConsultaAgencia() {
   );
 
   useEffect(() => {
-    const query = searchParams.get('search') ?? '';
-    setSearch(query);
-  }, [searchParams]);
+    setSearch(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleSearch = () => {
     setSearch((prev) => prev.trim());
@@ -233,7 +234,7 @@ export default function ConsultaAgencia() {
       const agencyNumberValue = a.cgcUnidade || a.unidade || '';
       const agencyNumberDigits = normalizeDigits(agencyNumberValue);
       const agencyNumberMatch = isNumericOnlySearch
-        ? (searchDigits.length >= 3 &&
+        ? (searchDigits.length >= 1 &&
             (agencyNumberDigits === searchDigits || agencyNumberDigits.startsWith(searchDigits)))
         : false;
 

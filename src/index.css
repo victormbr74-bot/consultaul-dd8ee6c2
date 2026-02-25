@@ -49,6 +49,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --info: 215 80% 28%;
+    --info-foreground: 0 0% 100%;
 
     --font-mono: 'JetBrains Mono', monospace;
   }
@@ -85,6 +87,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
+    --info: 215 80% 50%;
+    --info-foreground: 0 0% 100%;
   }
 
   /* Palette selector: set `data-color` on <html> */

@@ -16,6 +16,7 @@ import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Appearance from "./pages/Appearance";
 import AlarmeDashboard from "@/pages/alarmes/AlarmeDashboard";
+import BaseDashImportPage from "@/pages/alarmes/BaseDashImportPage";
 import PrincipalDashboard from "@/pages/alarmes/PrincipalDashboard";
 import PrincipalOEMP from "@/pages/alarmes/PrincipalOEMP";
 import PrincipalOI from "@/pages/alarmes/PrincipalOI";
@@ -119,6 +120,7 @@ const App = () => (
                   </Route>
                 </Route>
                 <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
+                <Route path="/alarmes/base-dash" element={<AdminOnlyRoute><BaseDashImportPage /></AdminOnlyRoute>} />
                 <Route path="/alarmes/principal" element={<AdminOnlyRoute><PrincipalDashboard /></AdminOnlyRoute>} />
                 <Route path="/alarmes/principal/oemp" element={<AdminOnlyRoute><PrincipalOEMP /></AdminOnlyRoute>} />
                 <Route path="/alarmes/principal/oi" element={<AdminOnlyRoute><PrincipalOI /></AdminOnlyRoute>} />

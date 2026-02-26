@@ -1,14 +1,13 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLayoutEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, AlertTriangle, RefreshCw, Upload } from "lucide-react";
+import { Search, AlertTriangle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
-import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
 import {
   AlarmPreset,
   AlarmRecord,
@@ -110,8 +109,6 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeBucketKey>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [uploadingBase, setUploadingBase] = useState(false);
-  const importRef = useRef<HTMLInputElement>(null);
 
   const query = useQuery({
     queryKey: ["alarme-dados", "v2"],
@@ -152,65 +149,28 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
 
   useLayoutEffect(() => {
     setOnExport(undefined);
-    setOnImportClick(() => () => importRef.current?.click());
+    setOnImportClick(undefined);
     return () => {
       setOnImportClick(undefined);
       setOnExport(undefined);
     };
   }, [setOnExport, setOnImportClick]);
 
-  const handleBaseImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingBase(true);
-    try {
-      const result = await importBasePlanilhaFile(file, {
-        strictBase: true,
-        preserveLotericas: true,
-        macroTarget: "macro_base_alarmes",
-      });
-      alert(formatImportBasePlanilhaSummary(result));
-      await query.refetch();
-    } catch (error) {
-      console.error("Falha ao subir base de alarmes", error);
-      alert("Falha ao subir base de alarmes: " + String((error as any)?.message || error));
-    } finally {
-      setUploadingBase(false);
-      e.target.value = "";
-    }
-  };
-
   return (
     <div className="space-y-6 p-6">
-      <input
-        ref={importRef}
-        type="file"
-        accept=".xlsm,.xlsx,.xls,.csv"
-        className="hidden"
-        onChange={handleBaseImport}
-        disabled={uploadingBase}
-      />
-
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Importe a base aqui para atualizar os menus `Dash`, `Principal`, `Backup` e `Desempenho` usando somente a planilha (`MACRO`, `Jira Abertos`, `Falhas GIS`).
+            A importação da base dos menus `Dash`, `Principal`, `Backup` e `Desempenho` é feita na página `Base Dash`.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => importRef.current?.click()}
-            disabled={uploadingBase}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {uploadingBase ? "Importando Base..." : "Importar Base Dash (.xlsx/.csv/.xlsm)"}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/alarmes/base-dash">Ir para Base Dash</Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => query.refetch()} disabled={query.isFetching || uploadingBase}>
+          <Button variant="outline" size="sm" onClick={() => query.refetch()} disabled={query.isFetching}>
             <RefreshCw className={`w-4 h-4 mr-2 ${query.isFetching ? "animate-spin" : ""}`} /> Atualizar
           </Button>
         </div>

@@ -16,8 +16,10 @@ import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Appearance from "./pages/Appearance";
 import AlarmeDashboard from "@/pages/alarmes/AlarmeDashboard";
+import PrincipalDashboard from "@/pages/alarmes/PrincipalDashboard";
 import PrincipalOEMP from "@/pages/alarmes/PrincipalOEMP";
 import PrincipalOI from "@/pages/alarmes/PrincipalOI";
+import BackupDashboard from "@/pages/alarmes/BackupDashboard";
 import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
@@ -117,8 +119,10 @@ const App = () => (
                   </Route>
                 </Route>
                 <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
+                <Route path="/alarmes/principal" element={<AdminOnlyRoute><PrincipalDashboard /></AdminOnlyRoute>} />
                 <Route path="/alarmes/principal/oemp" element={<AdminOnlyRoute><PrincipalOEMP /></AdminOnlyRoute>} />
                 <Route path="/alarmes/principal/oi" element={<AdminOnlyRoute><PrincipalOI /></AdminOnlyRoute>} />
+                <Route path="/alarmes/backup" element={<AdminOnlyRoute><BackupDashboard /></AdminOnlyRoute>} />
                 <Route path="/alarmes/backup/4g" element={<AdminOnlyRoute><Backup4G /></AdminOnlyRoute>} />
                 <Route path="/alarmes/backup/sencinet" element={<AdminOnlyRoute><BackupSencinet /></AdminOnlyRoute>} />
                 <Route path="/alarmes/desempenho" element={<AdminOnlyRoute><Desempenho /></AdminOnlyRoute>} />

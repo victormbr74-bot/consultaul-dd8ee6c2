@@ -158,6 +158,13 @@ export function AppSidebar() {
                         <SidebarMenu className="pl-6">
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/principal" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>Dashboard</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
                               <NavLink to="/alarmes/principal/oemp" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                                 <span>OEMP</span>
                               </NavLink>
@@ -187,6 +194,13 @@ export function AppSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenu className="pl-6">
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/backup" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>Dashboard</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild>
                               <NavLink to="/alarmes/backup/4g" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">

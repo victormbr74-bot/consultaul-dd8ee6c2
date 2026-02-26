@@ -186,7 +186,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
       <input
         ref={importRef}
         type="file"
-        accept=".xlsm,.xlsx,.xls"
+        accept=".xlsm,.xlsx,.xls,.csv"
         className="hidden"
         onChange={handleBaseImport}
         disabled={uploadingBase}
@@ -208,7 +208,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
             disabled={uploadingBase}
           >
             <Upload className="w-4 h-4 mr-2" />
-            {uploadingBase ? "Subindo Base..." : "Subir Base (.xlsm)"}
+            {uploadingBase ? "Subindo Base..." : "Subir Base (.xlsx/.csv/.xlsm)"}
           </Button>
           <Button variant="outline" size="sm" onClick={() => query.refetch()} disabled={query.isFetching || uploadingBase}>
             <RefreshCw className={`w-4 h-4 mr-2 ${query.isFetching ? "animate-spin" : ""}`} /> Atualizar

@@ -23,6 +23,11 @@ interface ImportBasePlanilhaOptions {
   macroTarget?: "lotericas" | "macro_base_alarmes";
 }
 
+function getFileExtension(fileName: string) {
+  const parts = fileName.toLowerCase().split(".");
+  return parts.length > 1 ? parts[parts.length - 1] : "";
+}
+
 function findSheetCaseInsensitive(sheetNames: string[], expectedName: string) {
   return sheetNames.find((sheet) => sheet.trim().toLowerCase() === expectedName.trim().toLowerCase());
 }
@@ -72,6 +77,15 @@ export async function importBasePlanilhaFile(
   const preserveLotericas = options?.preserveLotericas ?? true;
   const macroTarget = options?.macroTarget ?? "lotericas";
   const replaceMacro = macroTarget === "macro_base_alarmes" ? true : !preserveLotericas;
+  const extension = getFileExtension(file.name);
+
+  if (!["xlsx", "xlsm", "xls", "csv"].includes(extension)) {
+    throw new Error(`Formato não suportado: .${extension || "desconhecido"}. Use xlsx, csv ou xlsm.`);
+  }
+
+  if (strictBase && extension === "csv") {
+    throw new Error("CSV não é suportado em 'Subir Base' de alarmes. Use XLSX/XLSM com as abas MACRO, Jira Abertos e Falhas GIS.");
+  }
 
   const fileData = await file.arrayBuffer();
   const wb = XLSX.read(fileData, { type: "array", cellDates: true });

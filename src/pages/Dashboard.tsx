@@ -237,7 +237,7 @@ const Dashboard = () => {
       <input
         ref={importRef}
         type="file"
-        accept=".xlsx,.xls,.xlsm"
+        accept=".xlsx,.xls,.xlsm,.csv"
         className="hidden"
         onChange={handleImport}
         disabled={importing}

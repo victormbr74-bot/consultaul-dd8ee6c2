@@ -15,6 +15,12 @@ import LotericaDetail from "./pages/LotericaDetail";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Appearance from "./pages/Appearance";
+import AlarmeDashboard from "@/pages/alarmes/AlarmeDashboard";
+import PrincipalOEMP from "@/pages/alarmes/PrincipalOEMP";
+import PrincipalOI from "@/pages/alarmes/PrincipalOI";
+import Backup4G from "@/pages/alarmes/Backup4G";
+import BackupSencinet from "@/pages/alarmes/BackupSencinet";
+import Desempenho from "@/pages/alarmes/Desempenho";
 import AgenciaIntegradorModule from "@/agencia-integrador/AgenciaIntegradorModule";
 import AgenciaIntegradorLayout from "@/agencia-integrador/AgenciaIntegradorLayout";
 import IntegradorDashboardPage from "@/agencia-integrador/pages/Dashboard";
@@ -110,6 +116,12 @@ const App = () => (
                     <Route path="usuarios" element={<IntegradorUsuariosPage />} />
                   </Route>
                 </Route>
+                <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
+                <Route path="/alarmes/principal/oemp" element={<AdminOnlyRoute><PrincipalOEMP /></AdminOnlyRoute>} />
+                <Route path="/alarmes/principal/oi" element={<AdminOnlyRoute><PrincipalOI /></AdminOnlyRoute>} />
+                <Route path="/alarmes/backup/4g" element={<AdminOnlyRoute><Backup4G /></AdminOnlyRoute>} />
+                <Route path="/alarmes/backup/sencinet" element={<AdminOnlyRoute><BackupSencinet /></AdminOnlyRoute>} />
+                <Route path="/alarmes/desempenho" element={<AdminOnlyRoute><Desempenho /></AdminOnlyRoute>} />
                 <Route path="/admin" element={<Navigate to="/admin/dados" replace />} />
                 <Route path="/admin/dados" element={<AdminPanel section="data" />} />
                 <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />

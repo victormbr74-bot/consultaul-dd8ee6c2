@@ -14,6 +14,285 @@ export type Database = {
   }
   public: {
     Tables: {
+      agencias: {
+        Row: {
+          bairro: string
+          cep: string
+          cgc_unidade: string
+          cidade: string
+          complemento: string
+          cpe1: string
+          created_at: string
+          degrau: string
+          designacao_circuito: string
+          edd_cpe2: string
+          endereco: string
+          faturamento: string
+          id: string
+          ip_lan: string
+          ip_wan: string
+          ip_wan_edd_cpe2: string
+          logradouro: string
+          nome_logico_ponto: string
+          nome_ponto: string
+          nome_rede: string
+          numero: string
+          provedor_final: string
+          tecnologia: string
+          tipo_atendimento: string
+          tipo_ponto: string
+          uf: string
+          unidade: string
+          updated_at: string
+          velocidade: string
+          velocidade_real_solicitada: string
+          visao_felix: string
+          visao_freiria: string
+        }
+        Insert: {
+          bairro?: string
+          cep?: string
+          cgc_unidade?: string
+          cidade?: string
+          complemento?: string
+          cpe1?: string
+          created_at?: string
+          degrau?: string
+          designacao_circuito?: string
+          edd_cpe2?: string
+          endereco?: string
+          faturamento?: string
+          id?: string
+          ip_lan?: string
+          ip_wan?: string
+          ip_wan_edd_cpe2?: string
+          logradouro?: string
+          nome_logico_ponto?: string
+          nome_ponto?: string
+          nome_rede?: string
+          numero?: string
+          provedor_final?: string
+          tecnologia?: string
+          tipo_atendimento?: string
+          tipo_ponto?: string
+          uf?: string
+          unidade?: string
+          updated_at?: string
+          velocidade?: string
+          velocidade_real_solicitada?: string
+          visao_felix?: string
+          visao_freiria?: string
+        }
+        Update: {
+          bairro?: string
+          cep?: string
+          cgc_unidade?: string
+          cidade?: string
+          complemento?: string
+          cpe1?: string
+          created_at?: string
+          degrau?: string
+          designacao_circuito?: string
+          edd_cpe2?: string
+          endereco?: string
+          faturamento?: string
+          id?: string
+          ip_lan?: string
+          ip_wan?: string
+          ip_wan_edd_cpe2?: string
+          logradouro?: string
+          nome_logico_ponto?: string
+          nome_ponto?: string
+          nome_rede?: string
+          numero?: string
+          provedor_final?: string
+          tecnologia?: string
+          tipo_atendimento?: string
+          tipo_ponto?: string
+          uf?: string
+          unidade?: string
+          updated_at?: string
+          velocidade?: string
+          velocidade_real_solicitada?: string
+          visao_felix?: string
+          visao_freiria?: string
+        }
+        Relationships: []
+      }
+      cod_encerramento: {
+        Row: {
+          codigo: string
+          created_at: string
+          id: string
+          n1: string
+          n2: string
+          n3: string
+          quando_utilizar: string
+          updated_at: string
+        }
+        Insert: {
+          codigo?: string
+          created_at?: string
+          id?: string
+          n1?: string
+          n2?: string
+          n3?: string
+          quando_utilizar?: string
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          id?: string
+          n1?: string
+          n2?: string
+          n3?: string
+          quando_utilizar?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      import_logs: {
+        Row: {
+          arquivo: string
+          data_hora: string
+          id: string
+          registros: number
+          tipo: string
+          usuario: string
+        }
+        Insert: {
+          arquivo?: string
+          data_hora?: string
+          id?: string
+          registros?: number
+          tipo?: string
+          usuario?: string
+        }
+        Update: {
+          arquivo?: string
+          data_hora?: string
+          id?: string
+          registros?: number
+          tipo?: string
+          usuario?: string
+        }
+        Relationships: []
+      }
+      incidentes: {
+        Row: {
+          agencia_nome: string
+          causa: string
+          causa_raiz: string
+          chamado: string
+          circuito: string
+          contrato: string
+          created_at: string
+          data_hora_abertura: string
+          data_hora_atualizacao: string
+          descricao_falha: string
+          descricao_inicial: string
+          gitec: string
+          id: string
+          isolado: string
+          massiva: boolean
+          normalizacao_data_hora: string | null
+          normalizacao_data_hora_fechamento: string | null
+          oemp: string
+          periodo_ultima_atualizacao: string
+          ponto_codigo: string
+          protocolo_portal: string
+          reclamacao: string
+          rede: string
+          req: string
+          responsavel_portal: string
+          sla: string
+          status: string
+          tempo_total: string
+          tipo_circuito: string
+          tipo_ponto: string
+          tipo_solicitacao: string
+          uf: string
+          ultimo_comentario: string
+          updated_at: string
+          vulto: string
+        }
+        Insert: {
+          agencia_nome?: string
+          causa?: string
+          causa_raiz?: string
+          chamado?: string
+          circuito?: string
+          contrato?: string
+          created_at?: string
+          data_hora_abertura?: string
+          data_hora_atualizacao?: string
+          descricao_falha?: string
+          descricao_inicial?: string
+          gitec?: string
+          id?: string
+          isolado?: string
+          massiva?: boolean
+          normalizacao_data_hora?: string | null
+          normalizacao_data_hora_fechamento?: string | null
+          oemp?: string
+          periodo_ultima_atualizacao?: string
+          ponto_codigo?: string
+          protocolo_portal?: string
+          reclamacao?: string
+          rede?: string
+          req?: string
+          responsavel_portal?: string
+          sla?: string
+          status?: string
+          tempo_total?: string
+          tipo_circuito?: string
+          tipo_ponto?: string
+          tipo_solicitacao?: string
+          uf?: string
+          ultimo_comentario?: string
+          updated_at?: string
+          vulto?: string
+        }
+        Update: {
+          agencia_nome?: string
+          causa?: string
+          causa_raiz?: string
+          chamado?: string
+          circuito?: string
+          contrato?: string
+          created_at?: string
+          data_hora_abertura?: string
+          data_hora_atualizacao?: string
+          descricao_falha?: string
+          descricao_inicial?: string
+          gitec?: string
+          id?: string
+          isolado?: string
+          massiva?: boolean
+          normalizacao_data_hora?: string | null
+          normalizacao_data_hora_fechamento?: string | null
+          oemp?: string
+          periodo_ultima_atualizacao?: string
+          ponto_codigo?: string
+          protocolo_portal?: string
+          reclamacao?: string
+          rede?: string
+          req?: string
+          responsavel_portal?: string
+          sla?: string
+          status?: string
+          tempo_total?: string
+          tipo_circuito?: string
+          tipo_ponto?: string
+          tipo_solicitacao?: string
+          uf?: string
+          ultimo_comentario?: string
+          updated_at?: string
+          vulto?: string
+        }
+        Relationships: []
+      }
       loterica_change_requests: {
         Row: {
           after_data: Json | null
@@ -162,27 +441,156 @@ export type Database = {
         }
         Relationships: []
       }
+      meus_casos: {
+        Row: {
+          criado_em: string
+          id: string
+          incidente_chamado: string
+          notas: string[]
+          status_caso: string
+          updated_at: string
+          usuario_nome: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          incidente_chamado?: string
+          notas?: string[]
+          status_caso?: string
+          updated_at?: string
+          usuario_nome?: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          incidente_chamado?: string
+          notas?: string[]
+          status_caso?: string
+          updated_at?: string
+          usuario_nome?: string
+        }
+        Relationships: []
+      }
+      parceiras: {
+        Row: {
+          contato: string
+          created_at: string
+          email: string
+          id: string
+          nome_operadora: string
+          observacoes: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          contato?: string
+          created_at?: string
+          email?: string
+          id?: string
+          nome_operadora?: string
+          observacoes?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Update: {
+          contato?: string
+          created_at?: string
+          email?: string
+          id?: string
+          nome_operadora?: string
+          observacoes?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           active: boolean
           created_at: string
+          email: string | null
+          employee_id: string | null
+          full_name: string | null
           id: string
+          is_active: boolean | null
           name: string
           user_code: string | null
+          user_id: string | null
+          username: string | null
         }
         Insert: {
           active?: boolean
           created_at?: string
+          email?: string | null
+          employee_id?: string | null
+          full_name?: string | null
           id: string
+          is_active?: boolean | null
           name: string
           user_code?: string | null
+          user_id?: string | null
+          username?: string | null
         }
         Update: {
           active?: boolean
           created_at?: string
+          email?: string | null
+          employee_id?: string | null
+          full_name?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
           user_code?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      topologia: {
+        Row: {
+          comandos: string
+          concentrador: string
+          created_at: string
+          descricao: string
+          id: string
+          ip: string
+          lan: string
+          observacoes: string
+          uf_regiao: string
+          updated_at: string
+          vlan: string
+          wan1: string
+          wan2: string
+        }
+        Insert: {
+          comandos?: string
+          concentrador?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          ip?: string
+          lan?: string
+          observacoes?: string
+          uf_regiao?: string
+          updated_at?: string
+          vlan?: string
+          wan1?: string
+          wan2?: string
+        }
+        Update: {
+          comandos?: string
+          concentrador?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          ip?: string
+          lan?: string
+          observacoes?: string
+          uf_regiao?: string
+          updated_at?: string
+          vlan?: string
+          wan1?: string
+          wan2?: string
         }
         Relationships: []
       }
@@ -209,6 +617,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_app_data: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -218,7 +627,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "operacao" | "leitura"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -346,7 +755,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "operacao", "leitura"],
     },
   },
 } as const

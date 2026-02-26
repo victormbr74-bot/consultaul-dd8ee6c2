@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2 } from "lucide-react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2, LayoutDashboard, Radio, Shield, Gauge, ChevronDown } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -120,19 +121,99 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild>
                   <NavLink to="/" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Search className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
+                    <span>Consulta UL</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink to="/agencia-integrador" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      <span>AGENCIA INTEGRADOR</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink to="/agencia-integrador" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                        <Building2 className="mr-2 h-4 w-4" />
+                        <span>AGENCIA INTEGRADOR</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink to="/alarmes" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton className="justify-between">
+                          <span className="flex items-center">
+                            <Radio className="mr-2 h-4 w-4" />
+                            <span>Principal</span>
+                          </span>
+                          <ChevronDown className="h-3 w-3 transition-transform" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenu className="pl-6">
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/principal/oemp" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>OEMP</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/principal/oi" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>OI</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton className="justify-between">
+                          <span className="flex items-center">
+                            <Shield className="mr-2 h-4 w-4" />
+                            <span>Backup</span>
+                          </span>
+                          <ChevronDown className="h-3 w-3 transition-transform" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenu className="pl-6">
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/backup/4g" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>4G</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild>
+                              <NavLink to="/alarmes/backup/sencinet" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                                <span>Sencinet</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink to="/alarmes/desempenho" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                        <Gauge className="mr-2 h-4 w-4" />
+                        <span>Desempenho</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>

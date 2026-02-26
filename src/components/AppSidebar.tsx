@@ -257,13 +257,13 @@ export function AppSidebar() {
 
         {(isDashboardRoute || isAlarmRoute) && (
           <SidebarGroup>
-            <SidebarGroupLabel>Dados</SidebarGroupLabel>
+            <SidebarGroupLabel>{isAlarmRoute ? "Base Dash" : "Dados"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
-                    <span>{isAlarmRoute ? "Subir Base" : "Importar"}</span>
+                    <span>{isAlarmRoute ? "Importar Base Dash" : "Importar"}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 {isDashboardRoute && (

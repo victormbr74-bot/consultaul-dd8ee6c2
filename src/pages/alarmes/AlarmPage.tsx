@@ -197,7 +197,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
           <h1 className="text-2xl font-bold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Estes menus usam somente a base importada da planilha (abas `MACRO`, `Jira Abertos`, `Falhas GIS`).
+            Importe a base aqui para atualizar os menus `Dash`, `Principal`, `Backup` e `Desempenho` usando somente a planilha (`MACRO`, `Jira Abertos`, `Falhas GIS`).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
             disabled={uploadingBase}
           >
             <Upload className="w-4 h-4 mr-2" />
-            {uploadingBase ? "Subindo Base..." : "Subir Base (.xlsx/.csv/.xlsm)"}
+            {uploadingBase ? "Importando Base..." : "Importar Base Dash (.xlsx/.csv/.xlsm)"}
           </Button>
           <Button variant="outline" size="sm" onClick={() => query.refetch()} disabled={query.isFetching || uploadingBase}>
             <RefreshCw className={`w-4 h-4 mr-2 ${query.isFetching ? "animate-spin" : ""}`} /> Atualizar

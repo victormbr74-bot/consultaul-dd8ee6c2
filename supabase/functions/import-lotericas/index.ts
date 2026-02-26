@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type Dataset = "lotericas" | "jira_abertos" | "falhas_gis";
+type Dataset = "lotericas" | "macro_base_alarmes" | "jira_abertos" | "falhas_gis";
 
 type ImportBody = {
   dataset?: Dataset;
@@ -164,7 +164,7 @@ function toFalhaGis(row: Record<string, unknown>, index: number) {
 }
 
 function buildRows(dataset: Dataset, rows: Record<string, unknown>[], userId: string) {
-  if (dataset === "lotericas") {
+  if (dataset === "lotericas" || dataset === "macro_base_alarmes") {
     return rows.map((row) => toLoterica(row, userId)).filter(Boolean);
   }
   if (dataset === "jira_abertos") {
@@ -175,6 +175,7 @@ function buildRows(dataset: Dataset, rows: Record<string, unknown>[], userId: st
 
 function tableForDataset(dataset: Dataset) {
   if (dataset === "lotericas") return { table: "lotericas", conflict: "cod_ul", pk: "cod_ul" };
+  if (dataset === "macro_base_alarmes") return { table: "macro_base_alarmes", conflict: "cod_ul", pk: "cod_ul" };
   if (dataset === "jira_abertos") return { table: "jira_abertos", conflict: "chave", pk: "chave" };
   return { table: "falhas_gis", conflict: "record_key", pk: "record_key" };
 }
@@ -202,7 +203,7 @@ Deno.serve(async (req) => {
   const rows = body.rows as Record<string, unknown>[];
   const dataset: Dataset = body.dataset ?? "lotericas";
 
-  if (!["lotericas", "jira_abertos", "falhas_gis"].includes(dataset)) {
+  if (!["lotericas", "macro_base_alarmes", "jira_abertos", "falhas_gis"].includes(dataset)) {
     return new Response(JSON.stringify({ error: "Invalid dataset" }), { status: 400, headers: corsHeaders });
   }
 

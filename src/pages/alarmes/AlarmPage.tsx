@@ -146,7 +146,9 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
   const tableMode = getTableMode(preset);
 
   const errorMessage = query.error ? String((query.error as any)?.message || query.error) : "";
-  const hasMissingTablesHint = /jira_abertos|falhas_gis/i.test(errorMessage) && /find the table|does not exist/i.test(errorMessage);
+  const hasMissingTablesHint =
+    /jira_abertos|falhas_gis|macro_base_alarmes/i.test(errorMessage) &&
+    /find the table|does not exist/i.test(errorMessage);
 
   useLayoutEffect(() => {
     setOnExport(undefined);
@@ -166,6 +168,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
       const result = await importBasePlanilhaFile(file, {
         strictBase: true,
         preserveLotericas: true,
+        macroTarget: "macro_base_alarmes",
       });
       alert(formatImportBasePlanilhaSummary(result));
       await query.refetch();
@@ -229,7 +232,7 @@ export default function AlarmPage({ preset, title, description }: AlarmPageProps
             <p className="text-muted-foreground break-words">{errorMessage}</p>
             {hasMissingTablesHint && (
               <p className="text-muted-foreground">
-                Aplique a migration de `jira_abertos`/`falhas_gis` e reimporte a planilha `.xlsm` (abas `MACRO`, `Jira Abertos`, `Falhas GIS`).
+                Aplique as migrations de `macro_base_alarmes`, `jira_abertos` e `falhas_gis`, depois reimporte a planilha `.xlsm` (abas `MACRO`, `Jira Abertos`, `Falhas GIS`).
               </p>
             )}
           </CardContent>

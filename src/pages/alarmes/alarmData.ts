@@ -120,7 +120,7 @@ async function fetchAllRows(table: string, selectList = "*") {
 export async function fetchAlarmDatasets(): Promise<AlarmDatasets> {
   const [lotericas, jira, falhas] = await Promise.all([
     fetchAllRows(
-      "lotericas",
+      "macro_base_alarmes",
       "cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,operadora,raw_data,status,cidade,uf",
     ),
     fetchAllRows(

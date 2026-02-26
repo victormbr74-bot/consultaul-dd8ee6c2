@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 
-type ImportDataset = "lotericas" | "jira_abertos" | "falhas_gis";
+type ImportDataset = "lotericas" | "macro_base_alarmes" | "jira_abertos" | "falhas_gis";
 
 export interface ImportBaseDatasetResult {
   inserted: number;
@@ -20,6 +20,7 @@ export interface ImportBasePlanilhaResult {
 interface ImportBasePlanilhaOptions {
   strictBase?: boolean;
   preserveLotericas?: boolean;
+  macroTarget?: "lotericas" | "macro_base_alarmes";
 }
 
 function findSheetCaseInsensitive(sheetNames: string[], expectedName: string) {
@@ -69,6 +70,8 @@ export async function importBasePlanilhaFile(
 ): Promise<ImportBasePlanilhaResult> {
   const strictBase = Boolean(options?.strictBase);
   const preserveLotericas = options?.preserveLotericas ?? true;
+  const macroTarget = options?.macroTarget ?? "lotericas";
+  const replaceMacro = macroTarget === "macro_base_alarmes" ? true : !preserveLotericas;
 
   const fileData = await file.arrayBuffer();
   const wb = XLSX.read(fileData, { type: "array", cellDates: true });
@@ -108,7 +111,7 @@ export async function importBasePlanilhaFile(
   const jiraRows = toRows(jiraSheetName);
   const falhasRows = toRows(falhasSheetName);
 
-  const importedMacro = await invokeInChunks("lotericas", macroRows, !preserveLotericas, accessToken);
+  const importedMacro = await invokeInChunks(macroTarget, macroRows, replaceMacro, accessToken);
   const importedJira = await invokeInChunks("jira_abertos", jiraRows, true, accessToken);
   const importedFalhas = await invokeInChunks("falhas_gis", falhasRows, true, accessToken);
 
@@ -132,4 +135,3 @@ export function formatImportBasePlanilhaSummary(result: ImportBasePlanilhaResult
     .filter(Boolean)
     .join("\n");
 }
-

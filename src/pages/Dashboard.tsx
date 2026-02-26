@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -196,86 +197,11 @@ const Dashboard = () => {
 
     setImporting(true);
     try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: "array", cellDates: true });
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-
-      if (!accessToken) {
-        alert("Sessão inválida. Faça login novamente.");
-        return;
-      }
-
-      const findSheet = (name: string) => wb.SheetNames.find((sheet) => sheet.trim().toLowerCase() === name.trim().toLowerCase());
-      const macroSheetName = findSheet("MACRO");
-      const jiraSheetName = findSheet("Jira Abertos");
-      const falhasSheetName = findSheet("Falhas GIS");
-
-      const toRows = (sheetName?: string) => {
-        if (!sheetName) return [] as Record<string, unknown>[];
-        const ws = wb.Sheets[sheetName];
-        if (!ws) return [] as Record<string, unknown>[];
-        return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
-      };
-
-      const macroSheetRows = toRows(macroSheetName);
-      const macroRows =
-        macroSheetRows.length > 0
-          ? macroSheetRows
-          : XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true });
-      const jiraRows = toRows(jiraSheetName);
-      const falhasRows = toRows(falhasSheetName);
-
-      const invokeInChunks = async (
-        dataset: "lotericas" | "jira_abertos" | "falhas_gis",
-        rows: Record<string, unknown>[],
-        replace: boolean,
-      ) => {
-        if (!rows.length) return { inserted: 0, errors: 0, total: 0 };
-        const chunkSize = 300;
-        const totalChunks = Math.ceil(rows.length / chunkSize);
-        let inserted = 0;
-        let errors = 0;
-
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
-          const chunk = rows.slice(chunkIndex * chunkSize, (chunkIndex + 1) * chunkSize);
-          const res = await supabase.functions.invoke("import-lotericas", {
-            body: {
-              dataset,
-              rows: chunk,
-              chunkIndex,
-              chunkCount: totalChunks,
-              replace,
-            },
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-
-          if (res.error) {
-            throw new Error(`${dataset}: ${res.error.message}`);
-          }
-
-          inserted += Number(res.data?.inserted || 0);
-          errors += Number(res.data?.errors || 0);
-        }
-
-        return { inserted, errors, total: rows.length };
-      };
-
-      const importedMacro = await invokeInChunks("lotericas", macroRows, false);
-      const importedJira = await invokeInChunks("jira_abertos", jiraRows, true);
-      const importedFalhas = await invokeInChunks("falhas_gis", falhasRows, true);
-
-      alert(
-        [
-          "Importação concluída.",
-          `MACRO/lotéricas: ${importedMacro.inserted} inseridos, ${importedMacro.errors} erros.`,
-          `Jira Abertos: ${importedJira.inserted} inseridos, ${importedJira.errors} erros.`,
-          `Falhas GIS: ${importedFalhas.inserted} inseridos, ${importedFalhas.errors} erros.`,
-          !jiraSheetName || !falhasSheetName ? "Obs.: arquivo sem uma ou mais abas esperadas (Jira Abertos/Falhas GIS)." : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
+      const result = await importBasePlanilhaFile(file, {
+        strictBase: false,
+        preserveLotericas: true,
+      });
+      alert(formatImportBasePlanilhaSummary(result));
       void fetchLotericas();
     } catch (error) {
       console.error("Falha inesperada na importacao", error);

@@ -27,6 +27,7 @@ export function AppSidebar() {
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
   const isDashboardRoute = location.pathname === "/";
+  const isAlarmRoute = location.pathname === "/alarmes" || location.pathname.startsWith("/alarmes/");
   const isLotericaRoute = location.pathname.startsWith("/loterica/");
   const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
   const hasPendingChanges = pendingChangeCount > 0;
@@ -254,7 +255,7 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isDashboardRoute && (
+        {(isDashboardRoute || isAlarmRoute) && (
           <SidebarGroup>
             <SidebarGroupLabel>Dados</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -262,15 +263,17 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
-                    <span>Importar</span>
+                    <span>{isAlarmRoute ? "Subir Base" : "Importar"}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
-                    <Download className="mr-2 h-4 w-4" />
-                    <span>Exportar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {isDashboardRoute && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
+                      <Download className="mr-2 h-4 w-4" />
+                      <span>Exportar</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

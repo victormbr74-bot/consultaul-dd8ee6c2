@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -39,35 +40,319 @@ interface ConsultaMassaRow {
   source: TermMatch;
 }
 
-const getRawText = (raw: Record<string, unknown> | null | undefined, keys: string[]) => {
-  const obj = raw && typeof raw === "object" ? raw : {};
-  for (const key of keys) {
-    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
-    const value = normalizeText((obj as Record<string, unknown>)[key]);
-    if (value) return value;
+interface FieldSpec {
+  label: string;
+  aliases: string[];
+  mono?: boolean;
+  fallback?: (row: LotericaLookupRow) => unknown;
+}
+
+interface FieldSection {
+  title: string;
+  description: string;
+  fields: FieldSpec[];
+}
+
+interface ModalField {
+  label: string;
+  value: string;
+  mono?: boolean;
+}
+
+interface RawEntry {
+  key: string;
+  value: string;
+}
+
+interface RawLookup {
+  exact: Map<string, string>;
+  loose: Map<string, string>;
+  entries: RawEntry[];
+}
+
+const asText = (value: unknown) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleString("pt-BR");
   }
-  return "-";
+
+  if (typeof value === "object") {
+    try {
+      const json = JSON.stringify(value);
+      return json === "{}" ? "" : json;
+    } catch {
+      return String(value).trim();
+    }
+  }
+
+  return String(value).trim();
 };
 
-const buildSmartitQuickData = (row: LotericaLookupRow) => {
-  const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+const normalizeHeaderLoose = (value: string) => {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+};
 
-  return {
-    owner: getRawText(raw, ["OWNER"]),
-    responsavelBackup: getRawText(raw, ["RESP BACKUP"]),
-    tfl: getRawText(raw, ["TFL", "TFLs"]),
-    tipoUl: getRawText(raw, ["TIPO LOTERICA", "TIPO UL"]),
-    operadora: getRawText(raw, ["OPERADORA 4G", "OPERADORA"]),
-    empresaOemp: getRawText(raw, ["EMPRESA OEMP"]),
-    tecnologia: getRawText(raw, ["TECNOLOGIA"]),
-    perimetro: getRawText(raw, ["PERIMETRO", "PERÍMETRO", "PERIMETRO"]),
-    sim4g: getRawText(raw, ["SIM CARD 4G"]),
-    ipNat: getRawText(raw, ["IP NAT"]),
-    ipWan: getRawText(raw, ["IP WAN"]),
-    ipSwitch: getRawText(raw, ["IP SWITCH", "LOOPBACK SWITCH"]),
-    endereco: getRawText(raw, ["ENDEREÇO", "ENDERECO"]),
-    contato: getRawText(raw, ["CONTATO"]),
-  };
+const buildRawLookup = (rawData: Record<string, unknown> | null | undefined): RawLookup => {
+  const raw = rawData && typeof rawData === "object" ? rawData : {};
+  const exact = new Map<string, string>();
+  const loose = new Map<string, string>();
+  const entries: RawEntry[] = [];
+
+  for (const [key, rawValue] of Object.entries(raw)) {
+    const value = asText(rawValue);
+    const displayValue = value || "-";
+    entries.push({ key, value: displayValue });
+
+    if (!value) continue;
+
+    const exactKey = key.trim().toUpperCase();
+    const looseKey = normalizeHeaderLoose(key);
+
+    if (exactKey && !exact.has(exactKey)) exact.set(exactKey, value);
+    if (looseKey && !loose.has(looseKey)) loose.set(looseKey, value);
+  }
+
+  return { exact, loose, entries };
+};
+
+const getByAliases = (lookup: RawLookup, aliases: string[]) => {
+  for (const alias of aliases) {
+    const exactValue = lookup.exact.get(alias.trim().toUpperCase());
+    if (exactValue) return exactValue;
+
+    const looseValue = lookup.loose.get(normalizeHeaderLoose(alias));
+    if (looseValue) return looseValue;
+  }
+  return "";
+};
+
+const getFieldValue = (row: LotericaLookupRow, lookup: RawLookup, field: FieldSpec) => {
+  const rawValue = getByAliases(lookup, field.aliases);
+  if (rawValue) return rawValue;
+
+  const fallback = field.fallback ? asText(field.fallback(row)) : "";
+  return fallback || "-";
+};
+
+const FIELD_SECTIONS: FieldSection[] = [
+  {
+    title: "Dados da Lotérica",
+    description: "Informações gerais de identificação e operação da UL.",
+    fields: [
+      {
+        label: "Código UL",
+        mono: true,
+        aliases: ["COD. UL", "CODIGO DA UL", "CODIGO UL", "CÓDIGO UL", "CÓDIGO DA LOTÉRICA_", "cod_ul"],
+        fallback: (row) => row.cod_ul,
+      },
+      {
+        label: "Nome da Lotérica",
+        aliases: ["NOME DA LOTERICA", "NOME UL", "nome_loterica"],
+        fallback: (row) => row.nome_loterica,
+      },
+      {
+        label: "Endereço",
+        aliases: ["ENDEREÇO", "ENDERECO", "ENDEREÃ‡O", "endereco"],
+        fallback: (row) => row.endereco,
+      },
+      {
+        label: "Município / Cidade",
+        aliases: ["MUNICIPIO", "MUNICÍPIO", "CIDADE", "cidade"],
+        fallback: (row) => row.cidade,
+      },
+      {
+        label: "UF",
+        mono: true,
+        aliases: ["UF", "uf"],
+        fallback: (row) => row.uf,
+      },
+      {
+        label: "Contato",
+        aliases: ["CONTATO", "contato"],
+        fallback: (row) => row.contato,
+      },
+      {
+        label: "Status UL",
+        aliases: ["STATUS UL", "status"],
+        fallback: (row) => row.status,
+      },
+      {
+        label: "Migração",
+        aliases: ["MIGRAÇÃO", "MIGRACAO", "MIGRAÃ‡ÃƒO", "MIGRAÃ‡ÃƒO"],
+      },
+      {
+        label: "Homologado",
+        aliases: ["HOMOLOGADO"],
+      },
+      {
+        label: "Tipo UL",
+        aliases: ["TIPO UL", "TIPO LOTERICA", "TIPO LOTÉRICA"],
+      },
+      {
+        label: "TFL",
+        mono: true,
+        aliases: ["TFL", "TFLs", "TFLS"],
+      },
+      {
+        label: "Owner",
+        aliases: ["OWNER"],
+      },
+      {
+        label: "Resp. Backup",
+        aliases: ["RESP BACKUP", "RESPONSAVEL BACKUP", "RESPONSÁVEL BACKUP"],
+      },
+    ],
+  },
+  {
+    title: "Link Principal",
+    description: "Campos do link principal e dados de roteamento principal.",
+    fields: [
+      {
+        label: "CCTO OI",
+        mono: true,
+        aliases: ["CCTO OI", "ccto_oi"],
+        fallback: (row) => row.ccto_oi,
+      },
+      {
+        label: "Designação Nova",
+        mono: true,
+        aliases: ["DESIGINACAO NOVA", "DESIGINAÇÃO NOVA", "DESIGNAÇÃO NOVA", "designacao_nova"],
+        fallback: (row) => row.designacao_nova,
+      },
+      {
+        label: "BASE UN",
+        mono: true,
+        aliases: ["BASE UN"],
+      },
+      {
+        label: "Ponto Lógico / Designação",
+        mono: true,
+        aliases: ["Ponto Lógico / Designação", "Ponto Lógico / \nDesignação", "PONTO LOGICO / DESIGNACAO"],
+      },
+      {
+        label: "IP NAT",
+        mono: true,
+        aliases: ["IP NAT", "ip_nat"],
+        fallback: (row) => row.ip_nat,
+      },
+      {
+        label: "IP WAN",
+        mono: true,
+        aliases: ["IP WAN", "ip_wan"],
+        fallback: (row) => row.ip_wan,
+      },
+      {
+        label: "Loopback Principal",
+        mono: true,
+        aliases: ["LOOPBACK PRINCIPAL", "LOOPBACK PRIMARIO", "LOOTPBACK PRIMARIO", "loopback_wan"],
+        fallback: (row) => row.loopback_wan,
+      },
+      {
+        label: "IP / Loopback Switch",
+        mono: true,
+        aliases: ["IP SWITCH", "LOOPBACK SWITCH"],
+      },
+      {
+        label: "Rede LAN",
+        mono: true,
+        aliases: ["REDE LAN", "REDE_LAN"],
+      },
+      {
+        label: "Perímetro",
+        aliases: ["PERIMETRO", "PERÍMETRO", "PERÃMETRO"],
+      },
+    ],
+  },
+  {
+    title: "Link Secundário e Backup",
+    description: "Campos do circuito OEMP e tecnologias de contingência.",
+    fields: [
+      {
+        label: "CCTO OEMP",
+        mono: true,
+        aliases: ["CCTO OEMP", "ccto_oemp"],
+        fallback: (row) => row.ccto_oemp,
+      },
+      {
+        label: "Empresa OEMP",
+        aliases: ["EMPRESA OEMP"],
+      },
+      {
+        label: "Circuito OEMP",
+        mono: true,
+        aliases: ["CIRCUITO OEMP"],
+      },
+      {
+        label: "Loopback Secundário",
+        mono: true,
+        aliases: ["LOOPBACK SECUNDARIO", "LOOPBACK SECUNDÁRIO", "LOOPBACK SECUNDÃRIO", "loopback_lan"],
+        fallback: (row) => row.loopback_lan,
+      },
+      {
+        label: "Operadora 4G",
+        aliases: ["OPERADORA 4G", "OPERADORA", "operadora"],
+        fallback: (row) => row.operadora,
+      },
+      {
+        label: "SIM Card 4G",
+        mono: true,
+        aliases: ["SIM CARD 4G"],
+      },
+      {
+        label: "VSAT",
+        aliases: ["VSAT"],
+      },
+      {
+        label: "Meraki / PA Avançado",
+        mono: true,
+        aliases: ["PA AVANÇADO (MERAKI)", "PA AVANCADO (MERAKI)", "MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI"],
+      },
+      {
+        label: "Região",
+        aliases: ["REGIÃO", "REGIAO", "REGIÃƒO", "REGIÃƒO"],
+      },
+      {
+        label: "CEP",
+        mono: true,
+        aliases: ["CEP"],
+      },
+    ],
+  },
+  {
+    title: "Tecnologia e Equipamento",
+    description: "Informações técnicas adicionais da infraestrutura da UL.",
+    fields: [
+      {
+        label: "Tecnologia",
+        aliases: ["TECNOLOGIA"],
+      },
+      {
+        label: "Modelo Roteador",
+        aliases: ["MODELO ROTEADOR"],
+      },
+      {
+        label: "Atualizado em",
+        aliases: ["updated_at", "ATUALIZADO EM"],
+        fallback: (row) => row.updated_at,
+      },
+    ],
+  },
+];
+
+const FieldTile = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => {
+  return (
+    <div className="rounded-xl border bg-muted/25 p-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-sm break-words", mono ? "font-mono text-xs" : "")}>{value || "-"}</p>
+    </div>
+  );
 };
 
 const ConsultaMassaTab = () => {
@@ -134,10 +419,28 @@ const ConsultaMassaTab = () => {
     };
   }, [rows]);
 
-  const smartitData = useMemo(() => {
+  const selectedRawLookup = useMemo(() => {
     if (!selectedRow) return null;
-    return buildSmartitQuickData(selectedRow);
+    return buildRawLookup(selectedRow.raw_data);
   }, [selectedRow]);
+
+  const modalSections = useMemo(() => {
+    if (!selectedRow || !selectedRawLookup) return [] as Array<{ title: string; description: string; items: ModalField[] }>;
+
+    return FIELD_SECTIONS.map((section) => ({
+      title: section.title,
+      description: section.description,
+      items: section.fields.map((field) => ({
+        label: field.label,
+        mono: field.mono,
+        value: getFieldValue(selectedRow, selectedRawLookup, field),
+      })),
+    }));
+  }, [selectedRow, selectedRawLookup]);
+
+  const rawEntries = useMemo(() => {
+    return selectedRawLookup?.entries || [];
+  }, [selectedRawLookup]);
 
   const runLookup = async () => {
     const terms = dedupeTerms(parseTerms(input));
@@ -210,7 +513,7 @@ const ConsultaMassaTab = () => {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Clique em uma linha encontrada para abrir o detalhe estilo SMARTIT.
+                Clique em uma linha encontrada para abrir o detalhe completo da lotérica.
               </p>
 
               <div className="rounded-lg border overflow-auto max-h-[420px]">
@@ -266,84 +569,92 @@ const ConsultaMassaTab = () => {
       </Card>
 
       <Dialog open={!!selectedRow} onOpenChange={(open) => { if (!open) setSelectedRow(null); }}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden">
-          {selectedRow && smartitData && (
+        <DialogContent className="max-w-6xl p-0 overflow-hidden">
+          {selectedRow && (
             <>
-              <div className="bg-[#0B5EA8] text-white px-5 py-4 border-b">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-gradient-to-r from-[#0B5EA8] to-[#0673B7] text-white px-6 py-5 border-b">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/80">SMARTIT - Consulta UL</p>
-                    <h3 className="text-lg font-semibold mt-1">{normalizeText(selectedRow.nome_loterica) || "Lotérica"}</h3>
-                    <p className="text-sm font-mono mt-1">{normalizeText(selectedRow.cod_ul) || "-"}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-white/80">SMARTIT - Consulta UL</p>
+                    <h3 className="text-xl font-semibold mt-1">{normalizeText(selectedRow.nome_loterica) || "Lotérica"}</h3>
+                    <p className="text-sm font-mono mt-1">UL: {normalizeText(selectedRow.cod_ul) || "-"}</p>
                   </div>
-                  <Badge variant="outline" className="border-white/60 text-white bg-white/10">
-                    {normalizeText(selectedRow.status) || "-"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="border-white/70 text-white bg-white/10 font-mono">
+                      CCTO OI: {normalizeText(selectedRow.ccto_oi) || "-"}
+                    </Badge>
+                    <Badge variant="outline" className="border-white/70 text-white bg-white/10 font-mono">
+                      CCTO OEMP: {normalizeText(selectedRow.ccto_oemp) || "-"}
+                    </Badge>
+                    <Badge variant="outline" className="border-white/70 text-white bg-white/10">
+                      Status: {normalizeText(selectedRow.status) || "-"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-5 space-y-4 max-h-[72vh] overflow-y-auto">
+              <div className="p-6 space-y-5 max-h-[78vh] overflow-y-auto bg-background">
                 <DialogHeader>
-                  <DialogTitle>Detalhes da Lotérica</DialogTitle>
+                  <DialogTitle className="text-lg">Visão Completa da Planilha</DialogTitle>
                   <DialogDescription>
-                    Visualizacao rapida de dados operacionais para tratativa.
+                    Informações consolidadas da UL conforme a base importada da planilha (incluindo campos adicionais).
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-xs text-muted-foreground">Codigo UL</p>
-                    <p className="font-mono text-sm mt-1">{normalizeText(selectedRow.cod_ul) || "-"}</p>
-                  </div>
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-xs text-muted-foreground">CCTO OI / Designacao</p>
-                    <p className="font-mono text-sm mt-1">{normalizeText(selectedRow.ccto_oi || selectedRow.designacao_nova) || "-"}</p>
-                  </div>
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-xs text-muted-foreground">CCTO OEMP</p>
-                    <p className="font-mono text-sm mt-1">{normalizeText(selectedRow.ccto_oemp) || "-"}</p>
-                  </div>
-                </div>
+                {modalSections.map((section) => (
+                  <section key={section.title} className="space-y-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">{section.title}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                      {section.items.map((field) => (
+                        <FieldTile
+                          key={`${section.title}-${field.label}`}
+                          label={field.label}
+                          value={field.value}
+                          mono={field.mono}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Link Principal</p>
-                    <p className="font-mono text-sm mt-1">Loopback: {getLookupIp(selectedRow, "primario") || "-"}</p>
-                    <p className="text-xs mt-1">IP NAT: <span className="font-mono">{smartitData.ipNat}</span></p>
-                    <p className="text-xs mt-1">IP WAN: <span className="font-mono">{smartitData.ipWan}</span></p>
+                <section className="space-y-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Campos Brutos da Planilha</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Lista completa dos campos recebidos no `raw_data` da importação.
+                    </p>
                   </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Link Secundario / Backup</p>
-                    <p className="font-mono text-sm mt-1">Loopback: {getLookupIp(selectedRow, "secundario") || "-"}</p>
-                    <p className="text-xs mt-1">Operadora: <span className="font-medium">{smartitData.operadora}</span></p>
-                    <p className="text-xs mt-1">SIM 4G: <span className="font-mono">{smartitData.sim4g}</span></p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Owner</p>
-                    <p className="text-sm mt-1">{smartitData.owner}</p>
+                  <div className="rounded-xl border overflow-hidden">
+                    <div className="max-h-[320px] overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/60 sticky top-0">
+                          <tr className="text-left">
+                            <th className="p-2 font-medium">Campo da Planilha</th>
+                            <th className="p-2 font-medium">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rawEntries.length === 0 ? (
+                            <tr className="border-t">
+                              <td colSpan={2} className="p-3 text-muted-foreground">Sem dados brutos disponíveis para esta lotérica.</td>
+                            </tr>
+                          ) : (
+                            rawEntries.map((entry) => (
+                              <tr key={entry.key} className="border-t align-top">
+                                <td className="p-2 font-mono text-[11px]">{entry.key}</td>
+                                <td className="p-2 break-words">{entry.value}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Resp. Backup</p>
-                    <p className="text-sm mt-1">{smartitData.responsavelBackup}</p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Tipo UL / TFL</p>
-                    <p className="text-sm mt-1">{smartitData.tipoUl} / {smartitData.tfl}</p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">Tecnologia / Perimetro</p>
-                    <p className="text-sm mt-1">{smartitData.tecnologia} / {smartitData.perimetro}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Endereco e Contato</p>
-                  <p className="text-sm mt-1">{smartitData.endereco}</p>
-                  <p className="text-sm mt-1">{smartitData.contato}</p>
-                </div>
+                </section>
               </div>
             </>
           )}

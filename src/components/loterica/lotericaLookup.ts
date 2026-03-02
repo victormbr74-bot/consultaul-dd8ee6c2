@@ -9,9 +9,17 @@ export interface LotericaLookupRow {
   ccto_oi: string | null;
   ccto_oemp: string | null;
   designacao_nova: string | null;
+  operadora: string | null;
+  ip_nat: string | null;
+  ip_wan: string | null;
   loopback_wan: string | null;
   loopback_lan: string | null;
+  endereco: string | null;
+  contato: string | null;
+  cidade: string | null;
+  uf: string | null;
   status: string | null;
+  updated_at: string | null;
   raw_data: Record<string, unknown> | null;
 }
 
@@ -136,7 +144,9 @@ const fetchByColumn = async (column: MatchField, terms: string[]) => {
 
     const { data, error } = await (supabase as any)
       .from("lotericas")
-      .select("cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,loopback_wan,loopback_lan,status,raw_data")
+      .select(
+        "cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data",
+      )
       .in(column, queryTerms);
 
     if (error) {

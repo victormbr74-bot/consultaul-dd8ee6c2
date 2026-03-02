@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Plus } from "lucide-react";
 
 interface MascaraTabProps {
   form: any;
@@ -108,6 +108,33 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const [contatoEnc, setContatoEnc] = useState("Manoel Victor - 61 3464-9700");
   const [normAutoMode, setNormAutoMode] = useState(true);
   const [tempoBgp, setTempoBgp] = useState("");
+
+  // Custom items added by user
+  const [customFalhas, setCustomFalhas] = useState<string[]>([]);
+  const [customCausas, setCustomCausas] = useState<string[]>([]);
+  const [newFalha, setNewFalha] = useState("");
+  const [newCausa, setNewCausa] = useState("");
+
+  const allFalhas = useMemo(() => [...FALHAS_ENCERRAMENTO, ...customFalhas], [customFalhas]);
+  const allCausas = useMemo(() => [...CAUSAS_ENCERRAMENTO, ...customCausas], [customCausas]);
+
+  const addFalha = () => {
+    const v = newFalha.trim();
+    if (v && !allFalhas.includes(v)) {
+      setCustomFalhas((prev) => [...prev, v]);
+      setFalhaEnc(v);
+    }
+    setNewFalha("");
+  };
+
+  const addCausa = () => {
+    const v = newCausa.trim();
+    if (v && !allCausas.includes(v)) {
+      setCustomCausas((prev) => [...prev, v]);
+      setCausaEnc(v);
+    }
+    setNewCausa("");
+  };
 
   // Parse "dd/MM/yyyy HH:mm[:ss]" and common PT-BR variants to Date
   const parseDateBr = useCallback((str: string): Date | null => {
@@ -382,11 +409,23 @@ Contato de Autorizacao: ${contatoEnc}`;
                 <Select value={falhaEnc} onValueChange={setFalhaEnc}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {FALHAS_ENCERRAMENTO.map((falha) => (
+                    {allFalhas.map((falha) => (
                       <SelectItem key={falha} value={falha}>{falha}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex gap-1 mt-1">
+                  <Input
+                    value={newFalha}
+                    onChange={(e) => setNewFalha(e.target.value)}
+                    placeholder="Nova falha..."
+                    className="text-xs h-7"
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFalha())}
+                  />
+                  <Button variant="outline" size="sm" className="h-7 px-2" onClick={addFalha} disabled={!newFalha.trim()}>
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
               {/* Auto/Manual toggle */}
               <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-md bg-muted/50">
@@ -438,11 +477,23 @@ Contato de Autorizacao: ${contatoEnc}`;
                 <Select value={causaEnc} onValueChange={setCausaEnc}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {CAUSAS_ENCERRAMENTO.map((causa) => (
+                    {allCausas.map((causa) => (
                       <SelectItem key={causa} value={causa} className="text-xs">{causa}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex gap-1 mt-1">
+                  <Input
+                    value={newCausa}
+                    onChange={(e) => setNewCausa(e.target.value)}
+                    placeholder="Nova causa/solução..."
+                    className="text-xs h-7"
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCausa())}
+                  />
+                  <Button variant="outline" size="sm" className="h-7 px-2" onClick={addCausa} disabled={!newCausa.trim()}>
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
               <div className="md:col-span-2">
                 <Label className="text-xs">Contato de Autorização</Label>

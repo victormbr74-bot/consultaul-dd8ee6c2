@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2, LayoutDashboard, Radio, Shield, Gauge, ChevronDown } from "lucide-react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2, LayoutDashboard, Radio, Shield, Gauge, ChevronDown, ListChecks } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,6 +33,7 @@ export function AppSidebar() {
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
+    { id: "consulta-massa", label: "Consulta Massa", icon: ListChecks },
     { id: "mascara", label: "Máscara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Pingao", icon: Wifi },

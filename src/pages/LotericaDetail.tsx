@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save, History } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
+import ConsultaMassaTab from "@/components/loterica/ConsultaMassaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
 import Ping99Tab from "@/components/loterica/Ping99Tab";
@@ -278,6 +279,7 @@ const LotericaDetail = () => {
 
       <main className="container px-4 py-6 max-w-5xl">
         {lotericaTab === "consulta" && <ConsultaTab form={form} setForm={setForm} />}
+        {lotericaTab === "consulta-massa" && <ConsultaMassaTab />}
         {lotericaTab === "mascara" && <MascaraTab form={form} />}
         {lotericaTab === "testes" && <TestesTab form={form} />}
         {lotericaTab === "ping99" && <Ping99Tab form={form} />}

@@ -1,28 +1,44 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
+import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Activity } from "lucide-react";
+import { Copy, Check, Activity, Download } from "lucide-react";
 import {
   dedupeTerms,
   fetchLookupRows,
   getLookupIp,
   parseTerms,
   resolveMatches,
+  normalizeText,
   type LinkTarget,
+  type LotericaLookupRow,
 } from "@/components/loterica/lotericaLookup";
 
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PINGAO_REPEAT = 2;
 
 type LinkProfile = "principal_backup" | "4g" | "vsat";
-
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "ALTA LATENCIA" | "SEM DADOS";
 
-interface ParsedPingRow {
+type LookupStatus = "ok" | "missing_ip" | "not_found";
+
+interface LookupSummaryItem {
+  query: string;
+  status: LookupStatus;
+  ip: string;
+  codUl: string;
+  profile: LinkProfile;
+  profileLabel: string;
+  limitMs: number;
+  techSource: string;
+}
+
+interface ParsedPingMetrics {
   ip: string;
   successRate: number | null;
   sent: number | null;
@@ -31,17 +47,147 @@ interface ParsedPingRow {
   minMs: number | null;
   avgMs: number | null;
   maxMs: number | null;
+}
+
+interface AnalyzedPingRow extends ParsedPingMetrics {
+  query: string;
+  codUl: string;
+  profileLabel: string;
+  limitMs: number;
   status: PingStatus;
   reason: string;
 }
 
-const LINK_PROFILES: Array<{ id: LinkProfile; label: string; limitMs: number }> = [
-  { id: "principal_backup", label: "Principal / Backup (BRISANET)", limitMs: 150 },
-  { id: "4g", label: "4G", limitMs: 400 },
-  { id: "vsat", label: "VSAT", limitMs: 900 },
-];
+const PROFILE_LIMITS: Record<LinkProfile, number> = {
+  principal_backup: 150,
+  "4g": 400,
+  vsat: 900,
+};
+
+const PROFILE_LABELS: Record<LinkProfile, string> = {
+  principal_backup: "Principal / Backup",
+  "4g": "4G",
+  vsat: "VSAT",
+};
 
 const padOctet = (value: string) => value.padStart(3, "0");
+
+const toUpperNoAccent = (value: unknown) => {
+  return normalizeText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+};
+
+const isMeaningfulValue = (value: unknown) => {
+  const normalized = toUpperNoAccent(value);
+  if (!normalized) return false;
+  if (["-", "N/A", "NA", "0", "[OBJECT OBJECT]", "NULL", "UNDEFINED", "NAO OEMP"].includes(normalized)) {
+    return false;
+  }
+  return true;
+};
+
+const readRawByAliases = (row: LotericaLookupRow, aliases: string[]) => {
+  const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+
+  const exactMap = new Map<string, unknown>();
+  const looseMap = new Map<string, unknown>();
+
+  for (const [key, value] of Object.entries(raw)) {
+    const exact = key.trim().toUpperCase();
+    const loose = key
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    if (exact && !exactMap.has(exact)) exactMap.set(exact, value);
+    if (loose && !looseMap.has(loose)) looseMap.set(loose, value);
+  }
+
+  for (const alias of aliases) {
+    const exact = alias.trim().toUpperCase();
+    const loose = alias
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    const exactHit = exactMap.get(exact);
+    if (exactHit !== undefined && exactHit !== null && normalizeText(exactHit)) return normalizeText(exactHit);
+
+    const looseHit = looseMap.get(loose);
+    if (looseHit !== undefined && looseHit !== null && normalizeText(looseHit)) return normalizeText(looseHit);
+  }
+
+  return "";
+};
+
+const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
+  const tecnologia = readRawByAliases(row, ["TECNOLOGIA"]);
+  const perimetro = readRawByAliases(row, ["PERIMETRO", "PERÍMETRO", "PERIMETRO"]);
+  const operadora4g = readRawByAliases(row, ["OPERADORA 4G", "OPERADORA"]);
+  const vsat = readRawByAliases(row, ["VSAT"]);
+  const sim4g = readRawByAliases(row, ["SIM CARD 4G"]);
+
+  const signalParts = [
+    tecnologia,
+    perimetro,
+    operadora4g || row.operadora || "",
+    vsat,
+    sim4g,
+    target === "primario" ? row.ccto_oi : row.ccto_oemp,
+  ].filter(Boolean);
+
+  const signalText = signalParts.join(" | ");
+  const signal = toUpperNoAccent(signalText);
+
+  const hasVSAT = signal.includes("VSAT") || isMeaningfulValue(vsat);
+  const hasBrisanet = signal.includes("BRISANET");
+  const has4GKeyword =
+    signal.includes("4G") ||
+    signal.includes("ARQIA") ||
+    signal.includes("TIM") ||
+    signal.includes("VIVO") ||
+    signal.includes("CLARO");
+
+  const has4GSim = isMeaningfulValue(sim4g);
+
+  if (hasVSAT) {
+    return {
+      profile: "vsat" as const,
+      profileLabel: PROFILE_LABELS.vsat,
+      limitMs: PROFILE_LIMITS.vsat,
+      techSource: signalText || "VSAT",
+    };
+  }
+
+  if (hasBrisanet) {
+    return {
+      profile: "principal_backup" as const,
+      profileLabel: "Backup BRISANET",
+      limitMs: PROFILE_LIMITS.principal_backup,
+      techSource: signalText || "BRISANET",
+    };
+  }
+
+  if (target === "secundario" && (has4GKeyword || has4GSim)) {
+    return {
+      profile: "4g" as const,
+      profileLabel: PROFILE_LABELS["4g"],
+      limitMs: PROFILE_LIMITS["4g"],
+      techSource: signalText || "4G",
+    };
+  }
+
+  return {
+    profile: "principal_backup" as const,
+    profileLabel: PROFILE_LABELS.principal_backup,
+    limitMs: PROFILE_LIMITS.principal_backup,
+    techSource: signalText || "Principal/Backup",
+  };
+};
 
 const parseIpOctets = (value: string) => {
   const fullMatch = value.match(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/);
@@ -80,62 +226,25 @@ const buildTclScriptFromIps = (ips: string[]) => {
   return `tclsh\nforeach add {\n${commands}\n} { ping $add }`;
 };
 
-const statusBadgeVariant = (status: PingStatus) => {
-  if (status === "UP") return "default" as const;
-  if (status === "SEM DADOS") return "outline" as const;
-  return "destructive" as const;
-};
-
-const parsePingOutput = (text: string, latencyLimit: number): ParsedPingRow[] => {
+const parsePingOutput = (text: string): ParsedPingMetrics[] => {
   const lines = text.split(/\r?\n/);
-  const rows: ParsedPingRow[] = [];
+  const rows: ParsedPingMetrics[] = [];
 
-  let current: Omit<ParsedPingRow, "status" | "reason"> | null = null;
+  let current: ParsedPingMetrics | null = null;
 
   const flushCurrent = () => {
     if (!current) return;
 
-    const successRate = current.successRate;
-    const sent = current.sent;
-    const received = current.received;
-
     let lossPct = current.lossPct;
     if (lossPct === null) {
-      if (typeof sent === "number" && typeof received === "number" && sent > 0) {
-        lossPct = Math.max(0, Number((((sent - received) / sent) * 100).toFixed(2)));
-      } else if (typeof successRate === "number") {
-        lossPct = Math.max(0, Number((100 - successRate).toFixed(2)));
+      if (typeof current.sent === "number" && typeof current.received === "number" && current.sent > 0) {
+        lossPct = Math.max(0, Number((((current.sent - current.received) / current.sent) * 100).toFixed(2)));
+      } else if (typeof current.successRate === "number") {
+        lossPct = Math.max(0, Number((100 - current.successRate).toFixed(2)));
       }
     }
 
-    const latencyRef = current.avgMs ?? current.maxMs ?? null;
-
-    let status: PingStatus = "SEM DADOS";
-    let reason = "Nao foi possivel identificar sucesso do ping.";
-
-    if (typeof successRate === "number") {
-      if (successRate <= 0 || received === 0) {
-        status = "DOWN";
-        reason = "Sem respostas ICMP.";
-      } else if (typeof lossPct === "number" && lossPct > 0) {
-        status = "PERDA DE PACOTE";
-        reason = `Perda de pacote detectada (${lossPct}%).`;
-      } else if (typeof latencyRef === "number" && latencyRef > latencyLimit) {
-        status = "ALTA LATENCIA";
-        reason = `Latencia acima do limite (${latencyRef} ms > ${latencyLimit} ms).`;
-      } else {
-        status = "UP";
-        reason = "Sem perda e latencia dentro do limite.";
-      }
-    }
-
-    rows.push({
-      ...current,
-      lossPct,
-      status,
-      reason,
-    });
-
+    rows.push({ ...current, lossPct });
     current = null;
   };
 
@@ -183,33 +292,66 @@ const parsePingOutput = (text: string, latencyLimit: number): ParsedPingRow[] =>
   return rows;
 };
 
+const evaluateStatus = (row: ParsedPingMetrics, limitMs: number): { status: PingStatus; reason: string } => {
+  const latencyRef = row.avgMs ?? row.maxMs ?? null;
+
+  if (typeof row.successRate !== "number") {
+    return { status: "SEM DADOS", reason: "Nao foi possivel identificar sucesso do ping." };
+  }
+
+  if (row.successRate <= 0 || row.received === 0) {
+    return { status: "DOWN", reason: "Sem respostas ICMP." };
+  }
+
+  if (typeof row.lossPct === "number" && row.lossPct > 0) {
+    return { status: "PERDA DE PACOTE", reason: `Perda de pacote detectada (${row.lossPct}%).` };
+  }
+
+  if (typeof latencyRef === "number" && latencyRef > limitMs) {
+    return {
+      status: "ALTA LATENCIA",
+      reason: `Latencia acima do limite (${latencyRef} ms > ${limitMs} ms).`,
+    };
+  }
+
+  return { status: "UP", reason: "Sem perda e latencia dentro do limite." };
+};
+
+const statusBadgeClass = (status: PingStatus) => {
+  if (status === "UP") {
+    return "border-green-500/50 bg-green-500/15 text-green-700 dark:text-green-400";
+  }
+  if (status === "DOWN") {
+    return "border-red-500/50 bg-red-500/15 text-red-700 dark:text-red-400";
+  }
+  if (status === "PERDA DE PACOTE" || status === "ALTA LATENCIA") {
+    return "border-orange-500/50 bg-orange-500/15 text-orange-700 dark:text-orange-400";
+  }
+  return "border-muted-foreground/30 bg-muted/20 text-muted-foreground";
+};
+
 const PingaoTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [target, setTarget] = useState<LinkTarget>("primario");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [querySummary, setQuerySummary] = useState<Array<{ query: string; status: "ok" | "missing_ip" | "not_found"; ip: string }>>([]);
+  const [querySummary, setQuerySummary] = useState<LookupSummaryItem[]>([]);
   const [script, setScript] = useState("");
 
-  const [profile, setProfile] = useState<LinkProfile>("principal_backup");
   const [pingResultInput, setPingResultInput] = useState("");
-  const [pingRows, setPingRows] = useState<ParsedPingRow[]>([]);
-
-  const selectedProfile = useMemo(() => {
-    return LINK_PROFILES.find((item) => item.id === profile) || LINK_PROFILES[0];
-  }, [profile]);
+  const [analysisRows, setAnalysisRows] = useState<AnalyzedPingRow[]>([]);
 
   const pingSummary = useMemo(() => {
-    const total = pingRows.length;
-    const up = pingRows.filter((row) => row.status === "UP").length;
-    const down = pingRows.filter((row) => row.status === "DOWN").length;
-    const loss = pingRows.filter((row) => row.status === "PERDA DE PACOTE").length;
-    const highLatency = pingRows.filter((row) => row.status === "ALTA LATENCIA").length;
-    const noData = pingRows.filter((row) => row.status === "SEM DADOS").length;
+    const total = analysisRows.length;
+    const up = analysisRows.filter((row) => row.status === "UP").length;
+    const down = analysisRows.filter((row) => row.status === "DOWN").length;
+    const loss = analysisRows.filter((row) => row.status === "PERDA DE PACOTE").length;
+    const highLatency = analysisRows.filter((row) => row.status === "ALTA LATENCIA").length;
+    const noData = analysisRows.filter((row) => row.status === "SEM DADOS").length;
 
     return { total, up, down, loss, highLatency, noData };
-  }, [pingRows]);
+  }, [analysisRows]);
 
   const copy = (text: string, id: string) => {
     if (!text) return;
@@ -234,21 +376,50 @@ const PingaoTab = () => {
       const rows = await fetchLookupRows(terms);
       const matches = resolveMatches(terms, rows);
 
-      const summary = matches.map((match) => {
+      const summary: LookupSummaryItem[] = matches.map((match) => {
         if (!match.row) {
-          return { query: match.query, status: "not_found" as const, ip: "" };
+          return {
+            query: match.query,
+            status: "not_found",
+            ip: "",
+            codUl: "-",
+            profile: "principal_backup",
+            profileLabel: "Nao identificado",
+            limitMs: PROFILE_LIMITS.principal_backup,
+            techSource: "-",
+          };
         }
 
         const ip = getLookupIp(match.row, target);
+        const profileData = detectLatencyProfile(match.row, target);
+
         if (!ip) {
-          return { query: match.query, status: "missing_ip" as const, ip: "" };
+          return {
+            query: match.query,
+            status: "missing_ip",
+            ip: "",
+            codUl: normalizeText(match.row.cod_ul) || "-",
+            profile: profileData.profile,
+            profileLabel: profileData.profileLabel,
+            limitMs: profileData.limitMs,
+            techSource: profileData.techSource,
+          };
         }
 
-        return { query: match.query, status: "ok" as const, ip };
+        return {
+          query: match.query,
+          status: "ok",
+          ip,
+          codUl: normalizeText(match.row.cod_ul) || "-",
+          profile: profileData.profile,
+          profileLabel: profileData.profileLabel,
+          limitMs: profileData.limitMs,
+          techSource: profileData.techSource,
+        };
       });
 
       setQuerySummary(summary);
-      setScript(buildTclScriptFromIps(summary.map((item) => item.ip).filter(Boolean)));
+      setScript(buildTclScriptFromIps(summary.filter((item) => item.status === "ok").map((item) => item.ip)));
     } catch (lookupError) {
       setQuerySummary([]);
       setScript("");
@@ -259,8 +430,59 @@ const PingaoTab = () => {
   };
 
   const runPingResultAnalysis = () => {
-    const rows = parsePingOutput(pingResultInput, selectedProfile.limitMs);
-    setPingRows(rows);
+    const parsed = parsePingOutput(pingResultInput);
+
+    const ipIndex = new Map<string, LookupSummaryItem>();
+    for (const item of querySummary) {
+      if (item.status !== "ok" || !item.ip) continue;
+      if (!ipIndex.has(item.ip)) ipIndex.set(item.ip, item);
+    }
+
+    const analyzed = parsed.map((row) => {
+      const mapped = ipIndex.get(row.ip);
+      const limitMs = mapped?.limitMs ?? PROFILE_LIMITS.principal_backup;
+      const { status, reason } = evaluateStatus(row, limitMs);
+
+      return {
+        ...row,
+        query: mapped?.query || "-",
+        codUl: mapped?.codUl || "-",
+        profileLabel: mapped?.profileLabel || "Padrao",
+        limitMs,
+        status,
+        reason,
+      };
+    });
+
+    setAnalysisRows(analyzed);
+  };
+
+  const exportResultXlsx = async () => {
+    if (!analysisRows.length) return;
+
+    try {
+      const exportRows = analysisRows.map((row) => ({
+        "Codigo UL": row.codUl,
+        "Consulta": row.query,
+        "IP": row.ip,
+        "Perfil Latencia": row.profileLabel,
+        "Limite (ms)": row.limitMs,
+        "Sucesso (%)": row.successRate ?? "",
+        "Pacotes Recebidos": row.received ?? "",
+        "Pacotes Enviados": row.sent ?? "",
+        "Perda (%)": row.lossPct ?? "",
+        "Latencia Min (ms)": row.minMs ?? "",
+        "Latencia Avg (ms)": row.avgMs ?? "",
+        "Latencia Max (ms)": row.maxMs ?? "",
+        "Status": row.status,
+        "Observacao": row.reason,
+      }));
+
+      const wb = jsonToWorkbook([{ name: "Pingao Resultado", data: exportRows }]);
+      await writeFile(wb, "pingao_resultado.xlsx");
+    } catch (exportError) {
+      alert("Falha ao exportar resultado: " + String((exportError as Error)?.message || exportError));
+    }
   };
 
   return (
@@ -322,16 +544,23 @@ const PingaoTab = () => {
             </Button>
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            O limite de latencia e definido automaticamente com base na tecnologia do link e no tipo selecionado (Primario/Secundario).
+          </p>
+
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {querySummary.length > 0 && (
-            <div className="rounded-lg border overflow-auto max-h-[260px]">
+            <div className="rounded-lg border overflow-auto max-h-[280px]">
               <table className="w-full text-xs">
                 <thead className="bg-muted/60 sticky top-0">
                   <tr className="text-left">
                     <th className="p-2 font-medium">Consulta</th>
                     <th className="p-2 font-medium">Status</th>
+                    <th className="p-2 font-medium">Codigo UL</th>
                     <th className="p-2 font-medium">IP</th>
+                    <th className="p-2 font-medium">Perfil</th>
+                    <th className="p-2 font-medium">Limite</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,10 +568,13 @@ const PingaoTab = () => {
                     const text = item.status === "ok" ? "Pronto" : item.status === "missing_ip" ? "Sem IP" : "Nao encontrado";
                     const variant = item.status === "ok" ? "default" : item.status === "missing_ip" ? "secondary" : "outline";
                     return (
-                      <tr key={`${item.query}-${idx}`} className="border-t">
+                      <tr key={`${item.query}-${idx}`} className="border-t align-top">
                         <td className="p-2 font-mono">{item.query}</td>
                         <td className="p-2"><Badge variant={variant}>{text}</Badge></td>
+                        <td className="p-2 font-mono">{item.codUl}</td>
                         <td className="p-2 font-mono">{item.ip || "-"}</td>
+                        <td className="p-2">{item.profileLabel}</td>
+                        <td className="p-2 font-mono">{item.limitMs} ms</td>
                       </tr>
                     );
                   })}
@@ -365,35 +597,20 @@ const PingaoTab = () => {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Analise de Resultado do Ping</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => void exportResultXlsx()} disabled={!analysisRows.length}>
+            <Download className="w-4 h-4 mr-1" /> Exportar XLSX
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Perfil de latencia</Label>
-            <RadioGroup
-              value={profile}
-              onValueChange={(value) => setProfile(value as LinkProfile)}
-              className="grid gap-2 md:grid-cols-3"
-            >
-              {LINK_PROFILES.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 rounded border p-2">
-                  <RadioGroupItem value={item.id} id={`profile-${item.id}`} />
-                  <Label htmlFor={`profile-${item.id}`} className="text-xs">
-                    {item.label} ({">"} {item.limitMs} ms)
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="ping-result-input">Cole o resultado do ping</Label>
             <Textarea
               id="ping-result-input"
               value={pingResultInput}
               onChange={(e) => setPingResultInput(e.target.value)}
-              className="min-h-[170px] font-mono text-xs"
+              className="min-h-[190px] font-mono text-xs"
               placeholder="Type escape sequence to abort.\nSending 2, 100-byte ICMP Echos to 10.50.143.98..."
             />
           </div>
@@ -404,29 +621,31 @@ const PingaoTab = () => {
               variant="outline"
               onClick={() => {
                 setPingResultInput("");
-                setPingRows([]);
+                setAnalysisRows([]);
               }}
             >
               Limpar
             </Button>
           </div>
 
-          {pingRows.length > 0 && (
+          {analysisRows.length > 0 && (
             <>
               <div className="flex flex-wrap gap-2 text-xs">
                 <Badge variant="outline">Total: {pingSummary.total}</Badge>
-                <Badge variant="default">UP: {pingSummary.up}</Badge>
-                <Badge variant="destructive">DOWN: {pingSummary.down}</Badge>
-                <Badge variant="destructive">Perda: {pingSummary.loss}</Badge>
-                <Badge variant="destructive">Alta latencia: {pingSummary.highLatency}</Badge>
-                <Badge variant="outline">Sem dados: {pingSummary.noData}</Badge>
+                <Badge variant="outline" className={statusBadgeClass("UP")}>UP: {pingSummary.up}</Badge>
+                <Badge variant="outline" className={statusBadgeClass("DOWN")}>DOWN: {pingSummary.down}</Badge>
+                <Badge variant="outline" className={statusBadgeClass("PERDA DE PACOTE")}>Perda: {pingSummary.loss}</Badge>
+                <Badge variant="outline" className={statusBadgeClass("ALTA LATENCIA")}>Alta latencia: {pingSummary.highLatency}</Badge>
+                <Badge variant="outline" className={statusBadgeClass("SEM DADOS")}>Sem dados: {pingSummary.noData}</Badge>
               </div>
 
-              <div className="rounded-lg border overflow-auto max-h-[360px]">
+              <div className="rounded-lg border overflow-auto max-h-[420px]">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/60 sticky top-0">
                     <tr className="text-left">
+                      <th className="p-2 font-medium">Codigo UL</th>
                       <th className="p-2 font-medium">IP</th>
+                      <th className="p-2 font-medium">Perfil</th>
                       <th className="p-2 font-medium">Sucesso</th>
                       <th className="p-2 font-medium">Perda</th>
                       <th className="p-2 font-medium">Latencia (min/avg/max)</th>
@@ -435,9 +654,11 @@ const PingaoTab = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {pingRows.map((row, idx) => (
+                    {analysisRows.map((row, idx) => (
                       <tr key={`${row.ip}-${idx}`} className="border-t align-top">
+                        <td className="p-2 font-mono">{row.codUl}</td>
                         <td className="p-2 font-mono">{row.ip}</td>
+                        <td className="p-2">{row.profileLabel} ({row.limitMs} ms)</td>
                         <td className="p-2">{row.successRate !== null ? `${row.successRate}%` : "-"}</td>
                         <td className="p-2">{row.lossPct !== null ? `${row.lossPct}%` : "-"}</td>
                         <td className="p-2 font-mono">
@@ -446,7 +667,9 @@ const PingaoTab = () => {
                             : "-"}
                         </td>
                         <td className="p-2">
-                          <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
+                          <Badge variant="outline" className={cn(statusBadgeClass(row.status), "font-semibold")}>
+                            {row.status}
+                          </Badge>
                         </td>
                         <td className="p-2">{row.reason}</td>
                       </tr>

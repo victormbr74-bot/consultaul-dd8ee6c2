@@ -24,13 +24,17 @@ const Dashboard = () => {
   const importRef = useRef<HTMLInputElement>(null);
 
   const fetchLotericas = useCallback(async () => {
+    if (!search.trim()) {
+      setLotericas([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      let query = supabase.from("lotericas").select("*", { count: "exact" });
-      if (search.trim()) {
-        const s = `%${search.trim()}%`;
-        query = query.or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`);
-      }
+      const s = `%${search.trim()}%`;
+      let query = supabase.from("lotericas").select("*", { count: "exact" })
+        .or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`);
 
       const { data, count, error } = await query
         .order("cod_ul")
@@ -264,10 +268,16 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
-          <span>{total} {"lot\u00E9ricas encontradas"}</span>
-          <span>{"P\u00E1gina"} {page + 1} {"de"} {totalPages || 1}</span>
-        </div>
+        {search.trim() ? (
+          <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
+            <span>{total} {"lot\u00E9ricas encontradas"}</span>
+            <span>{"P\u00E1gina"} {page + 1} {"de"} {totalPages || 1}</span>
+          </div>
+        ) : (
+          <div className="mb-4 text-sm text-muted-foreground">
+            Digite um código, nome, CCTO ou cidade para pesquisar.
+          </div>
+        )}
 
         <Card>
           <CardContent className="p-0">

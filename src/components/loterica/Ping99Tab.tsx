@@ -75,8 +75,14 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
   const ips = useMemo<PingIp[]>(() => {
     if (!base) return [];
     const result: PingIp[] = [];
+    // First IP is the LAN IP itself
+    result.push({
+      normal: base.octets.join("."),
+      padded: base.octets.map((octet) => padOctet(String(octet))).join("."),
+    });
+    // Then 15 more IPs incrementing from LAN
     let current = base.octets;
-    for (let i = 0; i < SEQUENCE_SIZE; i++) {
+    for (let i = 0; i < SEQUENCE_SIZE - 1; i++) {
       const next = incrementIp(current);
       if (!next) break;
       current = next;

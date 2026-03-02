@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,7 @@ import ConsultaMassaTab from "@/components/loterica/ConsultaMassaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
 import Ping99Tab from "@/components/loterica/Ping99Tab";
+import PingaoTab from "@/components/loterica/PingaoTab";
 
 const LotericaDetail = () => {
   const { codUl } = useParams();
@@ -283,6 +284,7 @@ const LotericaDetail = () => {
         {lotericaTab === "mascara" && <MascaraTab form={form} />}
         {lotericaTab === "testes" && <TestesTab form={form} />}
         {lotericaTab === "ping99" && <Ping99Tab form={form} />}
+        {lotericaTab === "pingao" && <PingaoTab />}
 
         {showHistory && (
           <Card className="mt-6 animate-fade-in">

@@ -4,6 +4,7 @@ import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
+import PingaoTab from "@/components/loterica/PingaoTab";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +15,7 @@ const EXPORT_BATCH_SIZE = 1000;
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { setOnExport, setOnImportClick, setShowLotericaTabs, setLotericaTab } = useSidebarActions();
+  const { setOnExport, setOnImportClick, setShowLotericaTabs, setLotericaTab, lotericaTab } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -246,6 +247,10 @@ const Dashboard = () => {
         disabled={importing}
       />
       <main className="container px-4 py-6 max-w-6xl">
+        {lotericaTab === "pingao" ? (
+          <PingaoTab />
+        ) : (
+          <>
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -344,6 +349,8 @@ const Dashboard = () => {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

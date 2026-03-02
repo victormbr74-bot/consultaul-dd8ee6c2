@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
+import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -249,6 +250,8 @@ const Dashboard = () => {
       <main className="container px-4 py-6 max-w-6xl">
         {lotericaTab === "pingao" ? (
           <PingaoTab />
+        ) : lotericaTab === "script-router-sct" ? (
+          <ScriptRouterSctTab />
         ) : (
           <>
         <div className="flex flex-col sm:flex-row gap-3 mb-6">

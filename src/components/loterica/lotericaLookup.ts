@@ -83,12 +83,12 @@ const normalizeIp = (value: unknown) => {
   return octets.join(".");
 };
 
-const getPrimaryLoopback = (row: LotericaLookupRow) => {
+export const getPrimaryLoopbackValue = (row: LotericaLookupRow) => {
   const raw = toRawObject(row.raw_data);
   return normalizeText(row.loopback_wan || getRawString(raw, LOOPBACK_PRIMARIO_KEYS));
 };
 
-const getSecondaryLoopback = (row: LotericaLookupRow) => {
+export const getSecondaryLoopbackValue = (row: LotericaLookupRow) => {
   const raw = toRawObject(row.raw_data);
   const rawSec = getRawString(raw, LOOPBACK_SECUNDARIO_KEYS);
   const rowSecondary = normalizeText(row.loopback_lan);
@@ -102,8 +102,13 @@ const getSecondaryLoopback = (row: LotericaLookupRow) => {
   return normalizeText(rowSecondary || rawSec);
 };
 
+export const getRedeLanValue = (row: LotericaLookupRow) => {
+  const raw = toRawObject(row.raw_data);
+  return normalizeText(getRawString(raw, REDE_LAN_KEYS));
+};
+
 export const getLookupIp = (row: LotericaLookupRow, target: LinkTarget) => {
-  const candidate = target === "primario" ? getPrimaryLoopback(row) : getSecondaryLoopback(row);
+  const candidate = target === "primario" ? getPrimaryLoopbackValue(row) : getSecondaryLoopbackValue(row);
   return normalizeIp(candidate);
 };
 

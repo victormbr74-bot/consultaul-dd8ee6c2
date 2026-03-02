@@ -36,6 +36,7 @@ export function AppSidebar() {
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
     { id: "pingao", label: "Pingao", icon: Activity },
+    { id: "script-router-sct", label: "Script Router SCT", icon: Terminal },
   ];
 
   const fetchPendingChangeCount = useCallback(async () => {
@@ -275,3 +276,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

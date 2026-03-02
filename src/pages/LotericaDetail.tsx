@@ -12,6 +12,7 @@ import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
 import Ping99Tab from "@/components/loterica/Ping99Tab";
 import PingaoTab from "@/components/loterica/PingaoTab";
+import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 
 const LotericaDetail = () => {
   const { codUl } = useParams();
@@ -285,6 +286,7 @@ const LotericaDetail = () => {
         {lotericaTab === "testes" && <TestesTab form={form} />}
         {lotericaTab === "ping99" && <Ping99Tab form={form} />}
         {lotericaTab === "pingao" && <PingaoTab />}
+        {lotericaTab === "script-router-sct" && <ScriptRouterSctTab initialCodUl={String(codUl || "")} />}
 
         {showHistory && (
           <Card className="mt-6 animate-fade-in">

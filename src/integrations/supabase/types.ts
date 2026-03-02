@@ -152,6 +152,102 @@ export type Database = {
         }
         Relationships: []
       }
+      falhas_gis: {
+        Row: {
+          categoria_gis: string | null
+          categoria_gis_secundaria: string | null
+          chamado: string | null
+          cidade: string | null
+          cod_ul: string | null
+          data_hora_inicial: string | null
+          designacao: string | null
+          duracao_horas: number | null
+          empresa: string | null
+          id_alarme: string | null
+          imported_at: string
+          ip_loopback: string | null
+          loterica: string | null
+          m_duration: number | null
+          n_req_caixa: string | null
+          pontuacao_ul: number | null
+          previsao_atendimento: string | null
+          raw_data: Json | null
+          record_key: string
+          regional: string | null
+          site_owner: string | null
+          situacao: string | null
+          status: string | null
+          status_secundario: string | null
+          tecnologia: string | null
+          telefone: string | null
+          tipo_link: string | null
+          uf: string | null
+          ultimo_comentario_em: string | null
+        }
+        Insert: {
+          categoria_gis?: string | null
+          categoria_gis_secundaria?: string | null
+          chamado?: string | null
+          cidade?: string | null
+          cod_ul?: string | null
+          data_hora_inicial?: string | null
+          designacao?: string | null
+          duracao_horas?: number | null
+          empresa?: string | null
+          id_alarme?: string | null
+          imported_at?: string
+          ip_loopback?: string | null
+          loterica?: string | null
+          m_duration?: number | null
+          n_req_caixa?: string | null
+          pontuacao_ul?: number | null
+          previsao_atendimento?: string | null
+          raw_data?: Json | null
+          record_key: string
+          regional?: string | null
+          site_owner?: string | null
+          situacao?: string | null
+          status?: string | null
+          status_secundario?: string | null
+          tecnologia?: string | null
+          telefone?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+          ultimo_comentario_em?: string | null
+        }
+        Update: {
+          categoria_gis?: string | null
+          categoria_gis_secundaria?: string | null
+          chamado?: string | null
+          cidade?: string | null
+          cod_ul?: string | null
+          data_hora_inicial?: string | null
+          designacao?: string | null
+          duracao_horas?: number | null
+          empresa?: string | null
+          id_alarme?: string | null
+          imported_at?: string
+          ip_loopback?: string | null
+          loterica?: string | null
+          m_duration?: number | null
+          n_req_caixa?: string | null
+          pontuacao_ul?: number | null
+          previsao_atendimento?: string | null
+          raw_data?: Json | null
+          record_key?: string
+          regional?: string | null
+          site_owner?: string | null
+          situacao?: string | null
+          status?: string | null
+          status_secundario?: string | null
+          tecnologia?: string | null
+          telefone?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+          ultimo_comentario_em?: string | null
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           arquivo: string
@@ -293,6 +389,72 @@ export type Database = {
         }
         Relationships: []
       }
+      jira_abertos: {
+        Row: {
+          categoria_sintoma: string | null
+          chave: string
+          cod_ul: string | null
+          criado: string | null
+          data_agendamento: string | null
+          data_hora_normalizacao: string | null
+          data_proxima_atualizacao: string | null
+          descricao: string | null
+          imported_at: string
+          n_inc_snow: string | null
+          n_incidente_mam: string | null
+          n_req_caixa: string | null
+          raw_data: Json | null
+          relator: string | null
+          responsavel: string | null
+          resumo: string | null
+          site_owner: string | null
+          status: string | null
+          tipo_falha: string | null
+        }
+        Insert: {
+          categoria_sintoma?: string | null
+          chave: string
+          cod_ul?: string | null
+          criado?: string | null
+          data_agendamento?: string | null
+          data_hora_normalizacao?: string | null
+          data_proxima_atualizacao?: string | null
+          descricao?: string | null
+          imported_at?: string
+          n_inc_snow?: string | null
+          n_incidente_mam?: string | null
+          n_req_caixa?: string | null
+          raw_data?: Json | null
+          relator?: string | null
+          responsavel?: string | null
+          resumo?: string | null
+          site_owner?: string | null
+          status?: string | null
+          tipo_falha?: string | null
+        }
+        Update: {
+          categoria_sintoma?: string | null
+          chave?: string
+          cod_ul?: string | null
+          criado?: string | null
+          data_agendamento?: string | null
+          data_hora_normalizacao?: string | null
+          data_proxima_atualizacao?: string | null
+          descricao?: string | null
+          imported_at?: string
+          n_inc_snow?: string | null
+          n_incidente_mam?: string | null
+          n_req_caixa?: string | null
+          raw_data?: Json | null
+          relator?: string | null
+          responsavel?: string | null
+          resumo?: string | null
+          site_owner?: string | null
+          status?: string | null
+          tipo_falha?: string | null
+        }
+        Relationships: []
+      }
       loterica_change_requests: {
         Row: {
           after_data: Json | null
@@ -427,6 +589,72 @@ export type Database = {
           contato?: string | null
           designacao_nova?: string | null
           endereco?: string | null
+          ip_nat?: string | null
+          ip_wan?: string | null
+          loopback_lan?: string | null
+          loopback_wan?: string | null
+          nome_loterica?: string | null
+          operadora?: string | null
+          raw_data?: Json | null
+          status?: string | null
+          uf?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      macro_base_alarmes: {
+        Row: {
+          ccto_oemp: string | null
+          ccto_oi: string | null
+          cidade: string | null
+          cod_ul: string
+          contato: string | null
+          designacao_nova: string | null
+          endereco: string | null
+          imported_at: string
+          ip_nat: string | null
+          ip_wan: string | null
+          loopback_lan: string | null
+          loopback_wan: string | null
+          nome_loterica: string | null
+          operadora: string | null
+          raw_data: Json | null
+          status: string | null
+          uf: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          ccto_oemp?: string | null
+          ccto_oi?: string | null
+          cidade?: string | null
+          cod_ul: string
+          contato?: string | null
+          designacao_nova?: string | null
+          endereco?: string | null
+          imported_at?: string
+          ip_nat?: string | null
+          ip_wan?: string | null
+          loopback_lan?: string | null
+          loopback_wan?: string | null
+          nome_loterica?: string | null
+          operadora?: string | null
+          raw_data?: Json | null
+          status?: string | null
+          uf?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          ccto_oemp?: string | null
+          ccto_oi?: string | null
+          cidade?: string | null
+          cod_ul?: string
+          contato?: string | null
+          designacao_nova?: string | null
+          endereco?: string | null
+          imported_at?: string
           ip_nat?: string | null
           ip_wan?: string | null
           loopback_lan?: string | null

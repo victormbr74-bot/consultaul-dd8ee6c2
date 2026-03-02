@@ -6,6 +6,7 @@ import { DEFAULT_USER_SEED } from "@/data/defaultUsers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +66,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [changesSaving, setChangesSaving] = useState(false);
   const [changesError, setChangesError] = useState<string | null>(null);
   const [expandedChangeId, setExpandedChangeId] = useState<string | null>(null);
+  const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
@@ -166,6 +168,9 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       });
 
       setChangeRequests(view);
+      const availableIds = new Set(view.map((item) => item.id));
+      setSelectedChangeIds((prev) => prev.filter((id) => availableIds.has(id)));
+      setExpandedChangeId((prev) => (prev && availableIds.has(prev) ? prev : null));
     } catch (err) {
       console.error("Erro ao carregar solicitações de alteração", err);
       setChangeRequests([]);
@@ -192,6 +197,8 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     () => [...users].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
     [users],
   );
+  const selectedChangeCount = selectedChangeIds.length;
+  const allChangesSelected = changeRequests.length > 0 && selectedChangeCount === changeRequests.length;
 
   const resolveFunctionError = async (error: unknown) => {
     const err = error as { message?: string; context?: Response };
@@ -340,19 +347,14 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     }
   };
 
-  const approveChangeRequest = async (req: ChangeRequestViewRow) => {
-    if (!user?.id) {
-      alert("Sessão inválida. Faça login novamente.");
-      return;
-    }
-    const confirmApprove = window.confirm(
-      `Aprovar e aplicar a alteração da lotérica ${req.cod_ul}?`,
-    );
-    if (!confirmApprove) return;
-
-    setChangesSaving(true);
-    try {
-      const updates = req.after_data && typeof req.after_data === "object" ? (req.after_data as Record<string, unknown>) : {};
+  const applyChangeReview = async (
+    req: ChangeRequestViewRow,
+    nextStatus: "approved" | "rejected",
+    reviewerId: string,
+  ) => {
+    if (nextStatus === "approved") {
+      const updates =
+        req.after_data && typeof req.after_data === "object" ? (req.after_data as Record<string, unknown>) : {};
 
       const { error: updateError } = await supabase
         .from("lotericas")
@@ -360,23 +362,38 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         .eq("cod_ul", req.cod_ul);
 
       if (updateError) throw new Error(updateError.message);
+    }
 
-      const { error: reqError } = await (supabase as any)
-        .from("loterica_change_requests")
-        .update({
-          status: "approved",
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", req.id);
+    const { error: reqError } = await (supabase as any)
+      .from("loterica_change_requests")
+      .update({
+        status: nextStatus,
+        reviewed_by: reviewerId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", req.id);
 
-      if (reqError) throw new Error(reqError.message);
+    if (reqError) throw new Error(reqError.message);
+  };
 
-      setExpandedChangeId(null);
+  const approveChangeRequest = async (req: ChangeRequestViewRow) => {
+    if (!user?.id) {
+      alert("Sessao invalida. Faca login novamente.");
+      return;
+    }
+
+    const confirmApprove = window.confirm(`Aprovar e aplicar a alteracao da loterica ${req.cod_ul}?`);
+    if (!confirmApprove) return;
+
+    setChangesSaving(true);
+    try {
+      await applyChangeReview(req, "approved", user.id);
+      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
+      setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
-      alert("Alteração aprovada e aplicada no banco.");
+      alert("Alteracao aprovada e aplicada no banco.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao aprovar alteração.");
+      alert(err instanceof Error ? err.message : "Erro ao aprovar alteracao.");
     } finally {
       setChangesSaving(false);
     }
@@ -384,32 +401,103 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
 
   const rejectChangeRequest = async (req: ChangeRequestViewRow) => {
     if (!user?.id) {
-      alert("Sessão inválida. Faça login novamente.");
+      alert("Sessao invalida. Faca login novamente.");
       return;
     }
-    const confirmReject = window.confirm(
-      `Rejeitar a alteração da lotérica ${req.cod_ul}?`,
-    );
+
+    const confirmReject = window.confirm(`Rejeitar a alteracao da loterica ${req.cod_ul}?`);
     if (!confirmReject) return;
 
     setChangesSaving(true);
     try {
-      const { error: reqError } = await (supabase as any)
-        .from("loterica_change_requests")
-        .update({
-          status: "rejected",
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", req.id);
-
-      if (reqError) throw new Error(reqError.message);
-
-      setExpandedChangeId(null);
+      await applyChangeReview(req, "rejected", user.id);
+      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
+      setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
-      alert("Alteração rejeitada.");
+      alert("Alteracao rejeitada.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao rejeitar alteração.");
+      alert(err instanceof Error ? err.message : "Erro ao rejeitar alteracao.");
+    } finally {
+      setChangesSaving(false);
+    }
+  };
+
+  const toggleSelectAllChanges = (checked: boolean) => {
+    if (checked) {
+      setSelectedChangeIds(changeRequests.map((req) => req.id));
+      return;
+    }
+    setSelectedChangeIds([]);
+  };
+
+  const toggleChangeSelection = (requestId: string, checked: boolean) => {
+    setSelectedChangeIds((prev) => {
+      if (checked) {
+        return prev.includes(requestId) ? prev : [...prev, requestId];
+      }
+      return prev.filter((id) => id !== requestId);
+    });
+  };
+
+  const reviewSelectedChangeRequests = async (nextStatus: "approved" | "rejected") => {
+    if (!user?.id) {
+      alert("Sessao invalida. Faca login novamente.");
+      return;
+    }
+
+    const selectedRequests = changeRequests.filter((req) => selectedChangeIds.includes(req.id));
+    if (selectedRequests.length === 0) {
+      alert("Selecione ao menos uma solicitacao.");
+      return;
+    }
+
+    const actionLabel = nextStatus === "approved" ? "aprovar" : "rejeitar";
+    const confirmed = window.confirm(`Deseja ${actionLabel} ${selectedRequests.length} solicitacao(oes) selecionada(s)?`);
+    if (!confirmed) return;
+
+    setChangesSaving(true);
+    const succeededIds: string[] = [];
+    const failed: Array<{ cod_ul: string; reason: string }> = [];
+
+    try {
+      for (const req of selectedRequests) {
+        try {
+          await applyChangeReview(req, nextStatus, user.id);
+          succeededIds.push(req.id);
+        } catch (error) {
+          failed.push({
+            cod_ul: req.cod_ul,
+            reason: error instanceof Error ? error.message : "Falha desconhecida",
+          });
+        }
+      }
+
+      setExpandedChangeId((prev) => (prev && succeededIds.includes(prev) ? null : prev));
+      setSelectedChangeIds((prev) => prev.filter((id) => !succeededIds.includes(id)));
+      await fetchChangeRequests();
+
+      const baseMessage =
+        nextStatus === "approved" ? "Aprovacoes processadas." : "Rejeicoes processadas.";
+
+      if (failed.length === 0) {
+        alert(`${baseMessage}
+Total: ${selectedRequests.length}
+Sucesso: ${succeededIds.length}
+Falhas: 0`);
+        return;
+      }
+
+      const sampleFailures = failed.slice(0, 3);
+      const failureDetails = sampleFailures.map((item) => `- ${item.cod_ul}: ${item.reason}`).join("\n");
+      alert(
+        `${baseMessage}
+Total: ${selectedRequests.length}
+Sucesso: ${succeededIds.length}
+Falhas: ${failed.length}
+
+Exemplos de falha:
+${failureDetails}`,
+      );
     } finally {
       setChangesSaving(false);
     }
@@ -605,14 +693,40 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
 
           <TabsContent value="approvals" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Eye className="w-5 h-5" /> Aprovações Pendentes ({changeRequests.length})
+                  <Eye className="w-5 h-5" /> Aprovacoes Pendentes ({changeRequests.length})
                 </CardTitle>
-                <Button variant="outline" onClick={fetchChangeRequests} disabled={changesLoading || changesSaving}>
-                  <RefreshCw className={`w-4 h-4 mr-2 ${changesLoading ? "animate-spin" : ""}`} />
-                  Atualizar
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">Selecionadas: {selectedChangeCount}</Badge>
+                  <Button
+                    size="sm"
+                    onClick={() => void reviewSelectedChangeRequests("approved")}
+                    disabled={changesLoading || changesSaving || selectedChangeCount === 0}
+                  >
+                    <Check className="w-4 h-4 mr-1" /> Aprovar selecionadas
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => void reviewSelectedChangeRequests("rejected")}
+                    disabled={changesLoading || changesSaving || selectedChangeCount === 0}
+                  >
+                    <X className="w-4 h-4 mr-1" /> Rejeitar selecionadas
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedChangeIds([])}
+                    disabled={changesLoading || changesSaving || selectedChangeCount === 0}
+                  >
+                    Limpar selecao
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={fetchChangeRequests} disabled={changesLoading || changesSaving}>
+                    <RefreshCw className={`w-4 h-4 mr-2 ${changesLoading ? "animate-spin" : ""}`} />
+                    Atualizar
+                  </Button>
+                </div>
               </CardHeader>
               {!!changesError && (
                 <CardContent className="pt-0">
@@ -627,27 +741,43 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
+                        <th className="p-3 w-10">
+                          <Checkbox
+                            checked={allChangesSelected ? true : selectedChangeCount > 0 ? "indeterminate" : false}
+                            onCheckedChange={(checked) => toggleSelectAllChanges(checked === true)}
+                            disabled={changesLoading || changesSaving || changeRequests.length === 0}
+                            aria-label="Selecionar todas as solicitacoes"
+                          />
+                        </th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Data</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">UL</th>
-                        <th className="text-left p-3 font-medium text-muted-foreground">Lotérica</th>
+                        <th className="text-left p-3 font-medium text-muted-foreground">Loterica</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Solicitante</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Campos</th>
-                        <th className="text-left p-3 font-medium text-muted-foreground">Ações</th>
+                        <th className="text-left p-3 font-medium text-muted-foreground">Acoes</th>
                       </tr>
                     </thead>
                     <tbody>
                       {changesLoading ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-muted-foreground">Carregando...</td>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">Carregando...</td>
                         </tr>
                       ) : changeRequests.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhuma aprovação pendente.</td>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">Nenhuma aprovacao pendente.</td>
                         </tr>
                       ) : (
                         changeRequests.map((r) => (
                           <Fragment key={r.id}>
                             <tr className="border-b align-top">
+                              <td className="p-3 align-middle">
+                                <Checkbox
+                                  checked={selectedChangeIds.includes(r.id)}
+                                  onCheckedChange={(checked) => toggleChangeSelection(r.id, checked === true)}
+                                  disabled={changesSaving}
+                                  aria-label={`Selecionar solicitacao ${r.cod_ul}`}
+                                />
+                              </td>
                               <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
                                 {new Date(r.proposed_at).toLocaleString("pt-BR")}
                               </td>
@@ -681,9 +811,9 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
 
                             {expandedChangeId === r.id && (
                               <tr className="border-b bg-muted/20">
-                                <td colSpan={6} className="p-4">
+                                <td colSpan={7} className="p-4">
                                   {(r.changed_fields || []).length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">Sem detalhes de alteração.</div>
+                                    <div className="text-sm text-muted-foreground">Sem detalhes de alteracao.</div>
                                   ) : (
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                       {(r.changed_fields || []).map((k) => {

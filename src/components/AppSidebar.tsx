@@ -35,7 +35,7 @@ export function AppSidebar() {
     { id: "consulta", label: "Consulta", icon: Search },
     { id: "mascara", label: "Máscara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
-    { id: "ping99", label: "Ping 99", icon: Wifi },
+    { id: "ping99", label: "Pingao", icon: Wifi },
   ];
 
   const fetchPendingChangeCount = useCallback(async () => {

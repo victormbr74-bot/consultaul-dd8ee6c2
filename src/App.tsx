@@ -8,7 +8,9 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SidebarActionsProvider } from "@/contexts/SidebarActionsContext";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
+import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import LotericaDetail from "./pages/LotericaDetail";
@@ -87,60 +89,68 @@ const ProtectedLayout = () => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <ThemeProvider>
-          <AuthProvider>
-            <Routes>
-              <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
-              <Route element={<ProtectedLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/loterica/:codUl" element={<LotericaDetail />} />
-                <Route
-                  path="/agencia-integrador"
-                  element={
-                    <AdminOnlyRoute>
-                      <AgenciaIntegradorModule />
-                    </AdminOnlyRoute>
-                  }
-                >
-                  <Route element={<AgenciaIntegradorLayout />}>
-                    <Route index element={<IntegradorDashboardPage />} />
-                    <Route path="consulta" element={<IntegradorConsultaAgenciaPage />} />
-                    <Route path="meus-casos" element={<IntegradorMeusCasosPage />} />
-                    <Route path="agencias" element={<IntegradorAgenciasPage />} />
-                    <Route path="parceiras" element={<IntegradorParceirasPage />} />
-                    <Route path="topologia" element={<IntegradorTopologiaPage />} />
-                    <Route path="codigos" element={<IntegradorCodigosEncerramentoPage />} />
-                    <Route path="importar" element={<IntegradorImportarExcelPage />} />
-                    <Route path="usuarios" element={<IntegradorUsuariosPage />} />
+  <AppErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {supabaseConfigError && (
+          <div className="bg-destructive text-destructive-foreground text-xs text-center py-2 px-3">
+            {supabaseConfigError}
+          </div>
+        )}
+        <BrowserRouter>
+          <ThemeProvider>
+            <AuthProvider>
+              <Routes>
+                <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
+                <Route element={<ProtectedLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/loterica/:codUl" element={<LotericaDetail />} />
+                  <Route
+                    path="/agencia-integrador"
+                    element={
+                      <AdminOnlyRoute>
+                        <AgenciaIntegradorModule />
+                      </AdminOnlyRoute>
+                    }
+                  >
+                    <Route element={<AgenciaIntegradorLayout />}>
+                      <Route index element={<IntegradorDashboardPage />} />
+                      <Route path="consulta" element={<IntegradorConsultaAgenciaPage />} />
+                      <Route path="meus-casos" element={<IntegradorMeusCasosPage />} />
+                      <Route path="agencias" element={<IntegradorAgenciasPage />} />
+                      <Route path="parceiras" element={<IntegradorParceirasPage />} />
+                      <Route path="topologia" element={<IntegradorTopologiaPage />} />
+                      <Route path="codigos" element={<IntegradorCodigosEncerramentoPage />} />
+                      <Route path="importar" element={<IntegradorImportarExcelPage />} />
+                      <Route path="usuarios" element={<IntegradorUsuariosPage />} />
+                    </Route>
                   </Route>
+                  <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/base-dash" element={<AdminOnlyRoute><BaseDashImportPage /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/principal" element={<AdminOnlyRoute><PrincipalDashboard /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/principal/oemp" element={<AdminOnlyRoute><PrincipalOEMP /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/principal/oi" element={<AdminOnlyRoute><PrincipalOI /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/backup" element={<AdminOnlyRoute><BackupDashboard /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/backup/4g" element={<AdminOnlyRoute><Backup4G /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/backup/sencinet" element={<AdminOnlyRoute><BackupSencinet /></AdminOnlyRoute>} />
+                  <Route path="/alarmes/desempenho" element={<AdminOnlyRoute><Desempenho /></AdminOnlyRoute>} />
+                  <Route path="/admin" element={<Navigate to="/admin/dados" replace />} />
+                  <Route path="/admin/dados" element={<AdminPanel section="data" />} />
+                  <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
+                  <Route path="/senha" element={<ChangePassword />} />
+                  <Route path="/aparencia" element={<Appearance />} />
+                  <Route path="/temas" element={<Appearance />} />
                 </Route>
-                <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
-                <Route path="/alarmes/base-dash" element={<AdminOnlyRoute><BaseDashImportPage /></AdminOnlyRoute>} />
-                <Route path="/alarmes/principal" element={<AdminOnlyRoute><PrincipalDashboard /></AdminOnlyRoute>} />
-                <Route path="/alarmes/principal/oemp" element={<AdminOnlyRoute><PrincipalOEMP /></AdminOnlyRoute>} />
-                <Route path="/alarmes/principal/oi" element={<AdminOnlyRoute><PrincipalOI /></AdminOnlyRoute>} />
-                <Route path="/alarmes/backup" element={<AdminOnlyRoute><BackupDashboard /></AdminOnlyRoute>} />
-                <Route path="/alarmes/backup/4g" element={<AdminOnlyRoute><Backup4G /></AdminOnlyRoute>} />
-                <Route path="/alarmes/backup/sencinet" element={<AdminOnlyRoute><BackupSencinet /></AdminOnlyRoute>} />
-                <Route path="/alarmes/desempenho" element={<AdminOnlyRoute><Desempenho /></AdminOnlyRoute>} />
-                <Route path="/admin" element={<Navigate to="/admin/dados" replace />} />
-                <Route path="/admin/dados" element={<AdminPanel section="data" />} />
-                <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
-                <Route path="/senha" element={<ChangePassword />} />
-                <Route path="/aparencia" element={<Appearance />} />
-                <Route path="/temas" element={<Appearance />} />
-              </Route>
-            </Routes>
-          </AuthProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </AuthProvider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </AppErrorBoundary>
 );
 
 export default App;

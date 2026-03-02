@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import * as XLSX from 'xlsx';
+import type ExcelJS from 'exceljs';
+import { readExcel, sheetToJson } from '@/lib/excelCompat';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '@/agencia-integrador/contexts/DataContext';
@@ -128,8 +129,8 @@ const text = (value: unknown) => String(value ?? '').replace(/\u00A0/g, ' ').tri
 
 const isBlankRow = (row: unknown[]) => row.every((cell) => !text(cell));
 
-function parseParceirasSheet(ws: XLSX.WorkSheet): Parceira[] {
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+function parseParceirasSheet(ws: ExcelJS.Worksheet): Parceira[] {
+  const rows = sheetToJson<unknown[]>(ws, { header: 1, defval: '' });
   const result: Parceira[] = [];
   let i = 0;
 
@@ -186,8 +187,8 @@ function parseParceirasSheet(ws: XLSX.WorkSheet): Parceira[] {
   return result;
 }
 
-function parseTopologiaSheet(ws: XLSX.WorkSheet): Topologia[] {
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+function parseTopologiaSheet(ws: ExcelJS.Worksheet): Topologia[] {
+  const rows = sheetToJson<unknown[]>(ws, { header: 1, defval: '' });
   const out: Topologia[] = [];
   let currentRegion = '';
 
@@ -290,7 +291,7 @@ export default function ImportarExcel() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const wb = XLSX.read(evt.target?.result, { type: 'array', cellDates: true });
+        const wb = await readExcel(evt.target?.result as ArrayBuffer, { type: 'array', cellDates: true });
         const newResults: ImportResult[] = [];
         const logUser = profile?.full_name || profile?.username || profile?.employee_id || user?.email || 'usuario';
 
@@ -313,12 +314,12 @@ export default function ImportarExcel() {
           }
 
           try {
-            const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
+            const rawData = sheetToJson<Record<string, unknown>>(ws, { defval: '' });
             let count = rawData.length;
 
             switch (config.entityType) {
               case 'incidentes': {
-                const rawDataByColumn = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+                const rawDataByColumn = sheetToJson<Record<string, unknown>>(ws, {
                   header: 'A',
                   range: 1,
                   defval: '',
@@ -376,7 +377,7 @@ export default function ImportarExcel() {
                 break;
               }
               case 'agencias': {
-                const rawDataByColumn = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+                const rawDataByColumn = sheetToJson<Record<string, unknown>>(ws, {
                   header: 'A',
                   range: 1,
                   defval: '',

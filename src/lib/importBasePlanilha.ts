@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import { readExcel, sheetToJson } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 
 type ImportDataset = "lotericas" | "macro_base_alarmes" | "jira_abertos" | "falhas_gis";
@@ -24,7 +24,7 @@ export interface ImportBasePlanilhaProgress {
   message: string;
   dataset?: ImportDataset;
   datasetLabel?: string;
-  chunkIndex?: number; // 1-based
+  chunkIndex?: number;
   chunkCount?: number;
 }
 
@@ -96,16 +96,16 @@ export async function importBasePlanilhaFile(
   const emit = (progress: ImportBasePlanilhaProgress) => onProgress?.(progress);
 
   if (!["xlsx", "xlsm", "xls", "csv"].includes(extension)) {
-    throw new Error(`Formato n?o suportado: .${extension || "desconhecido"}. Use xlsx, csv ou xlsm.`);
+    throw new Error(`Formato não suportado: .${extension || "desconhecido"}. Use xlsx, csv ou xlsm.`);
   }
 
   if (strictBase && extension === "csv") {
-    throw new Error("CSV n?o ? suportado em 'Subir Base' de alarmes. Use XLSX/XLSM com as abas MACRO, Jira Abertos e Falhas GIS.");
+    throw new Error("CSV não é suportado em 'Subir Base' de alarmes. Use XLSX/XLSM com as abas MACRO, Jira Abertos e Falhas GIS.");
   }
 
   emit({ phase: "reading", percent: 5, message: "Lendo arquivo..." });
   const fileData = await file.arrayBuffer();
-  const wb = XLSX.read(fileData, { type: "array", cellDates: true });
+  const wb = await readExcel(fileData, { type: "array", cellDates: true });
 
   const {
     data: { session },
@@ -113,7 +113,7 @@ export async function importBasePlanilhaFile(
   const accessToken = session?.access_token;
 
   if (!accessToken) {
-    throw new Error("Sess?o inv?lida. Fa?a login novamente.");
+    throw new Error("Sessão inválida. Faça login novamente.");
   }
 
   emit({ phase: "validating", percent: 10, message: "Validando abas da planilha..." });
@@ -128,21 +128,21 @@ export async function importBasePlanilhaFile(
   ].filter(Boolean);
 
   if (strictBase && missingSheets.length > 0) {
-    throw new Error(`Planilha inv?lida para alarmes. Abas obrigat?rias ausentes: ${missingSheets.join(", ")}`);
+    throw new Error(`Planilha inválida para alarmes. Abas obrigatórias ausentes: ${missingSheets.join(", ")}`);
   }
 
   const toRows = (sheetName?: string) => {
     if (!sheetName) return [] as Record<string, unknown>[];
     const ws = wb.Sheets[sheetName];
     if (!ws) return [] as Record<string, unknown>[];
-    return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
+    return sheetToJson<Record<string, unknown>>(ws, { defval: "", raw: true });
   };
 
   const macroSheetRows = toRows(macroSheetName);
   const macroRows =
     macroSheetRows.length > 0
       ? macroSheetRows
-      : XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true });
+      : sheetToJson<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true });
   const jiraRows = toRows(jiraSheetName);
   const falhasRows = toRows(falhasSheetName);
 
@@ -161,7 +161,7 @@ export async function importBasePlanilhaFile(
   if (totalChunksAll === 0) {
     emit({ phase: "completed", percent: 100, message: "Nenhum registro encontrado para importar." });
   } else {
-    emit({ phase: "uploading", percent: 12, message: "Iniciando importa??o da base..." });
+    emit({ phase: "uploading", percent: 12, message: "Iniciando importação da base..." });
   }
 
   const importDatasetWithProgress = async (
@@ -188,7 +188,7 @@ export async function importBasePlanilhaFile(
   const importedJira = await importDatasetWithProgress("jira_abertos", "Jira Abertos", jiraRows, true);
   const importedFalhas = await importDatasetWithProgress("falhas_gis", "Falhas GIS", falhasRows, true);
 
-  emit({ phase: "completed", percent: 100, message: "Importa??o conclu?da com sucesso." });
+  emit({ phase: "completed", percent: 100, message: "Importação concluída com sucesso." });
 
   return {
     importedMacro,
@@ -201,7 +201,7 @@ export async function importBasePlanilhaFile(
 
 export function formatImportBasePlanilhaSummary(result: ImportBasePlanilhaResult) {
   return [
-    "Importa??o da base conclu?da.",
+    "Importação da base concluída.",
     `MACRO (base): ${result.importedMacro.inserted} inseridos, ${result.importedMacro.errors} erros.`,
     `Jira Abertos: ${result.importedJira.inserted} inseridos, ${result.importedJira.errors} erros.`,
     `Falhas GIS: ${result.importedFalhas.inserted} inseridos, ${result.importedFalhas.errors} erros.`,

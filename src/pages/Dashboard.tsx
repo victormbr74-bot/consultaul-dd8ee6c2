@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx";
+import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
@@ -146,8 +146,7 @@ const Dashboard = () => {
         return;
       }
 
-      const ws = XLSX.utils.json_to_sheet(
-        allRows.map((row) => {
+      const exportData = allRows.map((row) => {
           const raw = (row.raw_data && typeof row.raw_data === "object") ? row.raw_data as Record<string, unknown> : {};
           return {
             "Código UL": row.cod_ul,
@@ -184,11 +183,9 @@ const Dashboard = () => {
             "Homologado": raw["HOMOLOGADO"] ?? "",
             "Atualizado em": row.updated_at,
           };
-        }),
-      );
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Lot\u00E9ricas");
-      XLSX.writeFile(wb, "lotericas_export.xlsx");
+        });
+      const wb = jsonToWorkbook([{ name: "Lotéricas", data: exportData }]);
+      await writeFile(wb, "lotericas_export.xlsx");
     } catch (error) {
       console.error("Falha inesperada ao exportar lotericas", error);
       alert("Falha inesperada na exportacao.");

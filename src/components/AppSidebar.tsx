@@ -22,12 +22,11 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
   const location = useLocation();
   const { isAdmin, profile, signOut } = useAuth();
-  const { onExport, onImportClick, lotericaTab, setLotericaTab, showLotericaTabs } = useSidebarActions();
+  const { onExport, onImportClick, lotericaTab, setLotericaTab } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
   const isDashboardRoute = location.pathname === "/";
-  const isLotericaRoute = location.pathname.startsWith("/loterica/");
-  const shouldShowLotericaTabs = showLotericaTabs || isLotericaRoute;
+  const shouldShowLotericaTabs = true;
   const hasPendingChanges = pendingChangeCount > 0;
 
   const lotericaTabs = [

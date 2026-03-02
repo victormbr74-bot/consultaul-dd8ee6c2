@@ -14,7 +14,7 @@ const EXPORT_BATCH_SIZE = 1000;
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { setOnExport, setOnImportClick, setShowLotericaTabs } = useSidebarActions();
+  const { setOnExport, setOnImportClick, setShowLotericaTabs, setLotericaTab } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,7 @@ const Dashboard = () => {
 
       const codUl = exact?.cod_ul;
       if (codUl) {
+        setLotericaTab("consulta");
         navigate(`/loterica/${encodeURIComponent(codUl)}`);
         return;
       }
@@ -108,12 +109,13 @@ const Dashboard = () => {
         return;
       }
 
+      setLotericaTab("consulta");
       navigate(`/loterica/${encodeURIComponent(first)}`);
     } catch (error) {
       console.error("Falha inesperada ao buscar lotericas (atalho Enter)", error);
       alert("Falha inesperada ao buscar lot\u00E9ricas.");
     }
-  }, [navigate, search]);
+  }, [navigate, search, setLotericaTab]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -308,7 +310,10 @@ const Dashboard = () => {
                       <tr
                         key={l.cod_ul}
                         className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`)}
+                        onClick={() => {
+                          setLotericaTab("consulta");
+                          navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`);
+                        }}
                       >
                         <td className="p-3 font-mono text-xs font-medium">{l.cod_ul}</td>
                         <td className="p-3 font-medium">{l.nome_loterica}</td>

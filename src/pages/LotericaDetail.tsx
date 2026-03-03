@@ -12,6 +12,7 @@ import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
 import Ping99Tab from "@/components/loterica/Ping99Tab";
 import PingaoTab from "@/components/loterica/PingaoTab";
+import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 
 const LotericaDetail = () => {
@@ -286,6 +287,7 @@ const LotericaDetail = () => {
         {lotericaTab === "testes" && <TestesTab form={form} />}
         {lotericaTab === "ping99" && <Ping99Tab form={form} />}
         {lotericaTab === "pingao" && <PingaoTab />}
+        {lotericaTab === "pingao-nat" && <PingaoNatTab />}
         {lotericaTab === "script-router-sct" && <ScriptRouterSctTab initialCodUl={String(codUl || "")} />}
 
         {showHistory && (

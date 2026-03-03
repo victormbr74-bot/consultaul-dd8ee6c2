@@ -35,7 +35,8 @@ export function AppSidebar() {
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
     { id: "pingao", label: "Pingao", icon: Activity },
-    { id: "script-router-sct", label: "Script Router SCT", icon: Terminal },
+    { id: "pingao-nat", label: "Pingão NAT", icon: Activity },
+    ...(isAdmin ? [{ id: "script-router-sct", label: "Script Router SCT", icon: Terminal }] : []),
   ];
 
   const fetchPendingChangeCount = useCallback(async () => {

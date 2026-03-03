@@ -13,6 +13,7 @@ import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
+import ConsultaMassa from "./pages/ConsultaMassa";
 import LotericaDetail from "./pages/LotericaDetail";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
@@ -106,6 +107,7 @@ const App = () => (
                 <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
                 <Route element={<ProtectedLayout />}>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/consulta-massa" element={<ConsultaMassa />} />
                   <Route path="/loterica/:codUl" element={<LotericaDetail />} />
                   <Route
                     path="/agencia-integrador"

@@ -31,7 +31,6 @@ export function AppSidebar() {
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
-    { id: "consulta-massa", label: "Consulta Massa", icon: ListChecks },
     { id: "mascara", label: "Máscara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
@@ -123,6 +122,14 @@ export function AppSidebar() {
                   <NavLink to="/" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Search className="mr-2 h-4 w-4" />
                     <span>Consulta UL</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <ListChecks className="mr-2 h-4 w-4" />
+                    <span>Consulta Massa</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

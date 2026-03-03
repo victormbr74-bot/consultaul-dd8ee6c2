@@ -14,6 +14,7 @@ import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import ConsultaMassa from "./pages/ConsultaMassa";
+import PingaoNat from "./pages/PingaoNat";
 import LotericaDetail from "./pages/LotericaDetail";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
@@ -108,6 +109,7 @@ const App = () => (
                 <Route element={<ProtectedLayout />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/consulta-massa" element={<ConsultaMassa />} />
+                  <Route path="/pingao-nat" element={<PingaoNat />} />
                   <Route path="/loterica/:codUl" element={<LotericaDetail />} />
                   <Route
                     path="/agencia-integrador"

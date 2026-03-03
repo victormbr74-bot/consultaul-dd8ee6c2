@@ -35,7 +35,6 @@ export function AppSidebar() {
     { id: "testes", label: "Testes", icon: Terminal },
     { id: "ping99", label: "Ping 99", icon: Wifi },
     { id: "pingao", label: "Pingao", icon: Activity },
-    { id: "pingao-nat", label: "Pingão NAT", icon: Activity },
     ...(isAdmin ? [{ id: "script-router-sct", label: "Script Router SCT", icon: Terminal }] : []),
   ];
 
@@ -131,6 +130,14 @@ export function AppSidebar() {
                   <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <ListChecks className="mr-2 h-4 w-4" />
                     <span>Consulta Massa</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/pingao-nat" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Activity className="mr-2 h-4 w-4" />
+                    <span>Pingão NAT</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

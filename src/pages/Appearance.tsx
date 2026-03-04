@@ -1,8 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  WORLD_CUP_2026_TEAMS,
+  WORLD_CUP_2026_TEAM_BY_ID,
+  type WorldCupTeam,
+} from "@/data/worldCup2026Teams";
 import { useTheme, type ThemeColor } from "@/contexts/ThemeContext";
 import { Moon, Sun } from "lucide-react";
+
+const TEAM_OPTIONS = [...WORLD_CUP_2026_TEAMS].sort((a, b) => a.label.localeCompare(b.label));
 
 const PALETTES: Array<{ id: ThemeColor; label: string; preview: string }> = [
   { id: "blue", label: "Azul", preview: "215 80% 45%" },
@@ -13,12 +21,19 @@ const PALETTES: Array<{ id: ThemeColor; label: string; preview: string }> = [
   { id: "sky", label: "Azul Claro", preview: "198 90% 50%" },
   { id: "orange", label: "Laranja", preview: "24 95% 52%" },
   { id: "gray", label: "Cinza", preview: "220 10% 55%" },
-  { id: "world-cup-main", label: "Copa Principal", preview: "350 82% 46%" },
-  { id: "world-cup-brazil", label: "Copa Brasil", preview: "142 72% 34%" },
+  { id: "world-cup", label: "Copa Campeas", preview: "142 72% 34%" },
 ];
 
 const Appearance = () => {
-  const { mode, setMode, color, setColor } = useTheme();
+  const { mode, setMode, color, setColor, worldCupTeam, setWorldCupTeam } = useTheme();
+
+  const palettesWithDynamicWorldCupColor = PALETTES.map((palette) => {
+    if (palette.id !== "world-cup") return palette;
+    return {
+      ...palette,
+      preview: WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].primary,
+    };
+  });
 
   return (
     <div className="bg-background">
@@ -51,27 +66,46 @@ const Appearance = () => {
             <div className="space-y-2">
               <Label>Paleta de Cores</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {PALETTES.map((p) => (
+                {palettesWithDynamicWorldCupColor.map((palette) => (
                   <Button
-                    key={p.id}
+                    key={palette.id}
                     type="button"
-                    variant={color === p.id ? "default" : "outline"}
+                    variant={color === palette.id ? "default" : "outline"}
                     className="justify-start"
-                    onClick={() => setColor(p.id)}
+                    onClick={() => setColor(palette.id)}
                   >
                     <span
                       className="inline-block w-3 h-3 rounded-full mr-2 border border-black/10 dark:border-white/10"
-                      style={{ backgroundColor: `hsl(${p.preview})` }}
+                      style={{ backgroundColor: `hsl(${palette.preview})` }}
                     />
-                    {p.label}
+                    {palette.label}
                   </Button>
                 ))}
               </div>
             </div>
 
-            <div className="text-xs text-muted-foreground">
-              Suas preferências ficam salvas neste navegador.
-            </div>
+            {color === "world-cup" && (
+              <div className="space-y-2">
+                <Label htmlFor="world-cup-team">Selecao Campea</Label>
+                <Select value={worldCupTeam} onValueChange={(value) => setWorldCupTeam(value as WorldCupTeam)}>
+                  <SelectTrigger id="world-cup-team" className="w-full sm:w-[320px]">
+                    <SelectValue placeholder="Selecione uma selecao" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEAM_OPTIONS.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  As cores sao aplicadas conforme a selecao escolhida entre as 6 maiores campeas mundiais.
+                </div>
+              </div>
+            )}
+
+            <div className="text-xs text-muted-foreground">Suas preferencias ficam salvas neste navegador.</div>
           </CardContent>
         </Card>
       </main>

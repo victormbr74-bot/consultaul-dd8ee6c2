@@ -228,28 +228,7 @@
     --sidebar-ring: 220 10% 70%;
   }
 
-  :root[data-color="world-cup-main"] {
-    --primary: 350 82% 42%;
-    --ring: 350 82% 42%;
-    --accent: 45 95% 52%;
-    --accent-foreground: 220 25% 10%;
-    --sidebar-background: 350 68% 22%;
-    --sidebar-accent: 350 58% 30%;
-    --sidebar-border: 350 50% 30%;
-    --sidebar-ring: 45 95% 52%;
-  }
-  .dark[data-color="world-cup-main"] {
-    --primary: 350 90% 62%;
-    --ring: 350 90% 62%;
-    --accent: 45 95% 58%;
-    --accent-foreground: 220 25% 10%;
-    --sidebar-background: 350 40% 8%;
-    --sidebar-accent: 350 30% 14%;
-    --sidebar-border: 350 24% 18%;
-    --sidebar-ring: 45 95% 58%;
-  }
-
-  :root[data-color="world-cup-brazil"] {
+  :root[data-color="world-cup"] {
     --primary: 142 72% 30%;
     --ring: 142 72% 30%;
     --accent: 48 98% 50%;
@@ -259,7 +238,7 @@
     --sidebar-border: 142 55% 28%;
     --sidebar-ring: 48 98% 50%;
   }
-  .dark[data-color="world-cup-brazil"] {
+  .dark[data-color="world-cup"] {
     --primary: 142 78% 48%;
     --ring: 142 78% 48%;
     --accent: 48 98% 56%;

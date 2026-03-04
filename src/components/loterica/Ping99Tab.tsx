@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Copy, Check, Wifi, Terminal } from "lucide-react";
 import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
 
 interface Ping99TabProps {
-  form: {
+  form?: {
     cod_ul?: unknown;
     tfl?: unknown;
     raw_data?: Record<string, unknown> | null;
@@ -63,15 +65,23 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
   const [secureCrtLoading, setSecureCrtLoading] = useState(false);
   const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
+  const [manualRedeLan, setManualRedeLan] = useState("");
+  const [manualCodUl, setManualCodUl] = useState("");
+  const [manualTfl, setManualTfl] = useState("");
 
   const raw = useMemo(
     () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
     [form?.raw_data],
   );
 
-  const redeLan = getRawString(raw, REDE_LAN_KEYS);
-  const codUl = normalizeText(form?.cod_ul);
-  const tfl = normalizeText(raw["TFL"] ?? raw["TFLs"] ?? form?.tfl);
+  const isStandalone = !form;
+  const formRedeLan = getRawString(raw, REDE_LAN_KEYS);
+  const formCodUl = normalizeText(form?.cod_ul);
+  const formTfl = normalizeText(raw["TFL"] ?? raw["TFLs"] ?? form?.tfl);
+
+  const redeLan = isStandalone ? manualRedeLan : formRedeLan;
+  const codUl = isStandalone ? normalizeText(manualCodUl) : formCodUl;
+  const tfl = isStandalone ? normalizeText(manualTfl) : formTfl;
 
   const base = useMemo(() => {
     if (!redeLan) return null;
@@ -144,6 +154,37 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isStandalone && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="ping99-rede-lan">Rede LAN</Label>
+                <Input
+                  id="ping99-rede-lan"
+                  placeholder="10.123.45.67"
+                  value={manualRedeLan}
+                  onChange={(event) => setManualRedeLan(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ping99-cod-ul">Codigo UL (opcional)</Label>
+                <Input
+                  id="ping99-cod-ul"
+                  placeholder="21-000666-8"
+                  value={manualCodUl}
+                  onChange={(event) => setManualCodUl(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ping99-tfl">TFL (opcional)</Label>
+                <Input
+                  id="ping99-tfl"
+                  placeholder="1234"
+                  value={manualTfl}
+                  onChange={(event) => setManualTfl(event.target.value)}
+                />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div>
               <span className="text-xs text-muted-foreground">Rede LAN</span>
@@ -190,7 +231,9 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
               {tclScript}
             </pre>
           ) : (
-            <div className="text-sm text-muted-foreground">Rede LAN nao disponivel para gerar o script.</div>
+            <div className="text-sm text-muted-foreground">
+              {isStandalone ? "Informe a Rede LAN para gerar o script." : "Rede LAN nao disponivel para gerar o script."}
+            </div>
           )}
         </CardContent>
       </Card>

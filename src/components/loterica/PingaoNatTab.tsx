@@ -56,6 +56,21 @@ const statusBadgeClass = (status: PingStatus) => {
   return "border-muted-foreground/30 bg-muted/20 text-muted-foreground";
 };
 
+const normalizeCircuitSpacing = (value: string) => {
+  let normalized = value.trim();
+  let previous = "";
+
+  // Example: "UDI 5010343" => "UDI5010343"
+  while (normalized !== previous) {
+    previous = normalized;
+    normalized = normalized
+      .replace(/([A-Za-z])\s+(\d)/g, "$1$2")
+      .replace(/(\d)\s+([A-Za-z])/g, "$1$2");
+  }
+
+  return normalized;
+};
+
 const buildPingCommands = (items: LookupNatItem[]): string => {
   const valid = items.filter((i) => i.status === "ok" && i.ip);
   if (!valid.length) return "";
@@ -180,7 +195,10 @@ const PingaoNatTab = () => {
     setSecureCrtResult(null);
 
     try {
-      const rows = await fetchLookupRows(terms);
+      const sanitizedTerms = terms.map((term) => normalizeCircuitSpacing(term));
+      const fetchTerms = dedupeTerms([...terms, ...sanitizedTerms]);
+
+      const rows = await fetchLookupRows(fetchTerms);
       const matches = resolveMatches(terms, rows);
 
       const summary: LookupNatItem[] = matches.map((match) => {
@@ -317,6 +335,9 @@ const PingaoNatTab = () => {
 
           <p className="text-xs text-muted-foreground">
             Gera comandos <code className="font-mono">ping -c 2 -q -w 2</code> utilizando o IP NAT de cada lotérica.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Circuitos com espaco entre letras e numeros sao corrigidos automaticamente (ex.: UDI 5010343 para UDI5010343).
           </p>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -455,4 +476,5 @@ const PingaoNatTab = () => {
 };
 
 export default PingaoNatTab;
+
 

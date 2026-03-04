@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2, ListChecks, Activity } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isAdmin, profile, signOut } = useAuth();
   const { onExport, onImportClick, lotericaTab, setLotericaTab } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
@@ -33,8 +34,6 @@ export function AppSidebar() {
     { id: "consulta", label: "Consulta", icon: Search },
     { id: "mascara", label: "Máscara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
-    { id: "ping99", label: "Ping 99", icon: Wifi },
-    { id: "pingao", label: "Pingao", icon: Activity },
     ...(isAdmin ? [{ id: "script-router-sct", label: "Script Router SCT", icon: Terminal }] : []),
   ];
 
@@ -135,6 +134,22 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
+                  <NavLink to="/ping99" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Wifi className="mr-2 h-4 w-4" />
+                    <span>Ping 99</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/pingao" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Activity className="mr-2 h-4 w-4" />
+                    <span>Pingao</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
                   <NavLink to="/pingao-nat" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Activity className="mr-2 h-4 w-4" />
                     <span>Pingão NAT</span>
@@ -165,7 +180,12 @@ export function AppSidebar() {
                 {lotericaTabs.map((tab) => (
                   <SidebarMenuItem key={tab.id}>
                     <SidebarMenuButton
-                      onClick={() => setLotericaTab(tab.id)}
+                      onClick={() => {
+                        setLotericaTab(tab.id);
+                        if (!location.pathname.startsWith("/loterica/")) {
+                          navigate("/");
+                        }
+                      }}
                       className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
                     >
                       <tab.icon className="mr-2 h-4 w-4" />

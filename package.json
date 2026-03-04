@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "securecrt:bridge": "node scripts/securecrt-bridge/server.mjs",
+    "securecrt:bridge": "powershell -ExecutionPolicy Bypass -File scripts/securecrt-bridge/securecrt-bridge.ps1",
     "test": "vitest run",
     "test:watch": "vitest"
   },

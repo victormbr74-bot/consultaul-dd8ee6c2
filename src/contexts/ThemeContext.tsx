@@ -1,7 +1,17 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 export type ThemeMode = "light" | "dark";
-export type ThemeColor = "blue" | "red" | "green" | "purple" | "pink" | "sky" | "orange" | "gray";
+export type ThemeColor =
+  | "blue"
+  | "red"
+  | "green"
+  | "purple"
+  | "pink"
+  | "sky"
+  | "orange"
+  | "gray"
+  | "world-cup-main"
+  | "world-cup-brazil";
 
 const STORAGE_MODE_KEY = "lvh:theme-mode";
 const STORAGE_COLOR_KEY = "lvh:theme-color";
@@ -15,7 +25,9 @@ const isThemeColor = (value: unknown): value is ThemeColor =>
   value === "pink" ||
   value === "sky" ||
   value === "orange" ||
-  value === "gray";
+  value === "gray" ||
+  value === "world-cup-main" ||
+  value === "world-cup-brazil";
 
 const getSystemMode = (): ThemeMode => {
   try {

@@ -13,6 +13,8 @@ const PALETTES: Array<{ id: ThemeColor; label: string; preview: string }> = [
   { id: "sky", label: "Azul Claro", preview: "198 90% 50%" },
   { id: "orange", label: "Laranja", preview: "24 95% 52%" },
   { id: "gray", label: "Cinza", preview: "220 10% 55%" },
+  { id: "world-cup-main", label: "Copa Principal", preview: "350 82% 46%" },
+  { id: "world-cup-brazil", label: "Copa Brasil", preview: "142 72% 34%" },
 ];
 
 const Appearance = () => {

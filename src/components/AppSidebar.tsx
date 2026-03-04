@@ -107,13 +107,13 @@ export function AppSidebar() {
   }, [fetchPendingChangeCount, isAdmin]);
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <Store className="w-4 h-4 text-primary-foreground" />
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>
             <span className="text-[10px] text-sidebar-foreground/50">{"Gestão de unidades"}</span>
           </div>
@@ -122,7 +122,7 @@ export function AppSidebar() {
 
       <SidebarContent>
         {isDashboardRoute && (
-          <div className="px-2 pt-2">
+          <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -310,7 +310,7 @@ export function AppSidebar() {
           <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
             <User className="w-4 h-4 text-sidebar-accent-foreground" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
             <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usuário"}</p>
           </div>

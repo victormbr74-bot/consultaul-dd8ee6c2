@@ -121,6 +121,25 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {isDashboardRoute && (
+          <div className="px-2 pt-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={"Buscar por codigo, nome, CCTO ou cidade..."}
+                className="pl-9 bg-sidebar border-sidebar-border"
+                value={consultaSearch}
+                onChange={(e) => setConsultaSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onSearchSubmit?.();
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
         <SidebarGroup>
           <SidebarGroupLabel>{"Navegação"}</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -211,23 +230,6 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel>Dados</SidebarGroupLabel>
             <SidebarGroupContent>
-              <div className="px-2 pb-2">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder={"Buscar por código, nome, CCTO ou cidade..."}
-                    className="pl-9 bg-sidebar border-sidebar-border"
-                    value={consultaSearch}
-                    onChange={(e) => setConsultaSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        onSearchSubmit?.();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>

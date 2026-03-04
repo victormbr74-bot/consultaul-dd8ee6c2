@@ -6,9 +6,10 @@ import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const EXPORT_BATCH_SIZE = 1000;
@@ -151,6 +152,7 @@ const Dashboard = () => {
     setLotericaTab,
     lotericaTab,
     consultaSearch,
+    setConsultaSearch,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -497,7 +499,22 @@ const Dashboard = () => {
           <ScriptRouterSctTab />
         ) : (
           <>
-        <div className="flex justify-end mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
+              className="pl-10"
+              value={search}
+              onChange={(e) => setConsultaSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void goToFirstResult();
+                }
+              }}
+            />
+          </div>
           <Button variant="ghost" size="icon" onClick={() => void fetchLotericas()} title="Atualizar resultados">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>

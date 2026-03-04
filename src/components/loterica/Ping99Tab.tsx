@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Wifi } from "lucide-react";
+import { Copy, Check, Wifi, Terminal } from "lucide-react";
+import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
 
 interface Ping99TabProps {
   form: {
@@ -60,6 +61,8 @@ const incrementIp = (octets: number[]) => {
 
 const Ping99Tab = ({ form }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
+  const [secureCrtLoading, setSecureCrtLoading] = useState(false);
+  const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
 
   const raw = useMemo(
     () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
@@ -114,6 +117,24 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const sendToSecureCrt = async () => {
+    if (!tclScript.trim()) return;
+    setSecureCrtLoading(true);
+    setSecureCrtResult(null);
+    try {
+      const result = await executeSecureCrtCommands({
+        commands: tclScript,
+        source: "ping99",
+        captureOutput: true,
+        captureWaitMs: 9000,
+        delayMs: 100,
+      });
+      setSecureCrtResult(result);
+    } finally {
+      setSecureCrtLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -147,12 +168,23 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Script TCL - Ping 99</CardTitle>
-          <Button variant="outline" size="sm" onClick={copy} disabled={!tclScript}>
-            {copied ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
-            {copied ? "Copiado!" : "Copiar"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void sendToSecureCrt()} disabled={!tclScript || secureCrtLoading}>
+              <Terminal className="w-4 h-4 mr-1" />
+              {secureCrtLoading ? "Enviando..." : "Executar e Capturar"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={copy} disabled={!tclScript}>
+              {copied ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
+              {copied ? "Copiado!" : "Copiar"}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
+          {secureCrtResult ? (
+            <p className={`text-sm ${secureCrtResult.ok ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+              {secureCrtResult.message}
+            </p>
+          ) : null}
           {tclScript ? (
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap overflow-x-auto max-h-[500px] overflow-y-auto">
               {tclScript}

@@ -44,6 +44,10 @@ export interface LookupDisplayRow {
 const LOOKUP_BATCH_SIZE = 120;
 const MATCH_FIELDS: MatchField[] = ["cod_ul", "ccto_oi", "ccto_oemp", "designacao_nova"];
 
+export interface LookupOptions {
+  fields?: MatchField[];
+}
+
 const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;
 const LOOPBACK_PRIMARIO_KEYS = ["LOOPBACK PRINCIPAL", "LOOPBACK PRIMARIO", "LOOTPBACK PRIMARIO"] as const;
 const LOOPBACK_SECUNDARIO_KEYS = [
@@ -169,16 +173,18 @@ const fetchByColumn = async (column: MatchField, terms: string[]) => {
   return rows;
 };
 
-export const fetchLookupRows = async (terms: string[]) => {
-  const [byCode, byOi, byOemp, byDesignacao] = await Promise.all([
-    fetchByColumn("cod_ul", terms),
-    fetchByColumn("ccto_oi", terms),
-    fetchByColumn("ccto_oemp", terms),
-    fetchByColumn("designacao_nova", terms),
-  ]);
+const getLookupFields = (options?: LookupOptions) => {
+  const rawFields = options?.fields?.length ? options.fields : MATCH_FIELDS;
+  return Array.from(new Set(rawFields));
+};
+
+export const fetchLookupRows = async (terms: string[], options?: LookupOptions) => {
+  const fields = getLookupFields(options);
+  const rowGroups = await Promise.all(fields.map((field) => fetchByColumn(field, terms)));
+  const allRows = rowGroups.flat();
 
   const unique = new Map<string, LotericaLookupRow>();
-  for (const row of [...byCode, ...byOi, ...byOemp, ...byDesignacao]) {
+  for (const row of allRows) {
     const key = normalizeKey(row.cod_ul);
     if (!key) continue;
     if (!unique.has(key)) unique.set(key, row);
@@ -187,12 +193,13 @@ export const fetchLookupRows = async (terms: string[]) => {
   return [...unique.values()];
 };
 
-export const resolveMatches = (terms: string[], rows: LotericaLookupRow[]): TermMatch[] => {
+export const resolveMatches = (terms: string[], rows: LotericaLookupRow[], options?: LookupOptions): TermMatch[] => {
+  const fields = getLookupFields(options);
   const strict = new Map<string, { row: LotericaLookupRow; field: MatchField }>();
   const loose = new Map<string, { row: LotericaLookupRow; field: MatchField }>();
 
   for (const row of rows) {
-    for (const field of MATCH_FIELDS) {
+    for (const field of fields) {
       const value = normalizeText(row[field]);
       if (!value) continue;
 

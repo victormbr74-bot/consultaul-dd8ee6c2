@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Activity, Download } from "lucide-react";
+import { Copy, Check, Activity, Download, Terminal } from "lucide-react";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -16,14 +16,17 @@ import {
   resolveMatches,
   normalizeText,
   type LinkTarget,
+  type MatchField,
   type LotericaLookupRow,
 } from "@/components/loterica/lotericaLookup";
+import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
 
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PINGAO_REPEAT = 2;
 
 type LinkProfile = "principal_backup" | "4g" | "vsat";
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "ALTA LATENCIA" | "SEM DADOS";
+type LookupMode = "auto" | "cod_ul" | "ccto";
 
 type LookupStatus = "ok" | "missing_ip" | "not_found";
 
@@ -36,6 +39,7 @@ interface LookupSummaryItem {
   profileLabel: string;
   limitMs: number;
   techSource: string;
+  matchedBy: MatchField | null;
 }
 
 interface ParsedPingMetrics {
@@ -68,6 +72,19 @@ const PROFILE_LABELS: Record<LinkProfile, string> = {
   principal_backup: "Principal / Backup",
   "4g": "4G",
   vsat: "VSAT",
+};
+
+const LOOKUP_MODE_FIELDS: Record<LookupMode, MatchField[]> = {
+  auto: ["cod_ul", "ccto_oi", "ccto_oemp", "designacao_nova"],
+  cod_ul: ["cod_ul"],
+  ccto: ["ccto_oi", "ccto_oemp"],
+};
+
+const MATCH_FIELD_LABELS: Record<MatchField, string> = {
+  cod_ul: "Codigo UL",
+  ccto_oi: "CCTO OI",
+  ccto_oemp: "CCTO OEMP",
+  designacao_nova: "Designacao",
 };
 
 const padOctet = (value: string) => value.padStart(3, "0");
@@ -333,8 +350,11 @@ const statusBadgeClass = (status: PingStatus) => {
 const PingaoTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [target, setTarget] = useState<LinkTarget>("primario");
+  const [lookupMode, setLookupMode] = useState<LookupMode>("auto");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [secureCrtLoading, setSecureCrtLoading] = useState(false);
+  const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
   const [error, setError] = useState("");
   const [querySummary, setQuerySummary] = useState<LookupSummaryItem[]>([]);
   const [script, setScript] = useState("");
@@ -360,6 +380,28 @@ const PingaoTab = () => {
     setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500);
   };
 
+  const sendToSecureCrt = async () => {
+    if (!script.trim()) return;
+    setSecureCrtLoading(true);
+    setSecureCrtResult(null);
+    try {
+      const result = await executeSecureCrtCommands({
+        commands: script,
+        source: "pingao",
+        captureOutput: true,
+        captureWaitMs: 9000,
+        delayMs: 100,
+      });
+      setSecureCrtResult(result);
+      if (result.ok && result.output) {
+        setPingResultInput(result.output);
+        runPingResultAnalysis(result.output);
+      }
+    } finally {
+      setSecureCrtLoading(false);
+    }
+  };
+
   const runLookup = async () => {
     const terms = dedupeTerms(parseTerms(input));
     if (!terms.length) {
@@ -371,10 +413,12 @@ const PingaoTab = () => {
 
     setLoading(true);
     setError("");
+    setSecureCrtResult(null);
 
     try {
-      const rows = await fetchLookupRows(terms);
-      const matches = resolveMatches(terms, rows);
+      const fields = LOOKUP_MODE_FIELDS[lookupMode];
+      const rows = await fetchLookupRows(terms, { fields });
+      const matches = resolveMatches(terms, rows, { fields });
 
       const summary: LookupSummaryItem[] = matches.map((match) => {
         if (!match.row) {
@@ -387,6 +431,7 @@ const PingaoTab = () => {
             profileLabel: "Nao identificado",
             limitMs: PROFILE_LIMITS.principal_backup,
             techSource: "-",
+            matchedBy: null,
           };
         }
 
@@ -403,6 +448,7 @@ const PingaoTab = () => {
             profileLabel: profileData.profileLabel,
             limitMs: profileData.limitMs,
             techSource: profileData.techSource,
+            matchedBy: match.matchField ?? null,
           };
         }
 
@@ -415,6 +461,7 @@ const PingaoTab = () => {
           profileLabel: profileData.profileLabel,
           limitMs: profileData.limitMs,
           techSource: profileData.techSource,
+          matchedBy: match.matchField ?? null,
         };
       });
 
@@ -429,8 +476,9 @@ const PingaoTab = () => {
     }
   };
 
-  const runPingResultAnalysis = () => {
-    const parsed = parsePingOutput(pingResultInput);
+  const runPingResultAnalysis = (rawText?: string) => {
+    const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
+    const parsed = parsePingOutput(sourceText);
 
     const ipIndex = new Map<string, LookupSummaryItem>();
     for (const item of querySummary) {
@@ -492,10 +540,16 @@ const PingaoTab = () => {
           <CardTitle className="text-lg flex items-center gap-2">
             <Activity className="w-5 h-5" /> Pingao - Gerar Script TCL
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-script")} disabled={!script}>
-            {copiedId === "pingao-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
-            {copiedId === "pingao-script" ? "Copiado!" : "Copiar Script"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void sendToSecureCrt()} disabled={!script || secureCrtLoading}>
+              <Terminal className="w-4 h-4 mr-1" />
+              {secureCrtLoading ? "Enviando..." : "Executar e Capturar"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-script")} disabled={!script}>
+              {copiedId === "pingao-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
+              {copiedId === "pingao-script" ? "Copiado!" : "Copiar Script"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -516,11 +570,33 @@ const PingaoTab = () => {
             </RadioGroup>
           </div>
 
+          <div className="space-y-2">
+            <Label>Buscar por</Label>
+            <RadioGroup
+              value={lookupMode}
+              onValueChange={(value) => setLookupMode(value as LookupMode)}
+              className="flex flex-wrap items-center gap-6"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="auto" id="pingao-lookup-auto" />
+                <Label htmlFor="pingao-lookup-auto">Automatico (UL + CCTO)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="cod_ul" id="pingao-lookup-ul" />
+                <Label htmlFor="pingao-lookup-ul">Codigo UL</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="ccto" id="pingao-lookup-ccto" />
+                <Label htmlFor="pingao-lookup-ccto">CCTO (OI/OEMP)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="pingao-input">Codigos UL ou circuitos (um por linha)</Label>
+            <Label htmlFor="pingao-input">Codigos UL ou CCTO (um por linha)</Label>
             <Textarea
               id="pingao-input"
-              placeholder={"21-000666-8\n21-000666-3\n21-000666-5\n21-000666-1"}
+              placeholder={"21-000666-8\n21-000666-3\n21-000666-5\n219123456789"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className="min-h-[120px] font-mono text-xs"
@@ -538,6 +614,7 @@ const PingaoTab = () => {
                 setQuerySummary([]);
                 setScript("");
                 setError("");
+                setSecureCrtResult(null);
               }}
             >
               Limpar
@@ -549,6 +626,11 @@ const PingaoTab = () => {
           </p>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {secureCrtResult ? (
+            <p className={cn("text-sm", secureCrtResult.ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
+              {secureCrtResult.message}
+            </p>
+          ) : null}
 
           {querySummary.length > 0 && (
             <div className="rounded-lg border overflow-auto max-h-[280px]">
@@ -559,6 +641,7 @@ const PingaoTab = () => {
                     <th className="p-2 font-medium">Status</th>
                     <th className="p-2 font-medium">Codigo UL</th>
                     <th className="p-2 font-medium">IP</th>
+                    <th className="p-2 font-medium">Encontrado por</th>
                     <th className="p-2 font-medium">Perfil</th>
                     <th className="p-2 font-medium">Limite</th>
                   </tr>
@@ -573,6 +656,7 @@ const PingaoTab = () => {
                         <td className="p-2"><Badge variant={variant}>{text}</Badge></td>
                         <td className="p-2 font-mono">{item.codUl}</td>
                         <td className="p-2 font-mono">{item.ip || "-"}</td>
+                        <td className="p-2">{item.matchedBy ? MATCH_FIELD_LABELS[item.matchedBy] : "-"}</td>
                         <td className="p-2">{item.profileLabel}</td>
                         <td className="p-2 font-mono">{item.limitMs} ms</td>
                       </tr>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Activity, Download } from "lucide-react";
+import { Copy, Check, Activity, Download, Terminal } from "lucide-react";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -15,6 +15,7 @@ import {
   normalizeText,
   type LotericaLookupRow,
 } from "@/components/loterica/lotericaLookup";
+import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
 
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "SEM DADOS";
 
@@ -119,6 +120,8 @@ const PingaoNatTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [secureCrtLoading, setSecureCrtLoading] = useState(false);
+  const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
   const [error, setError] = useState("");
   const [querySummary, setQuerySummary] = useState<LookupNatItem[]>([]);
   const [script, setScript] = useState("");
@@ -141,6 +144,28 @@ const PingaoNatTab = () => {
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
   };
 
+  const sendToSecureCrt = async () => {
+    if (!script.trim()) return;
+    setSecureCrtLoading(true);
+    setSecureCrtResult(null);
+    try {
+      const result = await executeSecureCrtCommands({
+        commands: script,
+        source: "pingao-nat",
+        captureOutput: true,
+        captureWaitMs: 9000,
+        delayMs: 100,
+      });
+      setSecureCrtResult(result);
+      if (result.ok && result.output) {
+        setPingResultInput(result.output);
+        runPingResultAnalysis(result.output);
+      }
+    } finally {
+      setSecureCrtLoading(false);
+    }
+  };
+
   const runLookup = async () => {
     const terms = dedupeTerms(parseTerms(input));
     if (!terms.length) {
@@ -152,6 +177,7 @@ const PingaoNatTab = () => {
 
     setLoading(true);
     setError("");
+    setSecureCrtResult(null);
 
     try {
       const rows = await fetchLookupRows(terms);
@@ -193,8 +219,9 @@ const PingaoNatTab = () => {
     }
   };
 
-  const runPingResultAnalysis = () => {
-    const parsed = parseLinuxPingOutput(pingResultInput);
+  const runPingResultAnalysis = (rawText?: string) => {
+    const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
+    const parsed = parseLinuxPingOutput(sourceText);
 
     const ipIndex = new Map<string, LookupNatItem>();
     for (const item of querySummary) {
@@ -245,12 +272,18 @@ const PingaoNatTab = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="w-5 h-5" /> Pingão NAT - Gerar Comandos
+            <Activity className="w-5 h-5" /> Pingao NAT - Gerar Comandos
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-nat-script")} disabled={!script}>
-            {copiedId === "pingao-nat-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
-            {copiedId === "pingao-nat-script" ? "Copiado!" : "Copiar Script"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void sendToSecureCrt()} disabled={!script || secureCrtLoading}>
+              <Terminal className="w-4 h-4 mr-1" />
+              {secureCrtLoading ? "Enviando..." : "Executar e Capturar"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-nat-script")} disabled={!script}>
+              {copiedId === "pingao-nat-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
+              {copiedId === "pingao-nat-script" ? "Copiado!" : "Copiar Script"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
@@ -275,6 +308,7 @@ const PingaoNatTab = () => {
                 setQuerySummary([]);
                 setScript("");
                 setError("");
+                setSecureCrtResult(null);
               }}
             >
               Limpar
@@ -286,6 +320,11 @@ const PingaoNatTab = () => {
           </p>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {secureCrtResult ? (
+            <p className={cn("text-sm", secureCrtResult.ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
+              {secureCrtResult.message}
+            </p>
+          ) : null}
 
           {querySummary.length > 0 && (
             <div className="rounded-lg border overflow-auto max-h-[280px]">
@@ -416,3 +455,4 @@ const PingaoNatTab = () => {
 };
 
 export default PingaoNatTab;
+

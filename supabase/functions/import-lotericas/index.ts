@@ -15,14 +15,46 @@ type ImportBody = {
   replace?: boolean;
 };
 
+const normalizedRowCache = new WeakMap<Record<string, unknown>, Map<string, unknown>>();
+
 function isBlank(value: unknown) {
   return value === null || value === undefined || String(value).trim() === "";
 }
 
+function normalizeHeaderKey(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, "");
+}
+
+function getNormalizedLookup(row: Record<string, unknown>) {
+  const cached = normalizedRowCache.get(row);
+  if (cached) return cached;
+
+  const lookup = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(row)) {
+    const normalized = normalizeHeaderKey(key);
+    if (!normalized) continue;
+    if (!lookup.has(normalized) || (isBlank(lookup.get(normalized)) && !isBlank(value))) {
+      lookup.set(normalized, value);
+    }
+  }
+
+  normalizedRowCache.set(row, lookup);
+  return lookup;
+}
+
 function pick(row: Record<string, unknown>, keys: string[]) {
+  const normalizedLookup = getNormalizedLookup(row);
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(row, key)) {
       return row[key];
+    }
+    const byNormalized = normalizedLookup.get(normalizeHeaderKey(key));
+    if (byNormalized !== undefined) {
+      return byNormalized;
     }
   }
   return undefined;
@@ -68,30 +100,41 @@ function asIsoDate(value: unknown): string | null {
 }
 
 function toLoterica(row: Record<string, unknown>, userId: string) {
-  const codUl = asText(pick(row, ["cod_ul", "Código da Lotérica_", "CÃ³digo da LotÃ©rica_"])) || "";
+  const codUl =
+    asText(
+      pick(row, [
+        "cod_ul",
+        "CODIGO DA LOTERICA_",
+        "Codigo da Loterica_",
+        "CODIGO UL",
+        "Codigo UL",
+      ]),
+    ) || "";
   if (!codUl) return null;
 
   return {
     cod_ul: codUl,
-    nome_loterica: asText(pick(row, ["NOME UL", "nome_loterica"])),
+    nome_loterica: asText(pick(row, ["NOME UL", "nome_loterica", "Nome Loterica"])),
     ccto_oi: asText(pick(row, ["CCTO OI", "ccto_oi"])),
     ccto_oemp: asText(pick(row, ["CCTO OEMP", "ccto_oemp"])),
-    operadora: asText(pick(row, ["OPERADORA 4G", "operadora"])),
+    operadora: asText(pick(row, ["OPERADORA 4G", "operadora", "Operadora"])),
     ip_nat: asText(pick(row, ["IP NAT", "ip_nat"])),
     ip_wan: asText(pick(row, ["IP WAN", "ip_wan"])),
-    loopback_wan: asText(pick(row, ["LOOPBACK PRINCIPAL", "loopback_wan"])),
+    loopback_wan: asText(pick(row, ["LOOPBACK PRINCIPAL", "loopback_wan", "Loopback Principal"])),
     // BUGFIX mantido: mapear loopback secundario da coluna correta, nao REDE LAN.
-    loopback_lan: asText(pick(row, ["LOOPBACK SECUNDARIO", "LOOPBACK SECUNDÃRIO", "LOOPBACK SECUND?RIO", "loopback_lan"])),
-    endereco: asText(pick(row, ["ENDEREÇO", "ENDEREÃO", "endereco"])),
-    contato: asText(pick(row, ["CONTATO", "contato"])),
-    status: asText(pick(row, ["STATUS UL", "status"])),
-    cidade: asText(pick(row, ["MUNICIPIO", "cidade"])),
+    loopback_lan: asText(pick(row, ["LOOPBACK SECUNDARIO", "loopback_lan", "Loopback Secundario"])),
+    endereco: asText(pick(row, ["ENDERECO", "endereco", "Endereco"])),
+    contato: asText(pick(row, ["CONTATO", "contato", "Contato"])),
+    status: asText(pick(row, ["STATUS UL", "status", "Status"])),
+    cidade: asText(pick(row, ["MUNICIPIO", "cidade", "Cidade"])),
     uf: asText(pick(row, ["UF", "uf"])),
-    designacao_nova: asText(pick(row, ["DESIGINACAO NOVA", "designacao_nova"])),
+    designacao_nova: asText(pick(row, ["DESIGINACAO NOVA", "DESIGNACAO NOVA", "designacao_nova", "Designacao Nova"])),
     raw_data: row,
+    updated_at: new Date().toISOString(),
     updated_by: userId,
   };
 }
+
 
 function toJira(row: Record<string, unknown>) {
   const chave = asText(pick(row, ["Chave", "chave"]));

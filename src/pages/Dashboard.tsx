@@ -6,10 +6,9 @@ import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const EXPORT_BATCH_SIZE = 1000;
@@ -144,14 +143,22 @@ const BASE_NORMALIZED_HEADER_KEYS = new Set<string>([
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { setOnExport, setOnImportClick, setShowLotericaTabs, setLotericaTab, lotericaTab } = useSidebarActions();
+  const {
+    setOnExport,
+    setOnImportClick,
+    setOnSearchSubmit,
+    setShowLotericaTabs,
+    setLotericaTab,
+    lotericaTab,
+    consultaSearch,
+  } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const search = consultaSearch;
 
   const fetchLotericas = useCallback(async () => {
     if (!search.trim()) {
@@ -453,12 +460,16 @@ const Dashboard = () => {
     setShowLotericaTabs(false);
     setOnExport(() => handleExport);
     setOnImportClick(() => () => importRef.current?.click());
+    setOnSearchSubmit(() => () => {
+      void goToFirstResult();
+    });
     return () => {
       setShowLotericaTabs(false);
       setOnExport(undefined);
       setOnImportClick(undefined);
+      setOnSearchSubmit(undefined);
     };
-  }, [handleExport, setOnExport, setOnImportClick, setShowLotericaTabs]);
+  }, [goToFirstResult, handleExport, setOnExport, setOnImportClick, setOnSearchSubmit, setShowLotericaTabs]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -486,23 +497,8 @@ const Dashboard = () => {
           <ScriptRouterSctTab />
         ) : (
           <>
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
-              className="pl-10"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void goToFirstResult();
-                }
-              }}
-            />
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => void fetchLotericas()}>
+        <div className="flex justify-end mb-6">
+          <Button variant="ghost" size="icon" onClick={() => void fetchLotericas()} title="Atualizar resultados">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

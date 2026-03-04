@@ -18,12 +18,21 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, profile, signOut } = useAuth();
-  const { onExport, onImportClick, lotericaTab, setLotericaTab } = useSidebarActions();
+  const {
+    onExport,
+    onImportClick,
+    onSearchSubmit,
+    lotericaTab,
+    setLotericaTab,
+    consultaSearch,
+    setConsultaSearch,
+  } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
   const isDashboardRoute = location.pathname === "/";
@@ -202,6 +211,23 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel>Dados</SidebarGroupLabel>
             <SidebarGroupContent>
+              <div className="px-2 pb-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={"Buscar por código, nome, CCTO ou cidade..."}
+                    className="pl-9 bg-sidebar border-sidebar-border"
+                    value={consultaSearch}
+                    onChange={(e) => setConsultaSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onSearchSubmit?.();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>

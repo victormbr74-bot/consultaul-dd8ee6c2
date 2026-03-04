@@ -46,6 +46,102 @@ const formatDateTimePtBr = (value: unknown) => {
   return parsed.toLocaleString("pt-BR");
 };
 
+const LEGACY_EXPORT_HEADERS = [
+  "Código UL",
+  "Nome Lotérica",
+  "CCTO OI",
+  "CCTO OEMP",
+  "Designação Nova",
+  "Operadora",
+  "IP NAT",
+  "IP WAN",
+  "Loopback Principal",
+  "Loopback Secundário",
+  "Rede LAN",
+  "Endereço",
+  "Contato",
+  "Status",
+  "Cidade",
+  "UF",
+  "IP Switch",
+  "TFL",
+  "Circuito OEMP",
+  "Circuitos Meraki",
+  "Empresa OEMP",
+  "Tipo UL",
+  "Perímetro",
+  "Tecnologia",
+  "Modelo Roteador",
+  "SIM Card 4G",
+  "Owner",
+  "Resp. Backup",
+  "Região",
+  "CEP",
+  "Migração",
+  "Homologado",
+  "Atualizado em",
+] as const;
+
+const USER_EXPORT_HEADERS = [
+  "Usuário que alterou",
+  "Código usuário que alterou",
+  "Nome usuário que alterou",
+] as const;
+
+const normalizeHeaderKey = (value: string) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, "");
+
+const BASE_ALIAS_KEYS = [
+  "cod_ul",
+  "nome_loterica",
+  "ccto_oi",
+  "ccto_oemp",
+  "designacao_nova",
+  "operadora",
+  "ip_nat",
+  "ip_wan",
+  "loopback_wan",
+  "loopback_lan",
+  "endereco",
+  "contato",
+  "status",
+  "cidade",
+  "uf",
+  "updated_at",
+  "updated_by",
+  "CODIGO DA LOTERICA_",
+  "CÓDIGO DA LOTÉRICA_",
+  "NOME UL",
+  "STATUS UL",
+  "MUNICIPIO",
+  "MUNICÍPIO",
+  "REDE LAN",
+  "REDE_LAN",
+  "IP SWITCH",
+  "LOOPBACK SWITCH",
+  "TFLs",
+  "TFLS",
+  "CIRCUITO MERAKI",
+  "CIRCUITOS MERAKI",
+  "TIPO LOTERICA",
+  "TIPO UL",
+  "PERIMETRO",
+  "PERÍMETRO",
+  "SIM CARD 4G",
+  "RESP BACKUP",
+  "MIGRACAO",
+  "MIGRAÇÃO",
+] as const;
+
+const BASE_NORMALIZED_HEADER_KEYS = new Set<string>([
+  ...LEGACY_EXPORT_HEADERS.map((header) => normalizeHeaderKey(header)),
+  ...BASE_ALIAS_KEYS.map((key) => normalizeHeaderKey(key)),
+]);
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { setOnExport, setOnImportClick, setShowLotericaTabs, setLotericaTab, lotericaTab } = useSidebarActions();
@@ -207,115 +303,124 @@ const Dashboard = () => {
         }
       }
 
-      const exportData = allRows.map((row) => {
+      const preparedRows = allRows.map((row) => {
         const raw = asRecord(row.raw_data);
+        const rawByNormalized = new Map<string, unknown>();
+        Object.entries(raw).forEach(([key, value]) => {
+          const normalized = normalizeHeaderKey(key);
+          if (normalized && !rawByNormalized.has(normalized)) {
+            rawByNormalized.set(normalized, value);
+          }
+        });
 
-        const codUl = firstFilled(row.cod_ul, raw.cod_ul, raw["CODIGO DA LOTERICA_"], raw["CÓDIGO DA LOTÉRICA_"]);
-        const nomeLoterica = firstFilled(row.nome_loterica, raw.nome_loterica, raw["NOME UL"]);
-        const cctoOi = firstFilled(row.ccto_oi, raw.ccto_oi, raw["CCTO OI"]);
-        const cctoOemp = firstFilled(row.ccto_oemp, raw.ccto_oemp, raw["CCTO OEMP"]);
-        const designacaoNova = firstFilled(row.designacao_nova, raw.designacao_nova, raw["DESIGINACAO NOVA"]);
-        const operadora = firstFilled(row.operadora, raw.operadora, raw["OPERADORA 4G"]);
-        const ipNat = firstFilled(row.ip_nat, raw.ip_nat, raw["IP NAT"]);
-        const ipWan = firstFilled(row.ip_wan, raw.ip_wan, raw["IP WAN"]);
-        const loopbackPrincipal = firstFilled(row.loopback_wan, raw.loopback_wan, raw["LOOPBACK PRINCIPAL"]);
+        const pickRaw = (...aliases: string[]) => {
+          for (const alias of aliases) {
+            const value = rawByNormalized.get(normalizeHeaderKey(alias));
+            if (isFilled(value)) return value;
+          }
+          return "";
+        };
+
+        const codUl = firstFilled(row.cod_ul, pickRaw("CODIGO DA LOTERICA_", "CÓDIGO DA LOTÉRICA_", "cod_ul"));
+        const nomeLoterica = firstFilled(row.nome_loterica, pickRaw("NOME UL", "nome_loterica"));
+        const cctoOi = firstFilled(row.ccto_oi, pickRaw("CCTO OI", "ccto_oi"));
+        const cctoOemp = firstFilled(row.ccto_oemp, pickRaw("CCTO OEMP", "ccto_oemp"));
+        const designacaoNova = firstFilled(row.designacao_nova, pickRaw("DESIGINACAO NOVA", "DESIGNAÇÃO NOVA", "designacao_nova"));
+        const operadora = firstFilled(row.operadora, pickRaw("OPERADORA 4G", "operadora"));
+        const ipNat = firstFilled(row.ip_nat, pickRaw("IP NAT", "ip_nat"));
+        const ipWan = firstFilled(row.ip_wan, pickRaw("IP WAN", "ip_wan"));
+        const loopbackPrincipal = firstFilled(row.loopback_wan, pickRaw("LOOPBACK PRINCIPAL", "loopback_wan"));
         const loopbackSecundario = firstFilled(
           row.loopback_lan,
-          raw.loopback_lan,
-          raw["LOOPBACK SECUNDARIO"],
-          raw["LOOPBACK SECUNDÁRIO"],
-          raw["LOOPBACK SECUNDÃRIO"],
+          pickRaw("LOOPBACK SECUNDARIO", "LOOPBACK SECUNDÁRIO", "loopback_lan"),
         );
-        const endereco = firstFilled(row.endereco, raw.endereco, raw["ENDERECO"], raw["ENDEREÇO"], raw["ENDEREÃ‡O"]);
-        const contato = firstFilled(row.contato, raw.contato, raw["CONTATO"]);
-        const status = firstFilled(row.status, raw.status, raw["STATUS UL"]);
-        const cidade = firstFilled(row.cidade, raw.cidade, raw["MUNICIPIO"], raw["MUNICÍPIO"], raw["CIDADE"]);
-        const uf = firstFilled(row.uf, raw.uf, raw["UF"]);
-
-        const redeLan = firstFilled(raw["REDE LAN"], raw["REDE_LAN"], row.loopback_lan);
-        const ipSwitch = firstFilled(raw["IP SWITCH"], raw["LOOPBACK SWITCH"]);
-        const tfl = firstFilled(raw["TFL"], raw["TFLs"], raw["TFLS"]);
-        const circuitoOemp = firstFilled(raw["CIRCUITO OEMP"]);
-        const circuitoMeraki = firstFilled(raw["CIRCUITO MERAKI"], raw["CIRCUITOS MERAKI"], raw["MERAKI"]);
-        const empresaOemp = firstFilled(raw["EMPRESA OEMP"]);
-        const tipoUl = firstFilled(raw["TIPO LOTERICA"], raw["TIPO UL"]);
-        const perimetro = firstFilled(raw["PERIMETRO"], raw["PERÍMETRO"], raw["PERÃMETRO"]);
-        const tecnologia = firstFilled(raw["TECNOLOGIA"]);
-        const modeloRoteador = firstFilled(raw["MODELO ROTEADOR"]);
-        const simCard4g = firstFilled(raw["SIM CARD 4G"]);
-        const owner = firstFilled(raw["OWNER"]);
-        const respBackup = firstFilled(raw["RESP BACKUP"]);
-        const regiao = firstFilled(raw["REGIAO"], raw["REGIÃO"], raw["REGIÃƒO"]);
-        const cep = firstFilled(raw["CEP"]);
-        const migracao = firstFilled(raw["MIGRACAO"], raw["MIGRAÇÃO"], raw["MIGRAÃ‡ÃƒO"]);
-        const homologado = firstFilled(raw["HOMOLOGADO"]);
+        const endereco = firstFilled(row.endereco, pickRaw("ENDERECO", "ENDEREÇO", "endereco"));
+        const contato = firstFilled(row.contato, pickRaw("CONTATO", "contato"));
+        const status = firstFilled(row.status, pickRaw("STATUS UL", "status"));
+        const cidade = firstFilled(row.cidade, pickRaw("MUNICIPIO", "MUNICÍPIO", "CIDADE", "cidade"));
+        const uf = firstFilled(row.uf, pickRaw("UF", "uf"));
+        const updatedAtRaw = firstFilled(row.updated_at, pickRaw("ATUALIZADO EM", "updated_at"));
 
         const updatedBy = asString(row.updated_by);
         const updaterProfile = updatedBy ? profileById.get(updatedBy) : undefined;
         const updatedByDisplay = [updaterProfile?.user_code, updaterProfile?.name].filter(Boolean).join(" - ");
-        const updatedAt = firstFilled(row.updated_at, raw.updated_at, raw["ATUALIZADO EM"]);
 
-        return {
-          ...raw,
-          cod_ul: codUl,
-          nome_loterica: nomeLoterica,
-          ccto_oi: cctoOi,
-          ccto_oemp: cctoOemp,
-          designacao_nova: designacaoNova,
-          operadora,
-          ip_nat: ipNat,
-          ip_wan: ipWan,
-          loopback_wan: loopbackPrincipal,
-          loopback_lan: loopbackSecundario,
-          endereco,
-          contato,
-          status,
-          cidade,
-          uf,
-          "CODIGO DA LOTERICA_": codUl,
-          "NOME UL": nomeLoterica,
+        const baseData: Record<(typeof LEGACY_EXPORT_HEADERS)[number], unknown> = {
+          "Código UL": codUl,
+          "Nome Lotérica": nomeLoterica,
           "CCTO OI": cctoOi,
           "CCTO OEMP": cctoOemp,
-          "DESIGINACAO NOVA": designacaoNova,
-          "OPERADORA 4G": operadora,
+          "Designação Nova": designacaoNova,
+          "Operadora": operadora,
           "IP NAT": ipNat,
           "IP WAN": ipWan,
-          "LOOPBACK PRINCIPAL": loopbackPrincipal,
-          "LOOPBACK SECUNDARIO": loopbackSecundario,
-          ENDERECO: endereco,
-          CONTATO: contato,
-          "STATUS UL": status,
-          MUNICIPIO: cidade,
+          "Loopback Principal": loopbackPrincipal,
+          "Loopback Secundário": loopbackSecundario,
+          "Rede LAN": firstFilled(pickRaw("REDE LAN", "REDE_LAN"), row.loopback_lan),
+          "Endereço": endereco,
+          "Contato": contato,
+          "Status": status,
+          "Cidade": cidade,
           UF: uf,
-          "Codigo UL": codUl,
-          "Nome Loterica": nomeLoterica,
-          "Rede LAN": redeLan,
-          "IP Switch": ipSwitch,
-          TFL: tfl,
-          "Circuito OEMP": circuitoOemp,
-          "Circuitos Meraki": circuitoMeraki,
-          "Empresa OEMP": empresaOemp,
-          "Tipo UL": tipoUl,
-          Perimetro: perimetro,
-          Tecnologia: tecnologia,
-          "Modelo Roteador": modeloRoteador,
-          "SIM Card 4G": simCard4g,
-          Owner: owner,
-          "Resp. Backup": respBackup,
-          Regiao: regiao,
-          CEP: cep,
-          Migracao: migracao,
-          Homologado: homologado,
-          updated_at: updatedAt,
-          "ATUALIZADO EM": updatedAt,
-          "DATA/HORA ATUALIZACAO": formatDateTimePtBr(updatedAt),
-          updated_by: updatedBy,
-          "USUARIO QUE ALTEROU": updatedByDisplay || updatedBy,
-          "CODIGO USUARIO QUE ALTEROU": updaterProfile?.user_code ?? "",
-          "NOME USUARIO QUE ALTEROU": updaterProfile?.name ?? "",
+          "IP Switch": pickRaw("IP SWITCH", "LOOPBACK SWITCH"),
+          TFL: pickRaw("TFL", "TFLs", "TFLS"),
+          "Circuito OEMP": pickRaw("CIRCUITO OEMP"),
+          "Circuitos Meraki": pickRaw("CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"),
+          "Empresa OEMP": pickRaw("EMPRESA OEMP"),
+          "Tipo UL": pickRaw("TIPO LOTERICA", "TIPO UL"),
+          "Perímetro": pickRaw("PERIMETRO", "PERÍMETRO"),
+          Tecnologia: pickRaw("TECNOLOGIA"),
+          "Modelo Roteador": pickRaw("MODELO ROTEADOR"),
+          "SIM Card 4G": pickRaw("SIM CARD 4G"),
+          Owner: pickRaw("OWNER"),
+          "Resp. Backup": pickRaw("RESP BACKUP"),
+          "Região": pickRaw("REGIAO", "REGIÃO"),
+          CEP: pickRaw("CEP"),
+          "Migração": pickRaw("MIGRACAO", "MIGRAÇÃO"),
+          Homologado: pickRaw("HOMOLOGADO"),
+          "Atualizado em": formatDateTimePtBr(updatedAtRaw),
         };
+
+        const userData: Record<(typeof USER_EXPORT_HEADERS)[number], unknown> = {
+          "Usuário que alterou": updatedByDisplay || updatedBy,
+          "Código usuário que alterou": updaterProfile?.user_code ?? "",
+          "Nome usuário que alterou": updaterProfile?.name ?? "",
+        };
+
+        return { raw, rawByNormalized, baseData, userData };
       });
-      const wb = jsonToWorkbook([{ name: "Lotericas", data: exportData }]);
+
+      const extraHeaders: Array<{ label: string; normalized: string }> = [];
+      const seenExtra = new Set<string>();
+
+      preparedRows.forEach(({ raw }) => {
+        Object.keys(raw).forEach((key) => {
+          const normalized = normalizeHeaderKey(key);
+          if (!normalized || BASE_NORMALIZED_HEADER_KEYS.has(normalized) || seenExtra.has(normalized)) return;
+          seenExtra.add(normalized);
+          extraHeaders.push({ label: key, normalized });
+        });
+      });
+
+      const exportData = preparedRows.map(({ rawByNormalized, baseData, userData }) => {
+        const orderedRow: Record<string, unknown> = {};
+
+        LEGACY_EXPORT_HEADERS.forEach((header) => {
+          orderedRow[header] = baseData[header] ?? "";
+        });
+
+        extraHeaders.forEach(({ label, normalized }) => {
+          orderedRow[label] = firstFilled(rawByNormalized.get(normalized), "");
+        });
+
+        USER_EXPORT_HEADERS.forEach((header) => {
+          orderedRow[header] = userData[header] ?? "";
+        });
+
+        return orderedRow;
+      });
+
+      const wb = jsonToWorkbook([{ name: "Lotéricas", data: exportData }]);
       await writeFile(wb, "lotericas_export.xlsx");
     } catch (error) {
       console.error("Falha inesperada ao exportar lotericas", error);

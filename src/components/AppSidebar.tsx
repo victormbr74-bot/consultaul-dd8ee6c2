@@ -220,23 +220,6 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Base Dash</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink to="/alarmes/base-dash" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <Upload className="mr-2 h-4 w-4" />
-                      <span>Importação</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         {isAdmin && (
           <SidebarGroup>

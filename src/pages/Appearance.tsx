@@ -94,7 +94,7 @@ const Appearance = () => {
                   <SelectContent>
                     {TEAM_OPTIONS.map((team) => (
                       <SelectItem key={team.id} value={team.id}>
-                        {team.label}
+                        <span className="mr-1">{team.flag}</span> {team.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

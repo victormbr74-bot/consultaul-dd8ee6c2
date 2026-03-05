@@ -3,7 +3,9 @@ import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download,
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { WORLD_CUP_2026_TEAM_BY_ID } from "@/data/worldCup2026Teams";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -24,6 +26,10 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, profile, signOut } = useAuth();
+  const { color, worldCupTeam } = useTheme();
+
+  // TODO: Remover apos a Copa do Mundo 2026 (fim previsto: julho 2026)
+  const worldCupFlag = color === "world-cup" ? WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].flag : null;
   const {
     onExport,
     onImportClick,
@@ -111,7 +117,12 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Store className="w-4 h-4 text-primary-foreground" />
+            {/* TODO: Remover bloco worldCupFlag apos a Copa do Mundo 2026 */}
+            {worldCupFlag ? (
+              <span className="text-lg leading-none">{worldCupFlag}</span>
+            ) : (
+              <Store className="w-4 h-4 text-primary-foreground" />
+            )}
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>

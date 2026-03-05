@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Check, Wifi, Terminal } from "lucide-react";
-import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
+import { Copy, Check, Wifi } from "lucide-react";
 import { fetchLookupRows, resolveMatches, type MatchField } from "@/components/loterica/lotericaLookup";
 
 interface Ping99TabProps {
@@ -139,8 +138,6 @@ const sortNetworks = (a: string, b: string) => {
 
 const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
-  const [secureCrtLoading, setSecureCrtLoading] = useState(false);
-  const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
   const [manualRedeLan, setManualRedeLan] = useState("");
   const [manualCodUl, setManualCodUl] = useState("");
   const [manualTfl, setManualTfl] = useState("");
@@ -280,28 +277,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
     setAnalysisRan(true);
   }, [pingResultInput]);
 
-  const sendToSecureCrt = async () => {
-    if (!tclScript.trim()) return;
-    setSecureCrtLoading(true);
-    setSecureCrtResult(null);
-    try {
-      const result = await executeSecureCrtCommands({
-        commands: tclScript,
-        source: "ping99",
-        captureOutput: true,
-        captureWaitMs: 9000,
-        delayMs: 100,
-      });
-      setSecureCrtResult(result);
-      if (result.ok && result.output) {
-        setPingResultInput(result.output);
-        runPingResultAnalysis(result.output);
-      }
-    } finally {
-      setSecureCrtLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -408,10 +383,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Script TCL - Ping 99</CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => void sendToSecureCrt()} disabled={!tclScript || secureCrtLoading}>
-              <Terminal className="w-4 h-4 mr-1" />
-              {secureCrtLoading ? "Enviando..." : "Executar e Capturar"}
-            </Button>
             <Button variant="outline" size="sm" onClick={copy} disabled={!tclScript}>
               {copied ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
               {copied ? "Copiado!" : "Copiar"}
@@ -419,11 +390,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {secureCrtResult ? (
-            <p className={`text-sm ${secureCrtResult.ok ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-              {secureCrtResult.message}
-            </p>
-          ) : null}
           {tclScript ? (
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap overflow-x-auto max-h-[500px] overflow-y-auto">
               {tclScript}

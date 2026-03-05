@@ -29,7 +29,7 @@ export function AppSidebar() {
   const { color, worldCupTeam } = useTheme();
 
   // TODO: Remover apos a Copa do Mundo 2026 (fim previsto: julho 2026)
-  const worldCupFlag = color === "world-cup" ? WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].flag : null;
+  const worldCupFlagImg = color === "world-cup" ? WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].flagImg : null;
   const {
     onExport,
     onImportClick,
@@ -117,9 +117,9 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            {/* TODO: Remover bloco worldCupFlag apos a Copa do Mundo 2026 */}
-            {worldCupFlag ? (
-              <span className="text-lg leading-none">{worldCupFlag}</span>
+          {/* TODO: Remover bloco worldCupFlag apos a Copa do Mundo 2026 */}
+            {worldCupFlagImg ? (
+              <img src={worldCupFlagImg} alt="Bandeira" className="w-6 h-4 object-cover rounded-sm" />
             ) : (
               <Store className="w-4 h-4 text-primary-foreground" />
             )}

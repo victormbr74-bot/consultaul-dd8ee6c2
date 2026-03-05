@@ -436,23 +436,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
         </CardContent>
       </Card>
 
-      {!!ips.length && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">IPs da Rede LAN (+1 ate 16 IPs)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-              {ips.map((ip) => (
-                <div key={ip.normal} className="text-xs font-mono bg-muted/50 p-2 rounded text-center">
-                  {ip.normal}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Resultado Ping (estilo Pingao)</CardTitle>
@@ -503,6 +486,23 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
           )}
         </CardContent>
       </Card>
+
+      {!!ips.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">IPs da Rede LAN (+1 ate 16 IPs)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+              {ips.map((ip) => (
+                <div key={ip.normal} className="text-xs font-mono bg-muted/50 p-2 rounded text-center">
+                  {ip.normal}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

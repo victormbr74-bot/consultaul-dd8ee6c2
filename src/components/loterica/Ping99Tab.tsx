@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Copy, Check, Wifi, Terminal } from "lucide-react";
 import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
 import { fetchLookupRows, resolveMatches, type MatchField } from "@/components/loterica/lotericaLookup";
@@ -19,6 +20,13 @@ interface Ping99TabProps {
 type PingIp = {
   normal: string;
   padded: string;
+};
+
+type ParsedPingMetrics = {
+  ip: string;
+  successRate: number | null;
+  sent: number | null;
+  received: number | null;
 };
 
 const SEQUENCE_SIZE = 16;
@@ -70,6 +78,65 @@ const incrementIp = (octets: number[]) => {
   return null;
 };
 
+const parsePingOutput = (text: string): ParsedPingMetrics[] => {
+  const lines = text.split(/\r?\n/);
+  const rows: ParsedPingMetrics[] = [];
+  let current: ParsedPingMetrics | null = null;
+
+  const flushCurrent = () => {
+    if (!current) return;
+    rows.push(current);
+    current = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const sendMatch = line.match(/Sending\s+\d+,\s*\d+-byte ICMP Echos to\s+(\d{1,3}(?:\.\d{1,3}){3})/i);
+    if (sendMatch) {
+      flushCurrent();
+      current = {
+        ip: sendMatch[1],
+        successRate: null,
+        sent: null,
+        received: null,
+      };
+      continue;
+    }
+
+    if (!current) continue;
+
+    const successMatch = line.match(/Success\s+rate\s+is\s+(\d+)\s*percent\s*\((\d+)\/(\d+)\)/i);
+    if (successMatch) {
+      current.successRate = Number.parseInt(successMatch[1], 10);
+      current.received = Number.parseInt(successMatch[2], 10);
+      current.sent = Number.parseInt(successMatch[3], 10);
+    }
+  }
+
+  flushCurrent();
+  return rows;
+};
+
+const toNetwork24 = (ip: string) => {
+  const match = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
+  if (!match) return "";
+  const octets = match.slice(1, 4).map((part) => Number.parseInt(part, 10));
+  if (octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) return "";
+  return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;
+};
+
+const sortNetworks = (a: string, b: string) => {
+  const parse = (network: string) => network.split(".").map((part) => Number.parseInt(part, 10));
+  const ao = parse(a);
+  const bo = parse(b);
+  for (let i = 0; i < Math.min(ao.length, bo.length); i++) {
+    if (ao[i] !== bo[i]) return ao[i] - bo[i];
+  }
+  return a.localeCompare(b);
+};
+
 const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
   const [secureCrtLoading, setSecureCrtLoading] = useState(false);
@@ -81,6 +148,9 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupStatus, setLookupStatus] = useState<"idle" | "ok" | "error">("idle");
   const [lookupMessage, setLookupMessage] = useState("");
+  const [pingResultInput, setPingResultInput] = useState("");
+  const [respondedNetworks, setRespondedNetworks] = useState<string[]>([]);
+  const [analysisRan, setAnalysisRan] = useState(false);
   const autoLookupDoneRef = useRef(false);
 
   const raw = useMemo(
@@ -192,6 +262,24 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
     void loadFromConsulta(term);
   }, [autoLookupTerm, isStandalone, loadFromConsulta]);
 
+  const runPingResultAnalysis = useCallback((rawText?: string) => {
+    const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
+    const parsed = parsePingOutput(sourceText);
+    const unique = new Set<string>();
+
+    for (const row of parsed) {
+      const hasReply =
+        (typeof row.received === "number" && row.received > 0) ||
+        (typeof row.successRate === "number" && row.successRate > 0);
+      if (!hasReply) continue;
+      const network = toNetwork24(row.ip);
+      if (network) unique.add(network);
+    }
+
+    setRespondedNetworks([...unique].sort(sortNetworks));
+    setAnalysisRan(true);
+  }, [pingResultInput]);
+
   const sendToSecureCrt = async () => {
     if (!tclScript.trim()) return;
     setSecureCrtLoading(true);
@@ -205,6 +293,10 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
         delayMs: 100,
       });
       setSecureCrtResult(result);
+      if (result.ok && result.output) {
+        setPingResultInput(result.output);
+        runPingResultAnalysis(result.output);
+      }
     } finally {
       setSecureCrtLoading(false);
     }
@@ -360,6 +452,57 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Resultado Ping (estilo Pingao)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="ping99-result-input">Cole o resultado do ping</Label>
+            <Textarea
+              id="ping99-result-input"
+              value={pingResultInput}
+              onChange={(event) => setPingResultInput(event.target.value)}
+              className="min-h-[190px] font-mono text-xs"
+              placeholder={"Type escape sequence to abort.\nSending 1, 100-byte ICMP Echos to 10.50.143.98..."}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => runPingResultAnalysis()}>Mostrar redes que responderam</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPingResultInput("");
+                setRespondedNetworks([]);
+                setAnalysisRan(false);
+              }}
+            >
+              Limpar
+            </Button>
+          </div>
+
+          {respondedNetworks.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Redes com resposta: {respondedNetworks.length}
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {respondedNetworks.map((network) => (
+                  <div key={network} className="text-xs font-mono bg-muted/50 p-2 rounded text-center">
+                    {network}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysisRan && respondedNetworks.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nenhuma rede com resposta foi identificada no resultado colado.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

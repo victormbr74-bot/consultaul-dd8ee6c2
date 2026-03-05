@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Wifi } from "lucide-react";
 import { fetchLookupRows, resolveMatches } from "@/components/loterica/lotericaLookup";
 
@@ -112,16 +113,8 @@ const parsePingOutput = (text: string): ParsedPingMetrics[] => {
   return rows;
 };
 
-const toNetwork24 = (ip: string) => {
-  const match = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
-  if (!match) return "";
-  const octets = match.slice(1, 4).map((part) => Number.parseInt(part, 10));
-  if (octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) return "";
-  return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;
-};
-
-const sortNetworks = (a: string, b: string) => {
-  const parse = (network: string) => network.split(".").map((part) => Number.parseInt(part, 10));
+const sortIps = (a: string, b: string) => {
+  const parse = (ip: string) => ip.split(".").map((part) => Number.parseInt(part, 10));
   const ao = parse(a);
   const bo = parse(b);
   for (let i = 0; i < Math.min(ao.length, bo.length); i++) {
@@ -136,7 +129,7 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [manualCodUl, setManualCodUl] = useState("");
   const [manualTfl, setManualTfl] = useState("");
   const [pingResultInput, setPingResultInput] = useState("");
-  const [respondedNetworks, setRespondedNetworks] = useState<string[]>([]);
+  const [upRows, setUpRows] = useState<ParsedPingMetrics[]>([]);
   const [analysisRan, setAnalysisRan] = useState(false);
   const autoLookupDoneRef = useRef(false);
 
@@ -230,18 +223,18 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const runPingResultAnalysis = useCallback((rawText?: string) => {
     const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
     const parsed = parsePingOutput(sourceText);
-    const unique = new Set<string>();
+    const byIp = new Map<string, ParsedPingMetrics>();
 
     for (const row of parsed) {
       const hasReply =
         (typeof row.received === "number" && row.received > 0) ||
         (typeof row.successRate === "number" && row.successRate > 0);
       if (!hasReply) continue;
-      const network = toNetwork24(row.ip);
-      if (network) unique.add(network);
+      byIp.set(row.ip, row);
     }
 
-    setRespondedNetworks([...unique].sort(sortNetworks));
+    const ordered = [...byIp.values()].sort((a, b) => sortIps(a.ip, b.ip));
+    setUpRows(ordered);
     setAnalysisRan(true);
   }, [pingResultInput]);
 
@@ -348,12 +341,12 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => runPingResultAnalysis()}>Mostrar redes que responderam</Button>
+            <Button onClick={() => runPingResultAnalysis()}>Mostrar IPs UP</Button>
             <Button
               variant="outline"
               onClick={() => {
                 setPingResultInput("");
-                setRespondedNetworks([]);
+                setUpRows([]);
                 setAnalysisRan(false);
               }}
             >
@@ -361,23 +354,46 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
             </Button>
           </div>
 
-          {respondedNetworks.length > 0 && (
+          {upRows.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Redes com resposta: {respondedNetworks.length}
+                IPs UP: {upRows.length}
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {respondedNetworks.map((network) => (
-                  <div key={network} className="text-xs font-mono bg-muted/50 p-2 rounded text-center">
-                    {network}
-                  </div>
-                ))}
+              <div className="rounded-lg border overflow-auto max-h-[320px]">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/60 sticky top-0">
+                    <tr className="text-left">
+                      <th className="p-2 font-medium">IP</th>
+                      <th className="p-2 font-medium">Sucesso</th>
+                      <th className="p-2 font-medium">Pacotes (rec/env)</th>
+                      <th className="p-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upRows.map((row) => (
+                      <tr key={row.ip} className="border-t align-top">
+                        <td className="p-2 font-mono">{row.ip}</td>
+                        <td className="p-2">
+                          {row.successRate !== null ? `${row.successRate}%` : "-"}
+                        </td>
+                        <td className="p-2 font-mono">
+                          {row.received !== null && row.sent !== null ? `${row.received}/${row.sent}` : "-"}
+                        </td>
+                        <td className="p-2">
+                          <Badge variant="outline" className="border-green-500/50 bg-green-500/15 text-green-700 dark:text-green-400 font-semibold">
+                            UP
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {analysisRan && respondedNetworks.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhuma rede com resposta foi identificada no resultado colado.</p>
+          {analysisRan && upRows.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nenhum IP UP foi identificado no resultado colado.</p>
           )}
         </CardContent>
       </Card>

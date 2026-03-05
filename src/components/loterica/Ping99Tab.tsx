@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ interface Ping99TabProps {
     tfl?: unknown;
     raw_data?: Record<string, unknown> | null;
   };
+  autoLookupTerm?: string;
 }
 
 type PingIp = {
@@ -69,7 +70,7 @@ const incrementIp = (octets: number[]) => {
   return null;
 };
 
-const Ping99Tab = ({ form }: Ping99TabProps) => {
+const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [copied, setCopied] = useState(false);
   const [secureCrtLoading, setSecureCrtLoading] = useState(false);
   const [secureCrtResult, setSecureCrtResult] = useState<SecureCrtExecuteResult | null>(null);
@@ -80,6 +81,7 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupStatus, setLookupStatus] = useState<"idle" | "ok" | "error">("idle");
   const [lookupMessage, setLookupMessage] = useState("");
+  const autoLookupDoneRef = useRef(false);
 
   const raw = useMemo(
     () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
@@ -139,8 +141,8 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const loadFromConsulta = async () => {
-    const query = normalizeText(lookupTerm);
+  const loadFromConsulta = useCallback(async (termOverride?: string) => {
+    const query = normalizeText(termOverride ?? lookupTerm);
     if (!query) {
       setLookupStatus("error");
       setLookupMessage("Informe um Codigo UL, CCTO OI/OEMP ou Designacao.");
@@ -166,6 +168,7 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
       setManualCodUl(normalizeText(row.cod_ul));
       setManualRedeLan(getRawString(rowRaw, REDE_LAN_KEYS));
       setManualTfl(getRawString(rowRaw, TFL_KEYS));
+      setLookupTerm(query);
       setLookupStatus("ok");
       setLookupMessage(
         match.matchField
@@ -178,7 +181,16 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
     } finally {
       setLookupLoading(false);
     }
-  };
+  }, [lookupTerm]);
+
+  useEffect(() => {
+    if (!isStandalone) return;
+    if (autoLookupDoneRef.current) return;
+    const term = normalizeText(autoLookupTerm);
+    if (!term) return;
+    autoLookupDoneRef.current = true;
+    void loadFromConsulta(term);
+  }, [autoLookupTerm, isStandalone, loadFromConsulta]);
 
   const sendToSecureCrt = async () => {
     if (!tclScript.trim()) return;

@@ -44,6 +44,18 @@ export function AppSidebar() {
   const isDashboardRoute = location.pathname === "/";
   const shouldShowLotericaTabs = true;
   const hasPendingChanges = pendingChangeCount > 0;
+  const codUlSegment = location.pathname.startsWith("/loterica/")
+    ? location.pathname.replace("/loterica/", "").split("/")[0] || ""
+    : "";
+  const codUlFromDetailRoute = (() => {
+    try {
+      return decodeURIComponent(codUlSegment);
+    } catch {
+      return codUlSegment;
+    }
+  })();
+  const ping99SeedTerm = String(codUlFromDetailRoute || consultaSearch || "").trim();
+  const ping99Path = ping99SeedTerm ? `/ping99?q=${encodeURIComponent(ping99SeedTerm)}` : "/ping99";
 
   const lotericaTabs = [
     { id: "consulta", label: "Consulta", icon: Search },
@@ -173,7 +185,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to="/ping99" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                  <NavLink to={ping99Path} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Wifi className="mr-2 h-4 w-4" />
                     <span>Ping 99</span>
                   </NavLink>

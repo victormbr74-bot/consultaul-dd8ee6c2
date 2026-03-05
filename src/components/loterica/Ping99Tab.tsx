@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, Check, Wifi, Terminal } from "lucide-react";
 import { executeSecureCrtCommands, type SecureCrtExecuteResult } from "@/lib/secureCrtBridge";
+import { fetchLookupRows, resolveMatches, type MatchField } from "@/components/loterica/lotericaLookup";
 
 interface Ping99TabProps {
   form?: {
@@ -23,6 +24,13 @@ const SEQUENCE_SIZE = 16;
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PING99_REPEAT = 1;
 const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;
+const TFL_KEYS = ["TFL", "TFLs"] as const;
+const MATCH_FIELD_LABELS: Record<MatchField, string> = {
+  cod_ul: "Codigo UL",
+  ccto_oi: "CCTO OI",
+  ccto_oemp: "CCTO OEMP",
+  designacao_nova: "Designacao",
+};
 
 const padOctet = (value: string) => value.padStart(3, "0");
 const normalizeText = (value: unknown) => String(value ?? "").trim();
@@ -68,6 +76,10 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
   const [manualRedeLan, setManualRedeLan] = useState("");
   const [manualCodUl, setManualCodUl] = useState("");
   const [manualTfl, setManualTfl] = useState("");
+  const [lookupTerm, setLookupTerm] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [lookupMessage, setLookupMessage] = useState("");
 
   const raw = useMemo(
     () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
@@ -77,7 +89,7 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
   const isStandalone = !form;
   const formRedeLan = getRawString(raw, REDE_LAN_KEYS);
   const formCodUl = normalizeText(form?.cod_ul);
-  const formTfl = normalizeText(raw["TFL"] ?? raw["TFLs"] ?? form?.tfl);
+  const formTfl = normalizeText(getRawString(raw, TFL_KEYS) || form?.tfl);
 
   const redeLan = isStandalone ? manualRedeLan : formRedeLan;
   const codUl = isStandalone ? normalizeText(manualCodUl) : formCodUl;
@@ -127,6 +139,47 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const loadFromConsulta = async () => {
+    const query = normalizeText(lookupTerm);
+    if (!query) {
+      setLookupStatus("error");
+      setLookupMessage("Informe um Codigo UL, CCTO OI/OEMP ou Designacao.");
+      return;
+    }
+
+    setLookupLoading(true);
+    setLookupStatus("idle");
+    setLookupMessage("");
+    try {
+      const rows = await fetchLookupRows([query]);
+      const [match] = resolveMatches([query], rows);
+      if (!match?.row) {
+        setLookupStatus("error");
+        setLookupMessage("Consulta nao encontrou dados para o termo informado.");
+        return;
+      }
+
+      const row = match.row;
+      const rowRaw =
+        row.raw_data && typeof row.raw_data === "object" ? (row.raw_data as Record<string, unknown>) : {};
+
+      setManualCodUl(normalizeText(row.cod_ul));
+      setManualRedeLan(getRawString(rowRaw, REDE_LAN_KEYS));
+      setManualTfl(getRawString(rowRaw, TFL_KEYS));
+      setLookupStatus("ok");
+      setLookupMessage(
+        match.matchField
+          ? `Dados carregados da consulta para ${normalizeText(row.cod_ul)} (encontrado por ${MATCH_FIELD_LABELS[match.matchField]}).`
+          : `Dados carregados da consulta para ${normalizeText(row.cod_ul)}.`,
+      );
+    } catch (error) {
+      setLookupStatus("error");
+      setLookupMessage(String((error as Error)?.message || error || "Falha ao consultar dados da loterica."));
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
   const sendToSecureCrt = async () => {
     if (!tclScript.trim()) return;
     setSecureCrtLoading(true);
@@ -155,33 +208,74 @@ const Ping99Tab = ({ form }: Ping99TabProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           {isStandalone && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="ping99-rede-lan">Rede LAN</Label>
-                <Input
-                  id="ping99-rede-lan"
-                  placeholder="10.123.45.67"
-                  value={manualRedeLan}
-                  onChange={(event) => setManualRedeLan(event.target.value)}
-                />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                <div className="space-y-1">
+                  <Label htmlFor="ping99-consulta">Consulta (UL/CCTO/Designacao)</Label>
+                  <Input
+                    id="ping99-consulta"
+                    placeholder="21-000666-8"
+                    value={lookupTerm}
+                    onChange={(event) => setLookupTerm(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void loadFromConsulta();
+                      }
+                    }}
+                  />
+                </div>
+                <Button type="button" onClick={() => void loadFromConsulta()} disabled={lookupLoading}>
+                  {lookupLoading ? "Buscando..." : "Buscar dados"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setManualRedeLan("");
+                    setManualCodUl("");
+                    setManualTfl("");
+                    setLookupTerm("");
+                    setLookupStatus("idle");
+                    setLookupMessage("");
+                  }}
+                >
+                  Limpar
+                </Button>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="ping99-cod-ul">Codigo UL (opcional)</Label>
-                <Input
-                  id="ping99-cod-ul"
-                  placeholder="21-000666-8"
-                  value={manualCodUl}
-                  onChange={(event) => setManualCodUl(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="ping99-tfl">TFL (opcional)</Label>
-                <Input
-                  id="ping99-tfl"
-                  placeholder="1234"
-                  value={manualTfl}
-                  onChange={(event) => setManualTfl(event.target.value)}
-                />
+              {lookupMessage ? (
+                <p className={`text-sm ${lookupStatus === "error" ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                  {lookupMessage}
+                </p>
+              ) : null}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ping99-rede-lan">Rede LAN</Label>
+                  <Input
+                    id="ping99-rede-lan"
+                    placeholder="10.123.45.67"
+                    value={manualRedeLan}
+                    onChange={(event) => setManualRedeLan(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ping99-cod-ul">Codigo UL (opcional)</Label>
+                  <Input
+                    id="ping99-cod-ul"
+                    placeholder="21-000666-8"
+                    value={manualCodUl}
+                    onChange={(event) => setManualCodUl(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ping99-tfl">TFL (opcional)</Label>
+                  <Input
+                    id="ping99-tfl"
+                    placeholder="1234"
+                    value={manualTfl}
+                    onChange={(event) => setManualTfl(event.target.value)}
+                  />
+                </div>
               </div>
             </div>
           )}

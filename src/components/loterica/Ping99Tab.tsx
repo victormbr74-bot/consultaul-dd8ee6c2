@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, Check, Wifi } from "lucide-react";
-import { fetchLookupRows, resolveMatches, type MatchField } from "@/components/loterica/lotericaLookup";
+import { fetchLookupRows, resolveMatches } from "@/components/loterica/lotericaLookup";
 
 interface Ping99TabProps {
   form?: {
@@ -33,12 +33,6 @@ const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PING99_REPEAT = 1;
 const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;
 const TFL_KEYS = ["TFL", "TFLs"] as const;
-const MATCH_FIELD_LABELS: Record<MatchField, string> = {
-  cod_ul: "Codigo UL",
-  ccto_oi: "CCTO OI",
-  ccto_oemp: "CCTO OEMP",
-  designacao_nova: "Designacao",
-};
 
 const padOctet = (value: string) => value.padStart(3, "0");
 const normalizeText = (value: unknown) => String(value ?? "").trim();
@@ -141,10 +135,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [manualRedeLan, setManualRedeLan] = useState("");
   const [manualCodUl, setManualCodUl] = useState("");
   const [manualTfl, setManualTfl] = useState("");
-  const [lookupTerm, setLookupTerm] = useState("");
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupStatus, setLookupStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [lookupMessage, setLookupMessage] = useState("");
   const [pingResultInput, setPingResultInput] = useState("");
   const [respondedNetworks, setRespondedNetworks] = useState<string[]>([]);
   const [analysisRan, setAnalysisRan] = useState(false);
@@ -208,25 +198,13 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const loadFromConsulta = useCallback(async (termOverride?: string) => {
-    const query = normalizeText(termOverride ?? lookupTerm);
-    if (!query) {
-      setLookupStatus("error");
-      setLookupMessage("Informe um Codigo UL, CCTO OI/OEMP ou Designacao.");
-      return;
-    }
-
-    setLookupLoading(true);
-    setLookupStatus("idle");
-    setLookupMessage("");
+  const loadFromConsulta = useCallback(async (term: string) => {
+    const query = normalizeText(term);
+    if (!query) return;
     try {
       const rows = await fetchLookupRows([query]);
       const [match] = resolveMatches([query], rows);
-      if (!match?.row) {
-        setLookupStatus("error");
-        setLookupMessage("Consulta nao encontrou dados para o termo informado.");
-        return;
-      }
+      if (!match?.row) return;
 
       const row = match.row;
       const rowRaw =
@@ -235,20 +213,10 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
       setManualCodUl(normalizeText(row.cod_ul));
       setManualRedeLan(getRawString(rowRaw, REDE_LAN_KEYS));
       setManualTfl(getRawString(rowRaw, TFL_KEYS));
-      setLookupTerm(query);
-      setLookupStatus("ok");
-      setLookupMessage(
-        match.matchField
-          ? `Dados carregados da consulta para ${normalizeText(row.cod_ul)} (encontrado por ${MATCH_FIELD_LABELS[match.matchField]}).`
-          : `Dados carregados da consulta para ${normalizeText(row.cod_ul)}.`,
-      );
     } catch (error) {
-      setLookupStatus("error");
-      setLookupMessage(String((error as Error)?.message || error || "Falha ao consultar dados da loterica."));
-    } finally {
-      setLookupLoading(false);
+      console.error("Falha ao consultar dados para Ping99", error);
     }
-  }, [lookupTerm]);
+  }, []);
 
   useEffect(() => {
     if (!isStandalone) return;
@@ -288,45 +256,6 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
         <CardContent className="space-y-4">
           {isStandalone && (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
-                <div className="space-y-1">
-                  <Label htmlFor="ping99-consulta">Consulta (UL/CCTO/Designacao)</Label>
-                  <Input
-                    id="ping99-consulta"
-                    placeholder="21-000666-8"
-                    value={lookupTerm}
-                    onChange={(event) => setLookupTerm(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void loadFromConsulta();
-                      }
-                    }}
-                  />
-                </div>
-                <Button type="button" onClick={() => void loadFromConsulta()} disabled={lookupLoading}>
-                  {lookupLoading ? "Buscando..." : "Buscar dados"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setManualRedeLan("");
-                    setManualCodUl("");
-                    setManualTfl("");
-                    setLookupTerm("");
-                    setLookupStatus("idle");
-                    setLookupMessage("");
-                  }}
-                >
-                  Limpar
-                </Button>
-              </div>
-              {lookupMessage ? (
-                <p className={`text-sm ${lookupStatus === "error" ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
-                  {lookupMessage}
-                </p>
-              ) : null}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="ping99-rede-lan">Rede LAN</Label>

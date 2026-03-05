@@ -151,8 +151,8 @@ const Dashboard = () => {
     setShowLotericaTabs,
     setLotericaTab,
     lotericaTab,
-    consultaSearch,
-    setConsultaSearch,
+    consultaSearch: sidebarSearch,
+    setConsultaSearch: setSidebarSearch,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +160,8 @@ const Dashboard = () => {
   const [total, setTotal] = useState(0);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
-  const search = consultaSearch;
+  const [localSearch, setLocalSearch] = useState("");
+  const search = localSearch;
 
   const fetchLotericas = useCallback(async () => {
     if (!search.trim()) {
@@ -463,7 +464,7 @@ const Dashboard = () => {
     setOnExport(() => handleExport);
     setOnImportClick(() => () => importRef.current?.click());
     setOnSearchSubmit(() => () => {
-      void goToFirstResult();
+      setLocalSearch(sidebarSearch);
     });
     return () => {
       setShowLotericaTabs(false);
@@ -471,7 +472,7 @@ const Dashboard = () => {
       setOnImportClick(undefined);
       setOnSearchSubmit(undefined);
     };
-  }, [goToFirstResult, handleExport, setOnExport, setOnImportClick, setOnSearchSubmit, setShowLotericaTabs]);
+  }, [sidebarSearch, goToFirstResult, handleExport, setOnExport, setOnImportClick, setOnSearchSubmit, setShowLotericaTabs]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -506,7 +507,7 @@ const Dashboard = () => {
               placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
               className="pl-10"
               value={search}
-              onChange={(e) => setConsultaSearch(e.target.value)}
+              onChange={(e) => setLocalSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();

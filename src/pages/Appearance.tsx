@@ -86,7 +86,7 @@ const Appearance = () => {
 
             {color === "world-cup" && (
               <div className="space-y-2">
-                <Label htmlFor="world-cup-team">Selecao Campea</Label>
+                <Label htmlFor="world-cup-team">Tema Copa 2026</Label>
                 <Select value={worldCupTeam} onValueChange={(value) => setWorldCupTeam(value as WorldCupTeam)}>
                   <SelectTrigger id="world-cup-team" className="w-full sm:w-[320px]">
                     <SelectValue placeholder="Selecione uma selecao" />
@@ -94,7 +94,7 @@ const Appearance = () => {
                   <SelectContent>
                     {TEAM_OPTIONS.map((team) => (
                       <SelectItem key={team.id} value={team.id}>
-                        {team.label}
+                        <img src={team.flagImg} alt={team.label} className="inline-block w-5 h-3.5 object-cover rounded-sm mr-1.5 align-middle" /> {team.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

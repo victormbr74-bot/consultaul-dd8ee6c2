@@ -31,11 +31,21 @@ interface ConsultaMassaRow {
   statusText: string;
   codUl: string;
   nome: string;
+  endereco: string;
+  cidade: string;
+  uf: string;
+  contato: string;
+  statusUl: string;
   cctoOi: string;
+  designacaoNova: string;
+  ipNat: string;
+  ipWan: string;
+  loopbackWan: string;
+  loopbackLan: string;
   cctoOemp: string;
+  operadora: string;
   ipPrimario: string;
   ipSecundario: string;
-  statusUl: string;
   matchedBy: string;
   source: TermMatch;
 }
@@ -367,22 +377,17 @@ const ConsultaMassaTab = () => {
       const primary = buildLookupDisplay(match, "primario");
       const secondary = buildLookupDisplay(match, "secundario");
 
-      if (!match.row) {
-        return {
-          query: match.query,
-          statusType: "not_found",
-          statusText: "Nao encontrado",
-          codUl: "-",
-          nome: "-",
-          cctoOi: "-",
-          cctoOemp: "-",
-          ipPrimario: "",
-          ipSecundario: "",
-          statusUl: "-",
-          matchedBy: "-",
-          source: match,
-        };
-      }
+      const empty: ConsultaMassaRow = {
+        query: match.query,
+        statusType: "not_found",
+        statusText: "Nao encontrado",
+        codUl: "-", nome: "-", endereco: "-", cidade: "-", uf: "-", contato: "-",
+        statusUl: "-", cctoOi: "-", designacaoNova: "-", ipNat: "-", ipWan: "-",
+        loopbackWan: "-", loopbackLan: "-", cctoOemp: "-", operadora: "-",
+        ipPrimario: "", ipSecundario: "", matchedBy: "-", source: match,
+      };
+
+      if (!match.row) return empty;
 
       const row = match.row;
       const ipPrimario = getLookupIp(row, "primario");
@@ -395,11 +400,21 @@ const ConsultaMassaTab = () => {
         statusText: hasAnyIp ? "Encontrado" : "Sem IP",
         codUl: normalizeText(row.cod_ul) || "-",
         nome: normalizeText(row.nome_loterica) || "-",
-        cctoOi: normalizeText(row.ccto_oi || row.designacao_nova) || "-",
+        endereco: normalizeText(row.endereco) || "-",
+        cidade: normalizeText(row.cidade) || "-",
+        uf: normalizeText(row.uf) || "-",
+        contato: normalizeText(row.contato) || "-",
+        statusUl: normalizeText(row.status) || "-",
+        cctoOi: normalizeText(row.ccto_oi) || "-",
+        designacaoNova: normalizeText(row.designacao_nova) || "-",
+        ipNat: normalizeText(row.ip_nat) || "-",
+        ipWan: normalizeText(row.ip_wan) || "-",
+        loopbackWan: normalizeText(row.loopback_wan) || "-",
+        loopbackLan: normalizeText(row.loopback_lan) || "-",
         cctoOemp: normalizeText(row.ccto_oemp) || "-",
+        operadora: normalizeText(row.operadora) || "-",
         ipPrimario,
         ipSecundario,
-        statusUl: normalizeText(row.status) || "-",
         matchedBy: primary.matchedBy !== "-" ? primary.matchedBy : secondary.matchedBy,
         source: match,
       };
@@ -517,18 +532,28 @@ const ConsultaMassaTab = () => {
               </p>
 
               <div className="rounded-lg border overflow-auto max-h-[420px]">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs whitespace-nowrap">
                   <thead className="bg-muted/60 sticky top-0">
                     <tr className="text-left">
                       <th className="p-2 font-medium">Consulta</th>
                       <th className="p-2 font-medium">Status</th>
                       <th className="p-2 font-medium">Codigo UL</th>
                       <th className="p-2 font-medium">Nome</th>
-                      <th className="p-2 font-medium">CCTO OI/Designacao</th>
-                      <th className="p-2 font-medium">CCTO OEMP</th>
-                      <th className="p-2 font-medium">IP Primario</th>
-                      <th className="p-2 font-medium">IP Secundario</th>
+                      <th className="p-2 font-medium">Endereco</th>
+                      <th className="p-2 font-medium">Cidade</th>
+                      <th className="p-2 font-medium">UF</th>
+                      <th className="p-2 font-medium">Contato</th>
                       <th className="p-2 font-medium">Status UL</th>
+                      <th className="p-2 font-medium">CCTO OI</th>
+                      <th className="p-2 font-medium">Designacao Nova</th>
+                      <th className="p-2 font-medium">IP NAT</th>
+                      <th className="p-2 font-medium">IP WAN</th>
+                      <th className="p-2 font-medium">Loopback Principal</th>
+                      <th className="p-2 font-medium">IP Primario</th>
+                      <th className="p-2 font-medium">CCTO OEMP</th>
+                      <th className="p-2 font-medium">Loopback Secundario</th>
+                      <th className="p-2 font-medium">IP Secundario</th>
+                      <th className="p-2 font-medium">Operadora</th>
                       <th className="p-2 font-medium">Match</th>
                     </tr>
                   </thead>
@@ -551,11 +576,21 @@ const ConsultaMassaTab = () => {
                           </td>
                           <td className="p-2 font-mono">{row.codUl}</td>
                           <td className="p-2">{row.nome}</td>
-                          <td className="p-2 font-mono">{row.cctoOi}</td>
-                          <td className="p-2 font-mono">{row.cctoOemp}</td>
-                          <td className="p-2 font-mono">{row.ipPrimario || "-"}</td>
-                          <td className="p-2 font-mono">{row.ipSecundario || "-"}</td>
+                          <td className="p-2">{row.endereco}</td>
+                          <td className="p-2">{row.cidade}</td>
+                          <td className="p-2 font-mono">{row.uf}</td>
+                          <td className="p-2">{row.contato}</td>
                           <td className="p-2">{row.statusUl}</td>
+                          <td className="p-2 font-mono">{row.cctoOi}</td>
+                          <td className="p-2 font-mono">{row.designacaoNova}</td>
+                          <td className="p-2 font-mono">{row.ipNat}</td>
+                          <td className="p-2 font-mono">{row.ipWan}</td>
+                          <td className="p-2 font-mono">{row.loopbackWan}</td>
+                          <td className="p-2 font-mono">{row.ipPrimario || "-"}</td>
+                          <td className="p-2 font-mono">{row.cctoOemp}</td>
+                          <td className="p-2 font-mono">{row.loopbackLan}</td>
+                          <td className="p-2 font-mono">{row.ipSecundario || "-"}</td>
+                          <td className="p-2">{row.operadora}</td>
                           <td className="p-2">{row.matchedBy}</td>
                         </tr>
                       );

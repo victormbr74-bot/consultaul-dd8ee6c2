@@ -215,6 +215,10 @@ const parseIpOctets = (value: string) => {
   return octets;
 };
 
+const isIpAddress = (value: string) => {
+  return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value.trim()) && parseIpOctets(value.trim()) !== null;
+};
+
 const buildTclScriptFromIps = (ips: string[]) => {
   const unique: string[] = [];
   const seen = new Set<string>();
@@ -381,43 +385,74 @@ const PingaoTab = () => {
   const runLookup = async () => {
     const terms = dedupeTerms(parseTerms(input));
     if (!terms.length) {
-      setError("Informe ao menos um codigo UL ou circuito.");
+      setError("Informe ao menos um codigo UL, circuito ou IP.");
       setQuerySummary([]);
       setScript("");
       return;
     }
 
+    const directIpTerms = terms.filter((t) => isIpAddress(t));
+    const lookupTerms = terms.filter((t) => !isIpAddress(t));
+
     setLoading(true);
     setError("");
 
     try {
-      const fields = LOOKUP_MODE_FIELDS[lookupMode];
-      const rows = await fetchLookupRows(terms, { fields });
-      const matches = resolveMatches(terms, rows, { fields });
+      const directSummary: LookupSummaryItem[] = directIpTerms.map((ip) => ({
+        query: ip.trim(),
+        status: "ok" as const,
+        ip: ip.trim(),
+        codUl: "-",
+        profile: "principal_backup" as const,
+        profileLabel: PROFILE_LABELS.principal_backup,
+        limitMs: PROFILE_LIMITS.principal_backup,
+        techSource: "IP direto",
+        matchedBy: null,
+      }));
 
-      const summary: LookupSummaryItem[] = matches.map((match) => {
-        if (!match.row) {
+      let lookupSummary: LookupSummaryItem[] = [];
+
+      if (lookupTerms.length) {
+        const fields = LOOKUP_MODE_FIELDS[lookupMode];
+        const rows = await fetchLookupRows(lookupTerms, { fields });
+        const matches = resolveMatches(lookupTerms, rows, { fields });
+
+        lookupSummary = matches.map((match) => {
+          if (!match.row) {
+            return {
+              query: match.query,
+              status: "not_found" as const,
+              ip: "",
+              codUl: "-",
+              profile: "principal_backup" as const,
+              profileLabel: "Nao identificado",
+              limitMs: PROFILE_LIMITS.principal_backup,
+              techSource: "-",
+              matchedBy: null,
+            };
+          }
+
+          const ip = getLookupIp(match.row, target);
+          const profileData = detectLatencyProfile(match.row, target);
+
+          if (!ip) {
+            return {
+              query: match.query,
+              status: "missing_ip" as const,
+              ip: "",
+              codUl: normalizeText(match.row.cod_ul) || "-",
+              profile: profileData.profile,
+              profileLabel: profileData.profileLabel,
+              limitMs: profileData.limitMs,
+              techSource: profileData.techSource,
+              matchedBy: match.matchField ?? null,
+            };
+          }
+
           return {
             query: match.query,
-            status: "not_found",
-            ip: "",
-            codUl: "-",
-            profile: "principal_backup",
-            profileLabel: "Nao identificado",
-            limitMs: PROFILE_LIMITS.principal_backup,
-            techSource: "-",
-            matchedBy: null,
-          };
-        }
-
-        const ip = getLookupIp(match.row, target);
-        const profileData = detectLatencyProfile(match.row, target);
-
-        if (!ip) {
-          return {
-            query: match.query,
-            status: "missing_ip",
-            ip: "",
+            status: "ok" as const,
+            ip,
             codUl: normalizeText(match.row.cod_ul) || "-",
             profile: profileData.profile,
             profileLabel: profileData.profileLabel,
@@ -425,21 +460,10 @@ const PingaoTab = () => {
             techSource: profileData.techSource,
             matchedBy: match.matchField ?? null,
           };
-        }
+        });
+      }
 
-        return {
-          query: match.query,
-          status: "ok",
-          ip,
-          codUl: normalizeText(match.row.cod_ul) || "-",
-          profile: profileData.profile,
-          profileLabel: profileData.profileLabel,
-          limitMs: profileData.limitMs,
-          techSource: profileData.techSource,
-          matchedBy: match.matchField ?? null,
-        };
-      });
-
+      const summary = [...directSummary, ...lookupSummary];
       setQuerySummary(summary);
       setScript(buildTclScriptFromIps(summary.filter((item) => item.status === "ok").map((item) => item.ip)));
     } catch (lookupError) {

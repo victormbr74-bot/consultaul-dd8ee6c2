@@ -49,6 +49,13 @@ const getNatIp = (row: LotericaLookupRow): string => {
   return match ? match[1] : "";
 };
 
+const isIpAddress = (value: string) => {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) return false;
+  return match.slice(1, 5).every((o) => { const n = parseInt(o, 10); return n >= 0 && n <= 255; });
+};
+
 const statusBadgeClass = (status: PingStatus) => {
   if (status === "UP") return "border-green-500/50 bg-green-500/15 text-green-700 dark:text-green-400";
   if (status === "DOWN") return "border-red-500/50 bg-red-500/15 text-red-700 dark:text-red-400";
@@ -160,47 +167,63 @@ const PingaoNatTab = () => {
   const runLookup = async () => {
     const terms = dedupeTerms(parseTerms(input));
     if (!terms.length) {
-      setError("Informe ao menos um código UL ou circuito.");
+      setError("Informe ao menos um código UL, circuito ou IP.");
       setQuerySummary([]);
       setScript("");
       return;
     }
 
+    const directIpTerms = terms.filter((t) => isIpAddress(t));
+    const lookupTerms = terms.filter((t) => !isIpAddress(t));
+
     setLoading(true);
     setError("");
 
     try {
-      const sanitizedTerms = terms.map((term) => normalizeCircuitSpacing(term));
-      const fetchTerms = dedupeTerms([...terms, ...sanitizedTerms]);
+      const directSummary: LookupNatItem[] = directIpTerms.map((ip) => ({
+        query: ip.trim(),
+        status: "ok" as const,
+        ip: ip.trim(),
+        codUl: "-",
+        nomeLoterica: "-",
+      }));
 
-      const rows = await fetchLookupRows(fetchTerms);
-      const matches = resolveMatches(terms, rows);
+      let lookupSummary: LookupNatItem[] = [];
 
-      const summary: LookupNatItem[] = matches.map((match) => {
-        if (!match.row) {
-          return { query: match.query, status: "not_found", ip: "", codUl: "-", nomeLoterica: "-" };
-        }
+      if (lookupTerms.length) {
+        const sanitizedTerms = lookupTerms.map((term) => normalizeCircuitSpacing(term));
+        const fetchTerms = dedupeTerms([...lookupTerms, ...sanitizedTerms]);
 
-        const ip = getNatIp(match.row);
-        if (!ip) {
+        const rows = await fetchLookupRows(fetchTerms);
+        const matches = resolveMatches(lookupTerms, rows);
+
+        lookupSummary = matches.map((match) => {
+          if (!match.row) {
+            return { query: match.query, status: "not_found" as const, ip: "", codUl: "-", nomeLoterica: "-" };
+          }
+
+          const ip = getNatIp(match.row);
+          if (!ip) {
+            return {
+              query: match.query,
+              status: "missing_ip" as const,
+              ip: "",
+              codUl: normalizeText(match.row.cod_ul) || "-",
+              nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
+            };
+          }
+
           return {
             query: match.query,
-            status: "missing_ip",
-            ip: "",
+            status: "ok" as const,
+            ip,
             codUl: normalizeText(match.row.cod_ul) || "-",
             nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
           };
-        }
+        });
+      }
 
-        return {
-          query: match.query,
-          status: "ok",
-          ip,
-          codUl: normalizeText(match.row.cod_ul) || "-",
-          nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
-        };
-      });
-
+      const summary = [...directSummary, ...lookupSummary];
       setQuerySummary(summary);
       setScript(buildPingCommands(summary));
     } catch (err) {

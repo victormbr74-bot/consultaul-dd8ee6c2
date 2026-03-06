@@ -44,6 +44,7 @@ interface ConsultaMassaRow {
   loopbackLan: string;
   cctoOemp: string;
   operadora: string;
+  tecnologia: string;
   ipPrimario: string;
   ipSecundario: string;
   matchedBy: string;
@@ -383,13 +384,14 @@ const ConsultaMassaTab = () => {
         statusText: "Nao encontrado",
         codUl: "-", nome: "-", endereco: "-", cidade: "-", uf: "-", contato: "-",
         statusUl: "-", cctoOi: "-", designacaoNova: "-", ipNat: "-", ipWan: "-",
-        loopbackWan: "-", loopbackLan: "-", cctoOemp: "-", operadora: "-",
+        loopbackWan: "-", loopbackLan: "-", cctoOemp: "-", operadora: "-", tecnologia: "-",
         ipPrimario: "", ipSecundario: "", matchedBy: "-", source: match,
       };
 
       if (!match.row) return empty;
 
       const row = match.row;
+      const rawLookup = buildRawLookup(row.raw_data);
       const ipPrimario = getLookupIp(row, "primario");
       const ipSecundario = getLookupIp(row, "secundario");
       const hasAnyIp = Boolean(ipPrimario || ipSecundario);
@@ -413,6 +415,7 @@ const ConsultaMassaTab = () => {
         loopbackLan: normalizeText(row.loopback_lan) || "-",
         cctoOemp: normalizeText(row.ccto_oemp) || "-",
         operadora: normalizeText(row.operadora) || "-",
+        tecnologia: getByAliases(rawLookup, ["TECNOLOGIA"]) || "-",
         ipPrimario,
         ipSecundario,
         matchedBy: primary.matchedBy !== "-" ? primary.matchedBy : secondary.matchedBy,
@@ -438,6 +441,11 @@ const ConsultaMassaTab = () => {
     if (!selectedRow) return null;
     return buildRawLookup(selectedRow.raw_data);
   }, [selectedRow]);
+
+  const selectedTecnologia = useMemo(() => {
+    if (!selectedRawLookup) return "-";
+    return getByAliases(selectedRawLookup, ["TECNOLOGIA"]) || "-";
+  }, [selectedRawLookup]);
 
   const modalSections = useMemo(() => {
     if (!selectedRow || !selectedRawLookup) return [] as Array<{ title: string; description: string; items: ModalField[] }>;
@@ -554,6 +562,7 @@ const ConsultaMassaTab = () => {
                       <th className="p-2 font-medium">Loopback Secundario</th>
                       <th className="p-2 font-medium">IP Secundario</th>
                       <th className="p-2 font-medium">Operadora</th>
+                      <th className="p-2 font-medium">Tecnologia</th>
                       <th className="p-2 font-medium">Match</th>
                     </tr>
                   </thead>
@@ -591,6 +600,7 @@ const ConsultaMassaTab = () => {
                           <td className="p-2 font-mono">{row.loopbackLan}</td>
                           <td className="p-2 font-mono">{row.ipSecundario || "-"}</td>
                           <td className="p-2">{row.operadora}</td>
+                          <td className="p-2">{row.tecnologia}</td>
                           <td className="p-2">{row.matchedBy}</td>
                         </tr>
                       );
@@ -623,6 +633,9 @@ const ConsultaMassaTab = () => {
                     </Badge>
                     <Badge variant="outline" className="border-white/70 text-white bg-white/10">
                       Status: {normalizeText(selectedRow.status) || "-"}
+                    </Badge>
+                    <Badge variant="outline" className="border-white/70 text-white bg-white/10">
+                      Tecnologia: {selectedTecnologia}
                     </Badge>
                   </div>
                 </div>

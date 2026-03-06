@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
-import { formatImportBasePlanilhaSummary, importBasePlanilhaFile } from "@/lib/importBasePlanilha";
+import { formatImportBasePlanilhaSummary, importBasePlanilhaFile, type ImportBasePlanilhaProgress } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -159,6 +160,9 @@ const Dashboard = () => {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportBasePlanilhaProgress | null>(null);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [localSearch, setLocalSearch] = useState("");
   const search = localSearch;
@@ -443,16 +447,27 @@ const Dashboard = () => {
     if (!file) return;
 
     setImporting(true);
+    setImportSummary(null);
+    setImportErrorMessage(null);
+    setImportProgress({ phase: "reading", percent: 0, message: "Iniciando importacao da base..." });
     try {
       const result = await importBasePlanilhaFile(file, {
         strictBase: false,
         preserveLotericas: true,
+        onProgress: (evt) => {
+          setImportProgress(evt);
+        },
       });
-      alert(formatImportBasePlanilhaSummary(result));
+      const summary = formatImportBasePlanilhaSummary(result);
+      setImportSummary(summary);
+      setImportProgress({ phase: "completed", percent: 100, message: "Importacao concluida com sucesso." });
+      alert(summary);
       void fetchLotericas();
     } catch (error) {
       console.error("Falha inesperada na importacao", error);
-      alert("Falha inesperada na importacao: " + String((error as any)?.message || error));
+      const message = "Falha inesperada na importacao: " + String((error as any)?.message || error);
+      setImportErrorMessage(message);
+      alert(message);
     } finally {
       setImporting(false);
       e.target.value = "";
@@ -520,6 +535,32 @@ const Dashboard = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
+
+        {(importing || importProgress || importSummary || importErrorMessage) && (
+          <Card className="mb-4">
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Status da importacao da base</p>
+                <span className="text-xs text-muted-foreground">
+                  {importing ? "Importando..." : importErrorMessage ? "Falha" : importSummary ? "Concluida" : "Aguardando"}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>{importProgress?.message || "Aguardando importacao..."}</span>
+                  <span>{Math.round(importProgress?.percent || 0)}%</span>
+                </div>
+                <Progress value={importProgress?.percent || 0} />
+              </div>
+
+              {!!importErrorMessage && <p className="text-xs text-destructive whitespace-pre-line">{importErrorMessage}</p>}
+              {!!importSummary && !importing && !importErrorMessage && (
+                <p className="text-xs text-green-700 whitespace-pre-line">{importSummary}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {search.trim() ? (
           <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">

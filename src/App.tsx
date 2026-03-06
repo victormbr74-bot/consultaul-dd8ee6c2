@@ -31,17 +31,6 @@ import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
-import AgenciaIntegradorModule from "@/agencia-integrador/AgenciaIntegradorModule";
-import AgenciaIntegradorLayout from "@/agencia-integrador/AgenciaIntegradorLayout";
-import IntegradorDashboardPage from "@/agencia-integrador/pages/Dashboard";
-import IntegradorConsultaAgenciaPage from "@/agencia-integrador/pages/ConsultaAgencia";
-import IntegradorMeusCasosPage from "@/agencia-integrador/pages/MeusCasos";
-import IntegradorAgenciasPage from "@/agencia-integrador/pages/Agencias";
-import IntegradorParceirasPage from "@/agencia-integrador/pages/Parceiras";
-import IntegradorTopologiaPage from "@/agencia-integrador/pages/Topologia";
-import IntegradorCodigosEncerramentoPage from "@/agencia-integrador/pages/CodigosEncerramento";
-import IntegradorImportarExcelPage from "@/agencia-integrador/pages/ImportarExcel";
-import IntegradorUsuariosPage from "@/agencia-integrador/pages/Usuarios";
 
 const queryClient = new QueryClient();
 
@@ -116,26 +105,6 @@ const App = () => (
                   <Route path="/pingao" element={<Pingao />} />
                   <Route path="/pingao-nat" element={<PingaoNat />} />
                   <Route path="/loterica/:codUl" element={<LotericaDetail />} />
-                  <Route
-                    path="/agencia-integrador"
-                    element={
-                      <AdminOnlyRoute>
-                        <AgenciaIntegradorModule />
-                      </AdminOnlyRoute>
-                    }
-                  >
-                    <Route element={<AgenciaIntegradorLayout />}>
-                      <Route index element={<IntegradorDashboardPage />} />
-                      <Route path="consulta" element={<IntegradorConsultaAgenciaPage />} />
-                      <Route path="meus-casos" element={<IntegradorMeusCasosPage />} />
-                      <Route path="agencias" element={<IntegradorAgenciasPage />} />
-                      <Route path="parceiras" element={<IntegradorParceirasPage />} />
-                      <Route path="topologia" element={<IntegradorTopologiaPage />} />
-                      <Route path="codigos" element={<IntegradorCodigosEncerramentoPage />} />
-                      <Route path="importar" element={<IntegradorImportarExcelPage />} />
-                      <Route path="usuarios" element={<IntegradorUsuariosPage />} />
-                    </Route>
-                  </Route>
                   <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
                   <Route path="/alarmes/base-dash" element={<AdminOnlyRoute><BaseDashImportPage /></AdminOnlyRoute>} />
                   <Route path="/alarmes/principal" element={<AdminOnlyRoute><PrincipalDashboard /></AdminOnlyRoute>} />

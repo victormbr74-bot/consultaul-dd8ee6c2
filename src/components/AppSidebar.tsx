@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, Building2, ListChecks, Activity } from "lucide-react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -207,18 +207,6 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {isAdmin && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to="/agencia-integrador" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                        <Building2 className="mr-2 h-4 w-4" />
-                        <span>AGENCIA INTEGRADOR</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -249,27 +237,25 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isDashboardRoute && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Dados</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    <span>Importar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
-                    <Download className="mr-2 h-4 w-4" />
-                    <span>Exportar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        <SidebarGroup>
+          <SidebarGroupLabel>Dados</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  <span>Importar</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  <span>Exportar</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
 
         {isAdmin && (

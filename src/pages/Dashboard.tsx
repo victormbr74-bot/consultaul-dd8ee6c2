@@ -461,7 +461,6 @@ const Dashboard = () => {
       const summary = formatImportBasePlanilhaSummary(result);
       setImportSummary(summary);
       setImportProgress({ phase: "completed", percent: 100, message: "Importacao concluida com sucesso." });
-      alert(summary);
       void fetchLotericas();
     } catch (error) {
       console.error("Falha inesperada na importacao", error);

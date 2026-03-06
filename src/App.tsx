@@ -30,6 +30,7 @@ import BackupDashboard from "@/pages/alarmes/BackupDashboard";
 import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
+import ImportNatIps from "./pages/ImportNatIps";
 import AgenciaIntegradorModule from "@/agencia-integrador/AgenciaIntegradorModule";
 import AgenciaIntegradorLayout from "@/agencia-integrador/AgenciaIntegradorLayout";
 import IntegradorDashboardPage from "@/agencia-integrador/pages/Dashboard";
@@ -147,6 +148,7 @@ const App = () => (
                   <Route path="/admin" element={<Navigate to="/admin/dados" replace />} />
                   <Route path="/admin/dados" element={<AdminPanel section="data" />} />
                   <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
+                  <Route path="/admin/import-nat" element={<ImportNatIps />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

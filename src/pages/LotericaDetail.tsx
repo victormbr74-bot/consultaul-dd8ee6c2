@@ -26,6 +26,9 @@ const LotericaDetail = () => {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
+  const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
+  const [lotericaUpdatesError, setLotericaUpdatesError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     setShowLotericaTabs(true);
@@ -87,6 +90,43 @@ const LotericaDetail = () => {
 
     void fetchLoterica();
   }, [codUl]);
+
+  useEffect(() => {
+    const fetchLotericaUpdatesSetting = async () => {
+      setLotericaUpdatesLoading(true);
+      setLotericaUpdatesError(null);
+      try {
+        const { data, error } = await (supabase as any)
+          .from("app_settings")
+          .select("value_boolean")
+          .eq("key", "loterica_updates_enabled")
+          .maybeSingle();
+
+        if (error) {
+          const msg = String((error as any)?.message || "");
+          if (msg.includes("app_settings") && msg.includes("Could not find the table")) {
+            setLotericaUpdatesEnabled(true);
+            setLotericaUpdatesError(
+              "Banco desatualizado: falta a tabela app_settings.\n" +
+                "Aplique a migracao Supabase '20260306103000_loterica_updates_global_toggle.sql'.",
+            );
+            return;
+          }
+          throw new Error(msg || "Erro ao carregar configuracao de atualizacao.");
+        }
+
+        setLotericaUpdatesEnabled(Boolean((data as any)?.value_boolean ?? true));
+      } catch (error) {
+        console.error("Falha inesperada ao carregar configuracao de atualizacao", error);
+        setLotericaUpdatesEnabled(true);
+        setLotericaUpdatesError(error instanceof Error ? error.message : "Erro ao carregar configuracao de atualizacao.");
+      } finally {
+        setLotericaUpdatesLoading(false);
+      }
+    };
+
+    void fetchLotericaUpdatesSetting();
+  }, []);
 
   const fetchHistory = async () => {
     try {
@@ -199,6 +239,16 @@ const LotericaDetail = () => {
         return;
       }
 
+      if (!isAdmin && lotericaUpdatesLoading) {
+        alert("Aguarde: validando permissao de atualizacao.");
+        return;
+      }
+
+      if (!isAdmin && !lotericaUpdatesEnabled) {
+        alert("Atualizacao de dados bloqueada pelo ADM para usuarios.");
+        return;
+      }
+
       if (isAdmin) {
         const { error } = await supabase
           .from("lotericas")
@@ -231,6 +281,8 @@ const LotericaDetail = () => {
             "Banco desatualizado: falta a tabela loterica_change_requests.\n" +
               "Aplique a migracao Supabase '20260213173000_approval_workflow_and_loopback_fix.sql' e tente novamente.",
           );
+        } else if (msg.toLowerCase().includes("row-level security")) {
+          alert("Atualizacao de dados bloqueada pelo ADM para usuarios.");
         } else {
           alert("Erro ao enviar para aprovacao: " + msg);
         }
@@ -260,6 +312,8 @@ const LotericaDetail = () => {
     );
   }
 
+  const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
+
   return (
     <div className="bg-background">
       <div className="container flex items-center justify-between h-12 px-4 border-b">
@@ -274,11 +328,25 @@ const LotericaDetail = () => {
           <Button variant="outline" size="sm" onClick={fetchHistory}>
             <History className="w-4 h-4 mr-1" /> {"Histórico"}
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : isAdmin ? "Salvar" : "Enviar p/ Aprovação"}
+          <Button size="sm" onClick={handleSave} disabled={saving || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked))}>
+            <Save className="w-4 h-4 mr-1" />{" "}
+            {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
           </Button>
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="container px-4 py-2 border-b">
+          {lotericaUpdatesLoading ? (
+            <p className="text-xs text-muted-foreground">Verificando permissao de atualizacao...</p>
+          ) : nonAdminUpdatesBlocked ? (
+            <p className="text-xs text-destructive">Atualizacao de dados bloqueada pelo ADM para usuarios.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Atualizacao de dados liberada para envio de aprovacao.</p>
+          )}
+          {!!lotericaUpdatesError && <p className="text-xs text-destructive whitespace-pre-line">{lotericaUpdatesError}</p>}
+        </div>
+      )}
 
       <main className="container px-4 py-6 max-w-5xl">
         {lotericaTab === "consulta" && <ConsultaTab form={form} setForm={setForm} />}

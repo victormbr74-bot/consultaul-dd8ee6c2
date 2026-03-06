@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound } from "lucide-react";
@@ -67,6 +68,10 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [changesError, setChangesError] = useState<string | null>(null);
   const [expandedChangeId, setExpandedChangeId] = useState<string | null>(null);
   const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
+  const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
+  const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
+  const [lotericaUpdatesSaving, setLotericaUpdatesSaving] = useState(false);
+  const [lotericaUpdatesError, setLotericaUpdatesError] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
@@ -180,6 +185,39 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     }
   };
 
+  const fetchLotericaUpdatesSetting = async () => {
+    setLotericaUpdatesLoading(true);
+    setLotericaUpdatesError(null);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("app_settings")
+        .select("value_boolean")
+        .eq("key", "loterica_updates_enabled")
+        .maybeSingle();
+
+      if (error) {
+        const msg = String((error as any)?.message || "");
+        if (msg.includes("app_settings") && msg.includes("Could not find the table")) {
+          setLotericaUpdatesEnabled(true);
+          setLotericaUpdatesError(
+            "Banco desatualizado: falta a tabela app_settings.\n" +
+              "Aplique a migracao Supabase '20260306103000_loterica_updates_global_toggle.sql'.",
+          );
+          return;
+        }
+        throw new Error(msg || "Erro ao carregar configuracao global.");
+      }
+
+      setLotericaUpdatesEnabled(Boolean((data as any)?.value_boolean ?? true));
+    } catch (err) {
+      console.error("Erro ao carregar controle global de atualizacao", err);
+      setLotericaUpdatesEnabled(true);
+      setLotericaUpdatesError(err instanceof Error ? err.message : "Erro ao carregar configuracao global.");
+    } finally {
+      setLotericaUpdatesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (authLoading) return;
     if (!isAdmin) {
@@ -190,6 +228,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       void fetchUsers();
     } else {
       void fetchChangeRequests();
+      void fetchLotericaUpdatesSetting();
     }
   }, [authLoading, isAdmin, navigate, section]);
 
@@ -680,6 +719,50 @@ ${failureDetails}`,
     }
   };
 
+  const saveLotericaUpdatesSetting = async (enabled: boolean) => {
+    if (!user?.id) {
+      alert("Sessao invalida. Faca login novamente.");
+      return;
+    }
+
+    setLotericaUpdatesSaving(true);
+    setLotericaUpdatesError(null);
+    try {
+      const { error } = await (supabase as any).from("app_settings").upsert(
+        {
+          key: "loterica_updates_enabled",
+          value_boolean: enabled,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        },
+        { onConflict: "key" },
+      );
+
+      if (error) {
+        throw new Error(String((error as any)?.message || "Erro ao salvar configuracao global."));
+      }
+
+      setLotericaUpdatesEnabled(enabled);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao salvar configuracao global.";
+      console.error("Erro ao salvar controle global de atualizacao", err);
+      setLotericaUpdatesError(msg);
+      alert(msg);
+    } finally {
+      setLotericaUpdatesSaving(false);
+    }
+  };
+
+  const toggleLotericaUpdates = async (nextEnabled: boolean) => {
+    const action = nextEnabled ? "liberar" : "bloquear";
+    const confirmed = window.confirm(
+      `Deseja ${action} a atualizacao de dados das lotericas para usuarios nao-admin?`,
+    );
+    if (!confirmed) return;
+
+    await saveLotericaUpdatesSetting(nextEnabled);
+  };
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
   }
@@ -692,6 +775,35 @@ ${failureDetails}`,
         <Tabs value={section === "data" ? "approvals" : "users"} className="space-y-4">
 
           <TabsContent value="approvals" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle>Controle Global de Atualizacao</CardTitle>
+                <div className="flex items-center gap-3">
+                  <Badge variant={lotericaUpdatesEnabled ? "default" : "destructive"}>
+                    {lotericaUpdatesEnabled ? "Liberado" : "Bloqueado"}
+                  </Badge>
+                  <Switch
+                    checked={lotericaUpdatesEnabled}
+                    onCheckedChange={(checked) => {
+                      void toggleLotericaUpdates(checked);
+                    }}
+                    disabled={lotericaUpdatesLoading || lotericaUpdatesSaving}
+                    aria-label="Bloquear atualizacao de lotericas para usuarios"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Quando bloqueado, usuarios nao-admin nao conseguem enviar alteracoes para aprovacao.
+                </p>
+                {lotericaUpdatesLoading && <p className="text-xs text-muted-foreground">Carregando configuracao...</p>}
+                {lotericaUpdatesSaving && <p className="text-xs text-muted-foreground">Salvando configuracao...</p>}
+                {!!lotericaUpdatesError && (
+                  <div className="text-sm text-destructive whitespace-pre-line">{lotericaUpdatesError}</div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -722,7 +834,15 @@ ${failureDetails}`,
                   >
                     Limpar selecao
                   </Button>
-                  <Button size="sm" variant="outline" onClick={fetchChangeRequests} disabled={changesLoading || changesSaving}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      void fetchChangeRequests();
+                      void fetchLotericaUpdatesSetting();
+                    }}
+                    disabled={changesLoading || changesSaving || lotericaUpdatesLoading || lotericaUpdatesSaving}
+                  >
                     <RefreshCw className={`w-4 h-4 mr-2 ${changesLoading ? "animate-spin" : ""}`} />
                     Atualizar
                   </Button>

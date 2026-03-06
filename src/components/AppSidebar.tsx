@@ -298,6 +298,14 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin/import-nat" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                      <Upload className="mr-2 h-4 w-4" />
+                      <span>{"Importar IPs NAT"}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

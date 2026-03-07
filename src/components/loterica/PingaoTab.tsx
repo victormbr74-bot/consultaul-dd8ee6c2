@@ -4,10 +4,12 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Activity, Download } from "lucide-react";
+import { Copy, Check, Activity, Download, PlayCircle } from "lucide-react";
+import { executeSecureCrtCommands, getSecureCrtBridgeUrl, setSecureCrtBridgeUrl } from "@/lib/secureCrtBridge";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -363,6 +365,10 @@ const PingaoTab = () => {
 
   const [pingResultInput, setPingResultInput] = useState("");
   const [analysisRows, setAnalysisRows] = useState<AnalyzedPingRow[]>([]);
+  const [bridgeUrl, setBridgeUrl] = useState(() => getSecureCrtBridgeUrl());
+  const [sendingToSecureCrt, setSendingToSecureCrt] = useState(false);
+  const [bridgeMessage, setBridgeMessage] = useState("");
+  const [bridgeMessageType, setBridgeMessageType] = useState<"success" | "error" | null>(null);
 
   const pingSummary = useMemo(() => {
     const total = analysisRows.length;
@@ -504,6 +510,41 @@ const PingaoTab = () => {
     setAnalysisRows(analyzed);
   };
 
+  const runInSecureCrt = async () => {
+    if (!script.trim()) {
+      setBridgeMessageType("error");
+      setBridgeMessage("Gere o script antes de executar no SecureCRT.");
+      return;
+    }
+
+    setSendingToSecureCrt(true);
+    setBridgeMessage("");
+    setBridgeMessageType(null);
+
+    try {
+      setSecureCrtBridgeUrl(bridgeUrl || getSecureCrtBridgeUrl());
+      const result = await executeSecureCrtCommands({
+        commands: script,
+        source: "pingao",
+        delayMs: 120,
+      });
+
+      if (!result.ok) {
+        setBridgeMessageType("error");
+        setBridgeMessage(result.message);
+        return;
+      }
+
+      setBridgeMessageType("success");
+      setBridgeMessage(result.message);
+    } catch (runError) {
+      setBridgeMessageType("error");
+      setBridgeMessage(String((runError as Error)?.message || runError || "Falha ao executar no SecureCRT."));
+    } finally {
+      setSendingToSecureCrt(false);
+    }
+  };
+
   const exportResultXlsx = async () => {
     if (!analysisRows.length) return;
 
@@ -540,6 +581,10 @@ const PingaoTab = () => {
             <Activity className="w-5 h-5" /> Pingao - Gerar Script TCL
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void runInSecureCrt()} disabled={!script || sendingToSecureCrt}>
+              <PlayCircle className="w-4 h-4 mr-1" />
+              {sendingToSecureCrt ? "Enviando..." : "Executar no SecureCRT"}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-script")} disabled={!script}>
               {copiedId === "pingao-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
               {copiedId === "pingao-script" ? "Copiado!" : "Copiar Script"}
@@ -613,6 +658,24 @@ const PingaoTab = () => {
             >
               Limpar
             </Button>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pingao-bridge-url" className="text-xs text-muted-foreground">
+              Endpoint do agente SecureCRT
+            </Label>
+            <Input
+              id="pingao-bridge-url"
+              value={bridgeUrl}
+              onChange={(e) => setBridgeUrl(e.target.value)}
+              placeholder="http://127.0.0.1:48365/api/securecrt/execute"
+              className="font-mono text-xs"
+            />
+            {bridgeMessage ? (
+              <p className={cn("text-xs", bridgeMessageType === "error" ? "text-destructive" : "text-green-600")}>
+                {bridgeMessage}
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

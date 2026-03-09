@@ -1,10 +1,12 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search } from "lucide-react";
+import { PencilLine, Search } from "lucide-react";
+import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import {
   buildLookupDisplay,
   dedupeTerms,
@@ -367,11 +370,14 @@ const FieldTile = ({ label, value, mono }: { label: string; value: string; mono?
 };
 
 const ConsultaMassaTab = () => {
+  const navigate = useNavigate();
+  const { setLotericaTab } = useSidebarActions();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<TermMatch[]>([]);
   const [selectedRow, setSelectedRow] = useState<LotericaLookupRow | null>(null);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
 
   const rows = useMemo<ConsultaMassaRow[]>(() => {
     return matches.map((match) => {
@@ -437,6 +443,22 @@ const ConsultaMassaTab = () => {
     };
   }, [rows]);
 
+  const editableCodes = useMemo(() => {
+    return Array.from(
+      new Set(
+        rows
+          .filter((row) => Boolean(row.source.row) && row.codUl !== "-")
+          .map((row) => row.codUl),
+      ),
+    );
+  }, [rows]);
+
+  useEffect(() => {
+    setSelectedCodes((prev) => prev.filter((code) => editableCodes.includes(code)));
+  }, [editableCodes]);
+
+  const allSelected = editableCodes.length > 0 && selectedCodes.length === editableCodes.length;
+
   const selectedRawLookup = useMemo(() => {
     if (!selectedRow) return null;
     return buildRawLookup(selectedRow.raw_data);
@@ -488,6 +510,36 @@ const ConsultaMassaTab = () => {
     }
   };
 
+  const goToEditByCodes = (codes: string[]) => {
+    const normalized = Array.from(
+      new Set(
+        codes
+          .map((code) => normalizeText(code))
+          .filter(Boolean),
+      ),
+    );
+
+    if (!normalized.length) {
+      alert("Nenhuma loterica encontrada para editar.");
+      return;
+    }
+
+    setLotericaTab("consulta");
+    navigate(`/loterica/${encodeURIComponent(normalized.join(","))}`);
+  };
+
+  const toggleCodeSelection = (code: string, checked: boolean) => {
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(code);
+      } else {
+        next.delete(code);
+      }
+      return Array.from(next);
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -513,11 +565,27 @@ const ConsultaMassaTab = () => {
               {loading ? "Consultando..." : "Consultar"}
             </Button>
             <Button
+              variant="secondary"
+              onClick={() => goToEditByCodes(selectedCodes)}
+              disabled={selectedCodes.length === 0}
+            >
+              <PencilLine className="w-4 h-4 mr-1" />
+              Editar selecionadas ({selectedCodes.length})
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => goToEditByCodes(editableCodes)}
+              disabled={editableCodes.length === 0}
+            >
+              Editar encontradas ({editableCodes.length})
+            </Button>
+            <Button
               variant="outline"
               onClick={() => {
                 setInput("");
                 setMatches([]);
                 setError("");
+                setSelectedCodes([]);
               }}
             >
               Limpar
@@ -535,14 +603,29 @@ const ConsultaMassaTab = () => {
                 <Badge variant="outline">Nao encontrados: {summary.notFound}</Badge>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Clique em uma linha encontrada para abrir o detalhe completo da lotérica.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Selecione 1 ou mais linhas para editar em lote, ou clique na linha para abrir o detalhe completo.
+                </p>
+                <div className="flex items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={allSelected}
+                    disabled={editableCodes.length === 0}
+                    onCheckedChange={(checked) => {
+                      const shouldSelectAll = checked === true;
+                      setSelectedCodes(shouldSelectAll ? editableCodes : []);
+                    }}
+                    aria-label="Selecionar todas as lotericas encontradas"
+                  />
+                  <span className="text-muted-foreground">Selecionar todas</span>
+                </div>
+              </div>
 
               <div className="rounded-lg border overflow-auto max-h-[420px]">
                 <table className="w-full text-xs whitespace-nowrap">
                   <thead className="bg-muted/60 sticky top-0">
                     <tr className="text-left">
+                      <th className="p-2 font-medium">Selecionar</th>
                       <th className="p-2 font-medium">Consulta</th>
                       <th className="p-2 font-medium">Status</th>
                       <th className="p-2 font-medium">Codigo UL</th>
@@ -569,6 +652,8 @@ const ConsultaMassaTab = () => {
                   <tbody>
                     {rows.map((row, idx) => {
                       const canOpen = Boolean(row.source.row);
+                      const canSelect = canOpen && row.codUl !== "-";
+                      const isSelected = selectedCodes.includes(row.codUl);
                       return (
                         <tr
                           key={`${row.query}-${idx}`}
@@ -577,6 +662,20 @@ const ConsultaMassaTab = () => {
                             if (canOpen && row.source.row) setSelectedRow(row.source.row);
                           }}
                         >
+                          <td className="p-2">
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={!canSelect}
+                              onCheckedChange={(checked) => {
+                                if (!canSelect) return;
+                                toggleCodeSelection(row.codUl, checked === true);
+                              }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                              aria-label={`Selecionar ${row.codUl}`}
+                            />
+                          </td>
                           <td className="p-2 font-mono">{row.query}</td>
                           <td className="p-2">
                             <Badge variant={row.statusType === "ok" ? "default" : row.statusType === "missing_ip" ? "secondary" : "outline"}>
@@ -643,7 +742,20 @@ const ConsultaMassaTab = () => {
 
               <div className="p-6 space-y-5 max-h-[78vh] overflow-y-auto bg-background">
                 <DialogHeader>
-                  <DialogTitle className="text-lg">Visão Completa da Planilha</DialogTitle>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <DialogTitle className="text-lg">Visão Completa da Planilha</DialogTitle>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        const code = normalizeText(selectedRow.cod_ul);
+                        goToEditByCodes(code ? [code] : []);
+                      }}
+                    >
+                      <PencilLine className="w-4 h-4 mr-1" />
+                      Editar esta lotérica
+                    </Button>
+                  </div>
                   <DialogDescription>
                     Informações consolidadas da UL conforme a base importada da planilha (incluindo campos adicionais).
                   </DialogDescription>

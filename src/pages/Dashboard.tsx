@@ -39,6 +39,25 @@ const asString = (value: unknown) => {
   return String(value).trim();
 };
 
+const parseCodUlTerms = (value: string) => {
+  const parts = String(value || "")
+    .split(/[\n,;\t]+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const part of parts) {
+    const key = part.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(part);
+  }
+
+  return result;
+};
+
 const formatDateTimePtBr = (value: unknown) => {
   const text = asString(value);
   if (!text) return "";
@@ -214,12 +233,21 @@ const Dashboard = () => {
     const term = search.trim();
     if (!term) return;
 
+    const parsedTerms = parseCodUlTerms(term);
+    if (parsedTerms.length > 1) {
+      setLotericaTab("consulta");
+      navigate(`/loterica/${encodeURIComponent(parsedTerms.join(","))}`);
+      return;
+    }
+
+    const singleTerm = parsedTerms[0] || term;
+
     try {
       // Prefer exact match by codigo (cod_ul) to avoid jumping to unrelated results.
       const { data: exact, error: exactError } = await supabase
         .from("lotericas")
         .select("cod_ul")
-        .eq("cod_ul", term)
+        .eq("cod_ul", singleTerm)
         .maybeSingle();
 
       if (exactError) {
@@ -233,7 +261,7 @@ const Dashboard = () => {
         return;
       }
 
-      const s = `%${term}%`;
+      const s = `%${singleTerm}%`;
       const { data, error } = await supabase
         .from("lotericas")
         .select("cod_ul")

@@ -2,11 +2,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const FIELDS: Array<{ key: string; label: string; mono?: boolean }> = [
+type MainField = {
+  label: string;
+  mono?: boolean;
+  key?: string;
+  rawKeys?: string[];
+};
+
+const FIELDS: MainField[] = [
   { key: "nome_loterica", label: "Nome" },
   { key: "ccto_oi", label: "CCTO OI" },
-  { key: "ccto_oemp", label: "CCTO OEMP" },
+  { label: "Circuito Meraki", rawKeys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
   { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
+  { key: "ccto_oemp", label: "CCTO OEMP" },
   { key: "operadora", label: "Operadora" },
   { key: "ip_nat", label: "IP NAT", mono: true },
   { key: "ip_wan", label: "IP WAN", mono: true },
@@ -23,7 +31,6 @@ const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
   { label: "Rede LAN", keys: ["REDE LAN"], mono: true },
   { label: "IP Switch", keys: ["IP SWITCH", "LOOPBACK SWITCH"], mono: true },
   { label: "TFL", keys: ["TFL", "TFLs"], mono: true },
-  { label: "Circuitos Meraki", keys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
   { label: "Empresa OEMP", keys: ["EMPRESA OEMP"] },
   { label: "Tipo UL", keys: ["TIPO LOTERICA", "TIPO UL"] },
   { label: "Per\u00EDmetro", keys: ["PERIMETRO", "PER\u00CDMETRO"] },
@@ -70,12 +77,18 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {FIELDS.map((f) => (
-              <div key={f.key} className="space-y-1.5">
+              <div key={f.key || f.label} className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{f.label}</Label>
                 <Input
                   className={f.mono ? "font-mono text-xs" : ""}
-                  value={form?.[f.key] || ""}
-                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
+                  onChange={(e) => {
+                    if (f.key) {
+                      setForm({ ...form, [f.key]: e.target.value });
+                      return;
+                    }
+                    setRawValue(f.rawKeys || [], e.target.value);
+                  }}
                 />
               </div>
             ))}

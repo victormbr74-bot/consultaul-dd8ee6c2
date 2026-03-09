@@ -18,6 +18,7 @@ import Ping99 from "./pages/Ping99";
 import Pingao from "./pages/Pingao";
 import PingaoNat from "./pages/PingaoNat";
 import LotericaDetail from "./pages/LotericaDetail";
+import LotericaCreate from "./pages/LotericaCreate";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Appearance from "./pages/Appearance";
@@ -104,6 +105,7 @@ const App = () => (
                   <Route path="/ping99" element={<Ping99 />} />
                   <Route path="/pingao" element={<Pingao />} />
                   <Route path="/pingao-nat" element={<PingaoNat />} />
+                  <Route path="/loterica/cadastrar" element={<LotericaCreate />} />
                   <Route path="/loterica/:codUl" element={<LotericaDetail />} />
                   <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />
                   <Route path="/alarmes/base-dash" element={<AdminOnlyRoute><BaseDashImportPage /></AdminOnlyRoute>} />

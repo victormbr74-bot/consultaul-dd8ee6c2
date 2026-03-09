@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity } from "lucide-react";
+import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity, PlusCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -175,6 +175,16 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/loterica/cadastrar" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      <span>Cadastrar UL</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">

@@ -99,7 +99,7 @@ const LotericaCreate = () => {
         status: toNullableText(form?.status),
         cidade: toNullableText(form?.cidade),
         uf: toNullableText(form?.uf),
-        raw_data: toRawDataInsert(form?.raw_data),
+        raw_data: toRawDataInsert(form?.raw_data) as any,
         updated_by: user?.id || null,
         updated_at: new Date().toISOString(),
       };

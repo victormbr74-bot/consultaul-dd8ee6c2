@@ -496,9 +496,15 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       return;
     }
 
-    const actionLabel = nextStatus === "approved" ? "aprovar" : "rejeitar";
-    const confirmed = window.confirm(`Deseja ${actionLabel} ${selectedRequests.length} solicitacao(oes) selecionada(s)?`);
-    if (!confirmed) return;
+    let reviewNote: string | undefined;
+    if (nextStatus === "rejected") {
+      const reason = window.prompt(`Informe o motivo da rejeição para ${selectedRequests.length} solicitação(ões):`);
+      if (reason === null) return;
+      reviewNote = reason || "Sem motivo informado.";
+    } else {
+      const confirmed = window.confirm(`Deseja aprovar ${selectedRequests.length} solicitacao(oes) selecionada(s)?`);
+      if (!confirmed) return;
+    }
 
     setChangesSaving(true);
     const succeededIds: string[] = [];
@@ -507,7 +513,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     try {
       for (const req of selectedRequests) {
         try {
-          await applyChangeReview(req, nextStatus, user.id);
+          await applyChangeReview(req, nextStatus, user.id, reviewNote);
           succeededIds.push(req.id);
         } catch (error) {
           failed.push({

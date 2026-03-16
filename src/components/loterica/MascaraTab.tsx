@@ -475,7 +475,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara ATIVA</CardTitle>
-            <CopyBtn text={mascaraAtiva} id="ativa" />
+            <CopyBtn text={mascaraAtiva} id="ativa" tableRows={rowsAtiva} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div>

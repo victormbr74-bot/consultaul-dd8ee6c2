@@ -451,7 +451,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Abertura MAM/SCT</CardTitle>
-            <CopyBtn text={mascaraMamSct} id="mam" />
+            <CopyBtn text={mascaraMamSct} id="mam" tableRows={rowsMam} />
           </CardHeader>
           <CardContent>
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraMamSct}</pre>

@@ -450,12 +450,12 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       return;
     }
 
-    const confirmReject = window.confirm(`Rejeitar a alteracao da loterica ${req.cod_ul}?`);
-    if (!confirmReject) return;
+    const reason = window.prompt(`Rejeitar a alteracao da loterica ${req.cod_ul}?\n\nInforme o motivo da rejeição:`);
+    if (reason === null) return; // cancelled
 
     setChangesSaving(true);
     try {
-      await applyChangeReview(req, "rejected", user.id);
+      await applyChangeReview(req, "rejected", user.id, reason || "Sem motivo informado.");
       setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();

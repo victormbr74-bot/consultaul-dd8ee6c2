@@ -104,7 +104,7 @@ const LotericaCreate = () => {
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from("lotericas").insert(payload);
+      const { error } = await supabase.from("lotericas").insert([payload]);
       if (error) {
         const msg = String(error.message || "");
         if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("already exists")) {

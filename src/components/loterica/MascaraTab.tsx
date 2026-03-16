@@ -463,7 +463,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara WT Telecom</CardTitle>
-            <CopyBtn text={mascaraWtTelecom} id="wt" />
+            <CopyBtn text={mascaraWtTelecom} id="wt" tableRows={rowsWt} />
           </CardHeader>
           <CardContent>
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraWtTelecom}</pre>

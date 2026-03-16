@@ -72,6 +72,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
               </div>
             </header>
             <main className="flex-1">{children ?? <Outlet />}</main>
+            <RejectedRequestsNotification />
           </div>
         </div>
       </SidebarProvider>

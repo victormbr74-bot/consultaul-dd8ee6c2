@@ -99,12 +99,12 @@ const LotericaCreate = () => {
         status: toNullableText(form?.status),
         cidade: toNullableText(form?.cidade),
         uf: toNullableText(form?.uf),
-        raw_data: toRawDataInsert(form?.raw_data),
+        raw_data: toRawDataInsert(form?.raw_data) as any,
         updated_by: user?.id || null,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from("lotericas").insert(payload);
+      const { error } = await supabase.from("lotericas").insert([payload]);
       if (error) {
         const msg = String(error.message || "");
         if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("already exists")) {

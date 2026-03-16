@@ -119,6 +119,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value_boolean: boolean
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value_boolean?: boolean
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value_boolean?: boolean
+        }
+        Relationships: []
+      }
       cod_encerramento: {
         Row: {
           codigo: string
@@ -846,6 +867,7 @@ export type Database = {
     }
     Functions: {
       can_manage_app_data: { Args: { _user_id: string }; Returns: boolean }
+      can_manage_app_settings: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

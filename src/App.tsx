@@ -33,6 +33,7 @@ import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
+import RejectedRequestsNotification from "@/components/RejectedRequestsNotification";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
               </div>
             </header>
             <main className="flex-1">{children ?? <Outlet />}</main>
+            <RejectedRequestsNotification />
           </div>
         </div>
       </SidebarProvider>

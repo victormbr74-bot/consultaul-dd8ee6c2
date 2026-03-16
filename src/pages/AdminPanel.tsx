@@ -390,6 +390,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     req: ChangeRequestViewRow,
     nextStatus: "approved" | "rejected",
     reviewerId: string,
+    reviewNote?: string,
   ) => {
     if (nextStatus === "approved") {
       const updates =
@@ -403,13 +404,18 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       if (updateError) throw new Error(updateError.message);
     }
 
+    const updatePayload: Record<string, unknown> = {
+      status: nextStatus,
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    };
+    if (reviewNote !== undefined) {
+      updatePayload.review_note = reviewNote;
+    }
+
     const { error: reqError } = await (supabase as any)
       .from("loterica_change_requests")
-      .update({
-        status: nextStatus,
-        reviewed_by: reviewerId,
-        reviewed_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", req.id);
 
     if (reqError) throw new Error(reqError.message);
@@ -444,12 +450,12 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       return;
     }
 
-    const confirmReject = window.confirm(`Rejeitar a alteracao da loterica ${req.cod_ul}?`);
-    if (!confirmReject) return;
+    const reason = window.prompt(`Rejeitar a alteracao da loterica ${req.cod_ul}?\n\nInforme o motivo da rejeição:`);
+    if (reason === null) return; // cancelled
 
     setChangesSaving(true);
     try {
-      await applyChangeReview(req, "rejected", user.id);
+      await applyChangeReview(req, "rejected", user.id, reason || "Sem motivo informado.");
       setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
@@ -490,9 +496,15 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       return;
     }
 
-    const actionLabel = nextStatus === "approved" ? "aprovar" : "rejeitar";
-    const confirmed = window.confirm(`Deseja ${actionLabel} ${selectedRequests.length} solicitacao(oes) selecionada(s)?`);
-    if (!confirmed) return;
+    let reviewNote: string | undefined;
+    if (nextStatus === "rejected") {
+      const reason = window.prompt(`Informe o motivo da rejeição para ${selectedRequests.length} solicitação(ões):`);
+      if (reason === null) return;
+      reviewNote = reason || "Sem motivo informado.";
+    } else {
+      const confirmed = window.confirm(`Deseja aprovar ${selectedRequests.length} solicitacao(oes) selecionada(s)?`);
+      if (!confirmed) return;
+    }
 
     setChangesSaving(true);
     const succeededIds: string[] = [];
@@ -501,7 +513,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     try {
       for (const req of selectedRequests) {
         try {
-          await applyChangeReview(req, nextStatus, user.id);
+          await applyChangeReview(req, nextStatus, user.id, reviewNote);
           succeededIds.push(req.id);
         } catch (error) {
           failed.push({

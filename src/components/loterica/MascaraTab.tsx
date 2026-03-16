@@ -498,7 +498,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara de Encerramento</CardTitle>
-            <CopyBtn text={mascaraEncerramento} id="enc" />
+            <CopyBtn text={mascaraEncerramento} id="enc" tableRows={rowsEnc} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

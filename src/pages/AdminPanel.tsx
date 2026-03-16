@@ -390,6 +390,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     req: ChangeRequestViewRow,
     nextStatus: "approved" | "rejected",
     reviewerId: string,
+    reviewNote?: string,
   ) => {
     if (nextStatus === "approved") {
       const updates =
@@ -403,13 +404,18 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       if (updateError) throw new Error(updateError.message);
     }
 
+    const updatePayload: Record<string, unknown> = {
+      status: nextStatus,
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    };
+    if (reviewNote !== undefined) {
+      updatePayload.review_note = reviewNote;
+    }
+
     const { error: reqError } = await (supabase as any)
       .from("loterica_change_requests")
-      .update({
-        status: nextStatus,
-        reviewed_by: reviewerId,
-        reviewed_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", req.id);
 
     if (reqError) throw new Error(reqError.message);

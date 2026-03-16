@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Check, Plus } from "lucide-react";
+import { Copy, Check, Plus, Table } from "lucide-react";
 
 interface MascaraTabProps {
   form: any;
@@ -244,11 +244,36 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     setTimeout(() => setCopied(null), 1800);
   };
 
-  const CopyBtn = ({ text, id }: { text: string; id: string }) => (
-    <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
-      {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
-      {copied === id ? "Copiado!" : "Copiar"}
-    </Button>
+  const copyAsHtmlTable = (rows: [string, string][], id: string) => {
+    const html = `<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;width:100%;max-width:620px;">
+${rows.map(([label, value], i) => {
+  const bg = i % 2 === 0 ? "#1a1a2e" : "#16213e";
+  return `<tr style="background:${bg};">
+<td style="padding:6px 12px;font-weight:bold;color:#a8b2d1;border:1px solid #2a2a4a;white-space:nowrap;width:220px;">${label}</td>
+<td style="padding:6px 12px;color:#e2e8f0;border:1px solid #2a2a4a;">${value}</td>
+</tr>`;
+}).join("\n")}
+</table>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const textBlob = new Blob([rows.map(([l, v]) => `${l}\t${v}`).join("\n")], { type: "text/plain" });
+    navigator.clipboard.write([new ClipboardItem({ "text/html": blob, "text/plain": textBlob })]);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1800);
+  };
+
+  const CopyBtn = ({ text, id, tableRows }: { text: string; id: string; tableRows?: [string, string][] }) => (
+    <div className="flex gap-1">
+      <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
+        {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
+        {copied === id ? "Copiado!" : "Copiar"}
+      </Button>
+      {tableRows && (
+        <Button variant="outline" size="sm" onClick={() => copyAsHtmlTable(tableRows, id + "-tbl")}>
+          {copied === id + "-tbl" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Table className="w-4 h-4 mr-1" />}
+          {copied === id + "-tbl" ? "Copiado!" : "Tabela"}
+        </Button>
+      )}
+    </div>
   );
 
   const mascaraOempOi = `NOME SOLICITANTE: CEC CAIXA
@@ -316,6 +341,79 @@ Horario de normalizacao: ${horaNormalizacaoEncPreview}
 Causa/Solucao: ${causaEnc}
 Contato de Autorizacao: ${contatoEnc}`;
 
+  const rowsOemp: [string, string][] = [
+    ["NOME SOLICITANTE", "CEC CAIXA"],
+    ["NOME DO CONTATO LOCAL", contato],
+    ["RAZAO SOCIAL", "OI S/A"],
+    ["CNPJ", "CNPJ OI: 76.535.764/0001-43"],
+    ["ENDERECO", endereco],
+    ["HORARIO DE ATENDIMENTO", HORARIO_ACESSO_PADRAO],
+    ["AUTORIZACAO DE ACESSO?", "SIM"],
+    ["CHAMADO INTERNO", ""],
+    ["CIRCUITO OEMP", circuitoOemp],
+    ["CONTATO PARA ACOMPANHAR", CONTATO_VALIDACAO_PADRAO],
+    ["ATUALIZACAO", "SIM POR VOZ A CADA 1 HORA"],
+    ["DEFEITO RECLAMADO", `${defeitoOemp}\n${defeitoOempDesc}`],
+    ["NOME DA UL", nomeUl],
+    ["CODIGO UL", codUl],
+    ["CIRCUITO OI", designacaoOi],
+  ];
+
+  const rowsMam: [string, string][] = [
+    ["CODIGO UL", codUl],
+    ["NOME DA UL", nomeUl],
+    ["ENDERECO UL", endereco],
+    ["CONTATO", contato],
+    ["HORARIO DE FUNCIONAMENTO", HORARIO_FUNCIONAMENTO_PADRAO],
+    ["DEFEITO RECLAMADO", defeitoOemp],
+    ["OPERADORA", operadora],
+    ["SIM CARD", simCard],
+    ["MODELO ROTEADOR", modeloRoteador],
+    ["CEP", cep],
+    ["MUNICIPIO/ESTADO", `${cidade} ${uf}`],
+    ["RECLAMACAO INICIAL", defeitoOempDesc],
+    ["CONTATO DE VALIDACAO", CONTATO_VALIDACAO_PADRAO],
+    ["HORARIO DE ACESSO", HORARIO_ACESSO_PADRAO],
+  ];
+
+  const rowsWt: [string, string][] = [
+    ["Designacao/VLAN", `${circuitoOemp} VLAN:`],
+    ["Cliente Final", nomeUl],
+    ["Chamado interno", ""],
+    ["DEFEITO RECLAMADO", `${defeitoOemp}\n${defeitoOempDesc}`],
+    ["Horario do incidente", ""],
+    ["Telefone de contato", CONTATO_VALIDACAO_PADRAO],
+    ["Nome do solicitante", ""],
+    ["CIRCUITO OI", designacaoOi],
+  ];
+
+  const rowsAtiva: [string, string][] = [
+    ["DESIGINACAO", designacaoOi],
+    ["COD, UL", codUl],
+    ["CLIENTE", "OI/SA"],
+    ["PROTOCOLO OI", ""],
+    ["TIPO DE SOLICITACAO", "ABERTURA"],
+    ["PROVEDOR", circuitoOemp],
+    ["REICIDENTE", "NAO"],
+    ["JA ESCALONADO", "N1"],
+    ["DATA E HORA DA QUEDA", ""],
+    ["REALIZADO TS COM O CLIENTE", "SIM"],
+    ["DEFEITO RECLAMADO", defeitoAtiva],
+    ["HORARIO DE FUNCIONAMENTO", "08:00 as 18:00 segunda a sexta e sabado das 08:00 as 12:00"],
+    ["CONTATO LOCAL", contato],
+    ["CONTATO DE VALIDACAO", `${CONTATO_VALIDACAO_PADRAO} op.:1`],
+    ["RECLAMACAO INICIAL", defeitoAtivaDesc],
+  ];
+
+  const rowsEnc: [string, string][] = [
+    ["", "CEC Caixa"],
+    ["Falha", falhaEnc],
+    ["Horario da falha", horaFalhaEnc],
+    ["Horario de normalizacao", horaNormalizacaoEncPreview],
+    ["Causa/Solucao", causaEnc],
+    ["Contato de Autorizacao", contatoEnc],
+  ];
+
   return (
     <Tabs defaultValue="oemp" className="space-y-4">
       <TabsList className="grid grid-cols-5 w-full">
@@ -330,7 +428,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara OEMP OI</CardTitle>
-            <CopyBtn text={mascaraOempOi} id="oemp" />
+            <CopyBtn text={mascaraOempOi} id="oemp" tableRows={rowsOemp} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -353,7 +451,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Abertura MAM/SCT</CardTitle>
-            <CopyBtn text={mascaraMamSct} id="mam" />
+            <CopyBtn text={mascaraMamSct} id="mam" tableRows={rowsMam} />
           </CardHeader>
           <CardContent>
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraMamSct}</pre>
@@ -365,7 +463,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara WT Telecom</CardTitle>
-            <CopyBtn text={mascaraWtTelecom} id="wt" />
+            <CopyBtn text={mascaraWtTelecom} id="wt" tableRows={rowsWt} />
           </CardHeader>
           <CardContent>
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraWtTelecom}</pre>
@@ -377,7 +475,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara ATIVA</CardTitle>
-            <CopyBtn text={mascaraAtiva} id="ativa" />
+            <CopyBtn text={mascaraAtiva} id="ativa" tableRows={rowsAtiva} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -400,7 +498,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara de Encerramento</CardTitle>
-            <CopyBtn text={mascaraEncerramento} id="enc" />
+            <CopyBtn text={mascaraEncerramento} id="enc" tableRows={rowsEnc} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

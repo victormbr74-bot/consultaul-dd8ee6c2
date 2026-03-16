@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Check, Plus } from "lucide-react";
+import { Copy, Check, Plus, Table } from "lucide-react";
 
 interface MascaraTabProps {
   form: any;

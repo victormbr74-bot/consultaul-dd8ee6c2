@@ -4,12 +4,10 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Activity, Download, PlayCircle } from "lucide-react";
-import { executeSecureCrtCommands, getSecureCrtBridgeUrl, setSecureCrtBridgeUrl } from "@/lib/secureCrtBridge";
+import { Copy, Check, Activity, Download } from "lucide-react";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -26,7 +24,7 @@ import {
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PINGAO_REPEAT = 2;
 
-type LinkProfile = "principal_backup" | "4g" | "vsat";
+type LinkProfile = "primario" | "secundario" | "brisanet" | "4g" | "vsat";
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "ALTA LATENCIA" | "SEM DADOS";
 type LookupMode = "auto" | "cod_ul" | "ccto";
 
@@ -58,6 +56,7 @@ interface ParsedPingMetrics {
 interface AnalyzedPingRow extends ParsedPingMetrics {
   query: string;
   codUl: string;
+  profile: LinkProfile;
   profileLabel: string;
   limitMs: number;
   status: PingStatus;
@@ -65,15 +64,19 @@ interface AnalyzedPingRow extends ParsedPingMetrics {
 }
 
 const PROFILE_LIMITS: Record<LinkProfile, number> = {
-  principal_backup: 150,
+  primario: 150,
+  secundario: 150,
+  brisanet: 150,
   "4g": 400,
   vsat: 900,
 };
 
 const PROFILE_LABELS: Record<LinkProfile, string> = {
-  principal_backup: "Principal / Backup",
-  "4g": "4G",
-  vsat: "VSAT",
+  primario: "Primario",
+  secundario: "Secundario",
+  brisanet: "Backup BRISANET",
+  "4g": "Secundario 4G",
+  vsat: "Secundario VSAT",
 };
 
 const LOOKUP_MODE_FIELDS: Record<LookupMode, MatchField[]> = {
@@ -143,6 +146,13 @@ const readRawByAliases = (row: LotericaLookupRow, aliases: string[]) => {
   return "";
 };
 
+const getDefaultProfileData = (target: LinkTarget) => ({
+  profile: target === "primario" ? ("primario" as const) : ("secundario" as const),
+  profileLabel: target === "primario" ? PROFILE_LABELS.primario : PROFILE_LABELS.secundario,
+  limitMs: target === "primario" ? PROFILE_LIMITS.primario : PROFILE_LIMITS.secundario,
+  techSource: target === "primario" ? "Primario" : "Secundario",
+});
+
 const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
   const tecnologia = readRawByAliases(row, ["TECNOLOGIA"]);
   const perimetro = readRawByAliases(row, ["PERIMETRO", "PERÍMETRO", "PERIMETRO"]);
@@ -161,6 +171,15 @@ const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
 
   const signalText = signalParts.join(" | ");
   const signal = toUpperNoAccent(signalText);
+
+  if (target === "primario") {
+    return {
+      profile: "primario" as const,
+      profileLabel: PROFILE_LABELS.primario,
+      limitMs: PROFILE_LIMITS.primario,
+      techSource: signalText || "Primario",
+    };
+  }
 
   const hasVSAT = signal.includes("VSAT") || isMeaningfulValue(vsat);
   const hasBrisanet = signal.includes("BRISANET");
@@ -184,14 +203,14 @@ const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
 
   if (hasBrisanet) {
     return {
-      profile: "principal_backup" as const,
-      profileLabel: "Backup BRISANET",
-      limitMs: PROFILE_LIMITS.principal_backup,
+      profile: "brisanet" as const,
+      profileLabel: PROFILE_LABELS.brisanet,
+      limitMs: PROFILE_LIMITS.brisanet,
       techSource: signalText || "BRISANET",
     };
   }
 
-  if (target === "secundario" && (has4GKeyword || has4GSim)) {
+  if (has4GKeyword || has4GSim) {
     return {
       profile: "4g" as const,
       profileLabel: PROFILE_LABELS["4g"],
@@ -201,10 +220,10 @@ const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
   }
 
   return {
-    profile: "principal_backup" as const,
-    profileLabel: PROFILE_LABELS.principal_backup,
-    limitMs: PROFILE_LIMITS.principal_backup,
-    techSource: signalText || "Principal/Backup",
+    profile: "secundario" as const,
+    profileLabel: PROFILE_LABELS.secundario,
+    limitMs: PROFILE_LIMITS.secundario,
+    techSource: signalText || "Secundario",
   };
 };
 
@@ -353,6 +372,38 @@ const statusBadgeClass = (status: PingStatus) => {
   return "border-muted-foreground/30 bg-muted/20 text-muted-foreground";
 };
 
+const profileBadgeClass = (profile: LinkProfile) => {
+  if (profile === "primario") {
+    return "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+  }
+  if (profile === "secundario") {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+  }
+  if (profile === "brisanet") {
+    return "border-border bg-muted/50 text-muted-foreground";
+  }
+  if (profile === "4g") {
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+  }
+  return "border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300";
+};
+
+const targetButtonClass = (option: LinkTarget, selected: boolean, muted = false) => {
+  if (!selected) {
+    return "border-border bg-background text-muted-foreground hover:bg-muted/50";
+  }
+
+  if (muted) {
+    return "border-border bg-muted text-foreground shadow-sm";
+  }
+
+  if (option === "primario") {
+    return "border-sky-500/40 bg-sky-500 text-white shadow-sm hover:bg-sky-600";
+  }
+
+  return "border-amber-500/40 bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-400";
+};
+
 const PingaoTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [target, setTarget] = useState<LinkTarget>("primario");
@@ -365,10 +416,6 @@ const PingaoTab = () => {
 
   const [pingResultInput, setPingResultInput] = useState("");
   const [analysisRows, setAnalysisRows] = useState<AnalyzedPingRow[]>([]);
-  const [bridgeUrl, setBridgeUrl] = useState(() => getSecureCrtBridgeUrl());
-  const [sendingToSecureCrt, setSendingToSecureCrt] = useState(false);
-  const [bridgeMessage, setBridgeMessage] = useState("");
-  const [bridgeMessageType, setBridgeMessageType] = useState<"success" | "error" | null>(null);
 
   const pingSummary = useMemo(() => {
     const total = analysisRows.length;
@@ -380,12 +427,21 @@ const PingaoTab = () => {
 
     return { total, up, down, loss, highLatency, noData };
   }, [analysisRows]);
+  const brisanetSecondarySelected = target === "secundario" && querySummary.some((item) => item.profile === "brisanet");
 
   const copy = (text: string, id: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500);
+  };
+
+  const handleTargetChange = (nextTarget: LinkTarget) => {
+    if (nextTarget === target) return;
+    setTarget(nextTarget);
+    setQuerySummary([]);
+    setScript("");
+    setAnalysisRows([]);
   };
 
   const runLookup = async () => {
@@ -404,14 +460,15 @@ const PingaoTab = () => {
     setError("");
 
     try {
+      const defaultProfileData = getDefaultProfileData(target);
       const directSummary: LookupSummaryItem[] = directIpTerms.map((ip) => ({
         query: ip.trim(),
         status: "ok" as const,
         ip: ip.trim(),
         codUl: "-",
-        profile: "principal_backup" as const,
-        profileLabel: PROFILE_LABELS.principal_backup,
-        limitMs: PROFILE_LIMITS.principal_backup,
+        profile: defaultProfileData.profile,
+        profileLabel: defaultProfileData.profileLabel,
+        limitMs: defaultProfileData.limitMs,
         techSource: "IP direto",
         matchedBy: null,
       }));
@@ -430,9 +487,9 @@ const PingaoTab = () => {
               status: "not_found" as const,
               ip: "",
               codUl: "-",
-              profile: "principal_backup" as const,
+              profile: defaultProfileData.profile,
               profileLabel: "Nao identificado",
-              limitMs: PROFILE_LIMITS.principal_backup,
+              limitMs: defaultProfileData.limitMs,
               techSource: "-",
               matchedBy: null,
             };
@@ -484,6 +541,7 @@ const PingaoTab = () => {
   const runPingResultAnalysis = (rawText?: string) => {
     const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
     const parsed = parsePingOutput(sourceText);
+    const defaultProfileData = getDefaultProfileData(target);
 
     const ipIndex = new Map<string, LookupSummaryItem>();
     for (const item of querySummary) {
@@ -493,14 +551,15 @@ const PingaoTab = () => {
 
     const analyzed = parsed.map((row) => {
       const mapped = ipIndex.get(row.ip);
-      const limitMs = mapped?.limitMs ?? PROFILE_LIMITS.principal_backup;
+      const limitMs = mapped?.limitMs ?? defaultProfileData.limitMs;
       const { status, reason } = evaluateStatus(row, limitMs);
 
       return {
         ...row,
         query: mapped?.query || "-",
         codUl: mapped?.codUl || "-",
-        profileLabel: mapped?.profileLabel || "Padrao",
+        profile: mapped?.profile || defaultProfileData.profile,
+        profileLabel: mapped?.profileLabel || defaultProfileData.profileLabel,
         limitMs,
         status,
         reason,
@@ -508,41 +567,6 @@ const PingaoTab = () => {
     });
 
     setAnalysisRows(analyzed);
-  };
-
-  const runInSecureCrt = async () => {
-    if (!script.trim()) {
-      setBridgeMessageType("error");
-      setBridgeMessage("Gere o script antes de executar no SecureCRT.");
-      return;
-    }
-
-    setSendingToSecureCrt(true);
-    setBridgeMessage("");
-    setBridgeMessageType(null);
-
-    try {
-      setSecureCrtBridgeUrl(bridgeUrl || getSecureCrtBridgeUrl());
-      const result = await executeSecureCrtCommands({
-        commands: script,
-        source: "pingao",
-        delayMs: 120,
-      });
-
-      if (!result.ok) {
-        setBridgeMessageType("error");
-        setBridgeMessage(result.message);
-        return;
-      }
-
-      setBridgeMessageType("success");
-      setBridgeMessage(result.message);
-    } catch (runError) {
-      setBridgeMessageType("error");
-      setBridgeMessage(String((runError as Error)?.message || runError || "Falha ao executar no SecureCRT."));
-    } finally {
-      setSendingToSecureCrt(false);
-    }
   };
 
   const exportResultXlsx = async () => {
@@ -581,10 +605,6 @@ const PingaoTab = () => {
             <Activity className="w-5 h-5" /> Pingao - Gerar Script TCL
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => void runInSecureCrt()} disabled={!script || sendingToSecureCrt}>
-              <PlayCircle className="w-4 h-4 mr-1" />
-              {sendingToSecureCrt ? "Enviando..." : "Executar no SecureCRT"}
-            </Button>
             <Button variant="outline" size="sm" onClick={() => copy(script, "pingao-script")} disabled={!script}>
               {copiedId === "pingao-script" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
               {copiedId === "pingao-script" ? "Copiado!" : "Copiar Script"}
@@ -594,20 +614,32 @@ const PingaoTab = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Selecionar IP para montar o Pingao</Label>
-            <RadioGroup
-              value={target}
-              onValueChange={(value) => setTarget(value as LinkTarget)}
-              className="flex flex-row items-center gap-6"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="primario" id="pingao-primario" />
-                <Label htmlFor="pingao-primario">Primario</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="secundario" id="pingao-secundario" />
-                <Label htmlFor="pingao-secundario">Secundario</Label>
-              </div>
-            </RadioGroup>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTargetChange("primario")}
+                className={cn("min-w-[140px] justify-center font-semibold", targetButtonClass("primario", target === "primario"))}
+              >
+                Primario
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTargetChange("secundario")}
+                className={cn(
+                  "min-w-[140px] justify-center font-semibold",
+                  targetButtonClass("secundario", target === "secundario", brisanetSecondarySelected),
+                )}
+              >
+                Secundario
+              </Button>
+            </div>
+            {brisanetSecondarySelected ? (
+              <p className="text-xs text-muted-foreground">
+                Brisanet identificada no secundario: destaque neutro aplicado e limite mantido em 150 ms.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -660,24 +692,6 @@ const PingaoTab = () => {
             </Button>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="pingao-bridge-url" className="text-xs text-muted-foreground">
-              Endpoint do agente SecureCRT
-            </Label>
-            <Input
-              id="pingao-bridge-url"
-              value={bridgeUrl}
-              onChange={(e) => setBridgeUrl(e.target.value)}
-              placeholder="http://127.0.0.1:48365/api/securecrt/execute"
-              className="font-mono text-xs"
-            />
-            {bridgeMessage ? (
-              <p className={cn("text-xs", bridgeMessageType === "error" ? "text-destructive" : "text-green-600")}>
-                {bridgeMessage}
-              </p>
-            ) : null}
-          </div>
-
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {querySummary.length > 0 && (
@@ -705,7 +719,11 @@ const PingaoTab = () => {
                         <td className="p-2 font-mono">{item.codUl}</td>
                         <td className="p-2 font-mono">{item.ip || "-"}</td>
                         <td className="p-2">{item.matchedBy ? MATCH_FIELD_LABELS[item.matchedBy] : "-"}</td>
-                        <td className="p-2">{item.profileLabel}</td>
+                        <td className="p-2">
+                          <Badge variant="outline" className={cn("font-semibold", profileBadgeClass(item.profile))}>
+                            {item.profileLabel}
+                          </Badge>
+                        </td>
                         <td className="p-2 font-mono">{item.limitMs} ms</td>
                       </tr>
                     );
@@ -790,7 +808,14 @@ const PingaoTab = () => {
                       <tr key={`${row.ip}-${idx}`} className="border-t align-top">
                         <td className="p-2 font-mono">{row.codUl}</td>
                         <td className="p-2 font-mono">{row.ip}</td>
-                        <td className="p-2">{row.profileLabel} ({row.limitMs} ms)</td>
+                        <td className="p-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={cn("font-semibold", profileBadgeClass(row.profile))}>
+                              {row.profileLabel}
+                            </Badge>
+                            <span className="font-mono">{row.limitMs} ms</span>
+                          </div>
+                        </td>
                         <td className="p-2">{row.successRate !== null ? `${row.successRate}%` : "-"}</td>
                         <td className="p-2">{row.lossPct !== null ? `${row.lossPct}%` : "-"}</td>
                         <td className="p-2 font-mono">

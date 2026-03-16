@@ -8,14 +8,28 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Copy, Check, Plus, Table } from "lucide-react";
 
-interface MascaraTabProps {
-  form: any;
-}
-
 type Defeito = {
   value: string;
   desc: string;
 };
+
+type MascaraForm = {
+  cod_ul?: string | null;
+  nome_loterica?: string | null;
+  endereco?: string | null;
+  contato?: string | null;
+  designacao_nova?: string | null;
+  ccto_oi?: string | null;
+  ccto_oemp?: string | null;
+  operadora?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  raw_data?: Record<string, unknown> | null;
+};
+
+interface MascaraTabProps {
+  form: MascaraForm;
+}
 
 const DEFEITOS_OEMP: Defeito[] = [
   { value: "TROCA DE SWITCH", desc: "FAVOR REALIZAR A TROCA DO SWITCH NA UNIDADE" },
@@ -276,6 +290,30 @@ ${rows.map(([label, value], i) => {
     </div>
   );
 
+  const DefeitoSelectField = ({
+    label,
+    options,
+    value,
+    onChange,
+  }: {
+    label: string;
+    options: Defeito[];
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+        <SelectContent>
+          {options.map((defeito) => (
+            <SelectItem key={defeito.value} value={defeito.value}>{defeito.value}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   const mascaraOempOi = `NOME SOLICITANTE: CEC CAIXA
 NOME DO CONTATO LOCAL: ${contato}
 RAZAO SOCIAL: OI S/A
@@ -431,17 +469,12 @@ Contato de Autorizacao: ${contatoEnc}`;
             <CopyBtn text={mascaraOempOi} id="oemp" tableRows={rowsOemp} />
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <Label className="text-xs">Defeito Reclamado</Label>
-              <Select value={defeitoOemp} onValueChange={setDefeitoOemp}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {DEFEITOS_OEMP.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>{d.value}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DefeitoSelectField
+              label="Defeito Reclamado"
+              options={DEFEITOS_OEMP}
+              value={defeitoOemp}
+              onChange={setDefeitoOemp}
+            />
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraOempOi}</pre>
           </CardContent>
         </Card>
@@ -453,7 +486,13 @@ Contato de Autorizacao: ${contatoEnc}`;
             <CardTitle className="text-lg">Abertura MAM/SCT</CardTitle>
             <CopyBtn text={mascaraMamSct} id="mam" tableRows={rowsMam} />
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <DefeitoSelectField
+              label="Defeito Reclamado"
+              options={DEFEITOS_OEMP}
+              value={defeitoOemp}
+              onChange={setDefeitoOemp}
+            />
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraMamSct}</pre>
           </CardContent>
         </Card>
@@ -465,7 +504,13 @@ Contato de Autorizacao: ${contatoEnc}`;
             <CardTitle className="text-lg">Mascara WT Telecom</CardTitle>
             <CopyBtn text={mascaraWtTelecom} id="wt" tableRows={rowsWt} />
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <DefeitoSelectField
+              label="Defeito Reclamado"
+              options={DEFEITOS_OEMP}
+              value={defeitoOemp}
+              onChange={setDefeitoOemp}
+            />
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraWtTelecom}</pre>
           </CardContent>
         </Card>
@@ -478,17 +523,12 @@ Contato de Autorizacao: ${contatoEnc}`;
             <CopyBtn text={mascaraAtiva} id="ativa" tableRows={rowsAtiva} />
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <Label className="text-xs">Defeito Reclamado</Label>
-              <Select value={defeitoAtiva} onValueChange={setDefeitoAtiva}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {DEFEITOS_ATIVA.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>{d.value}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DefeitoSelectField
+              label="Defeito Reclamado"
+              options={DEFEITOS_ATIVA}
+              value={defeitoAtiva}
+              onChange={setDefeitoAtiva}
+            />
             <pre className="text-xs font-mono bg-muted/50 p-4 rounded whitespace-pre-wrap">{mascaraAtiva}</pre>
           </CardContent>
         </Card>
@@ -501,6 +541,20 @@ Contato de Autorizacao: ${contatoEnc}`;
             <CopyBtn text={mascaraEncerramento} id="enc" tableRows={rowsEnc} />
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <DefeitoSelectField
+                label="Defeito Reclamado OEMP/MAM/WT"
+                options={DEFEITOS_OEMP}
+                value={defeitoOemp}
+                onChange={setDefeitoOemp}
+              />
+              <DefeitoSelectField
+                label="Defeito Reclamado ATIVA"
+                options={DEFEITOS_ATIVA}
+                value={defeitoAtiva}
+                onChange={setDefeitoAtiva}
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Falha</Label>

@@ -341,6 +341,79 @@ Horario de normalizacao: ${horaNormalizacaoEncPreview}
 Causa/Solucao: ${causaEnc}
 Contato de Autorizacao: ${contatoEnc}`;
 
+  const rowsOemp: [string, string][] = [
+    ["NOME SOLICITANTE", "CEC CAIXA"],
+    ["NOME DO CONTATO LOCAL", contato],
+    ["RAZAO SOCIAL", "OI S/A"],
+    ["CNPJ", "CNPJ OI: 76.535.764/0001-43"],
+    ["ENDERECO", endereco],
+    ["HORARIO DE ATENDIMENTO", HORARIO_ACESSO_PADRAO],
+    ["AUTORIZACAO DE ACESSO?", "SIM"],
+    ["CHAMADO INTERNO", ""],
+    ["CIRCUITO OEMP", circuitoOemp],
+    ["CONTATO PARA ACOMPANHAR", CONTATO_VALIDACAO_PADRAO],
+    ["ATUALIZACAO", "SIM POR VOZ A CADA 1 HORA"],
+    ["DEFEITO RECLAMADO", `${defeitoOemp}\n${defeitoOempDesc}`],
+    ["NOME DA UL", nomeUl],
+    ["CODIGO UL", codUl],
+    ["CIRCUITO OI", designacaoOi],
+  ];
+
+  const rowsMam: [string, string][] = [
+    ["CODIGO UL", codUl],
+    ["NOME DA UL", nomeUl],
+    ["ENDERECO UL", endereco],
+    ["CONTATO", contato],
+    ["HORARIO DE FUNCIONAMENTO", HORARIO_FUNCIONAMENTO_PADRAO],
+    ["DEFEITO RECLAMADO", defeitoOemp],
+    ["OPERADORA", operadora],
+    ["SIM CARD", simCard],
+    ["MODELO ROTEADOR", modeloRoteador],
+    ["CEP", cep],
+    ["MUNICIPIO/ESTADO", `${cidade} ${uf}`],
+    ["RECLAMACAO INICIAL", defeitoOempDesc],
+    ["CONTATO DE VALIDACAO", CONTATO_VALIDACAO_PADRAO],
+    ["HORARIO DE ACESSO", HORARIO_ACESSO_PADRAO],
+  ];
+
+  const rowsWt: [string, string][] = [
+    ["Designacao/VLAN", `${circuitoOemp} VLAN:`],
+    ["Cliente Final", nomeUl],
+    ["Chamado interno", ""],
+    ["DEFEITO RECLAMADO", `${defeitoOemp}\n${defeitoOempDesc}`],
+    ["Horario do incidente", ""],
+    ["Telefone de contato", CONTATO_VALIDACAO_PADRAO],
+    ["Nome do solicitante", ""],
+    ["CIRCUITO OI", designacaoOi],
+  ];
+
+  const rowsAtiva: [string, string][] = [
+    ["DESIGINACAO", designacaoOi],
+    ["COD, UL", codUl],
+    ["CLIENTE", "OI/SA"],
+    ["PROTOCOLO OI", ""],
+    ["TIPO DE SOLICITACAO", "ABERTURA"],
+    ["PROVEDOR", circuitoOemp],
+    ["REICIDENTE", "NAO"],
+    ["JA ESCALONADO", "N1"],
+    ["DATA E HORA DA QUEDA", ""],
+    ["REALIZADO TS COM O CLIENTE", "SIM"],
+    ["DEFEITO RECLAMADO", defeitoAtiva],
+    ["HORARIO DE FUNCIONAMENTO", "08:00 as 18:00 segunda a sexta e sabado das 08:00 as 12:00"],
+    ["CONTATO LOCAL", contato],
+    ["CONTATO DE VALIDACAO", `${CONTATO_VALIDACAO_PADRAO} op.:1`],
+    ["RECLAMACAO INICIAL", defeitoAtivaDesc],
+  ];
+
+  const rowsEnc: [string, string][] = [
+    ["", "CEC Caixa"],
+    ["Falha", falhaEnc],
+    ["Horario da falha", horaFalhaEnc],
+    ["Horario de normalizacao", horaNormalizacaoEncPreview],
+    ["Causa/Solucao", causaEnc],
+    ["Contato de Autorizacao", contatoEnc],
+  ];
+
   return (
     <Tabs defaultValue="oemp" className="space-y-4">
       <TabsList className="grid grid-cols-5 w-full">
@@ -355,7 +428,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara OEMP OI</CardTitle>
-            <CopyBtn text={mascaraOempOi} id="oemp" />
+            <CopyBtn text={mascaraOempOi} id="oemp" tableRows={rowsOemp} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div>

@@ -17,6 +17,7 @@ import ConsultaMassa from "./pages/ConsultaMassa";
 import Ping99 from "./pages/Ping99";
 import Pingao from "./pages/Pingao";
 import PingaoNat from "./pages/PingaoNat";
+import TextCompare from "./pages/TextCompare";
 import LotericaDetail from "./pages/LotericaDetail";
 import LotericaCreate from "./pages/LotericaCreate";
 import AdminPanel from "./pages/AdminPanel";
@@ -105,6 +106,7 @@ const App = () => (
                   <Route path="/ping99" element={<Ping99 />} />
                   <Route path="/pingao" element={<Pingao />} />
                   <Route path="/pingao-nat" element={<PingaoNat />} />
+                  <Route path="/comparar-texto" element={<TextCompare />} />
                   <Route path="/loterica/cadastrar" element={<LotericaCreate />} />
                   <Route path="/loterica/:codUl" element={<LotericaDetail />} />
                   <Route path="/alarmes" element={<AdminOnlyRoute><AlarmeDashboard /></AdminOnlyRoute>} />

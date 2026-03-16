@@ -217,6 +217,14 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/comparar-texto" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Comparar Texto</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -244,11 +244,36 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     setTimeout(() => setCopied(null), 1800);
   };
 
-  const CopyBtn = ({ text, id }: { text: string; id: string }) => (
-    <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
-      {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
-      {copied === id ? "Copiado!" : "Copiar"}
-    </Button>
+  const copyAsHtmlTable = (rows: [string, string][], id: string) => {
+    const html = `<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;width:100%;max-width:620px;">
+${rows.map(([label, value], i) => {
+  const bg = i % 2 === 0 ? "#1a1a2e" : "#16213e";
+  return `<tr style="background:${bg};">
+<td style="padding:6px 12px;font-weight:bold;color:#a8b2d1;border:1px solid #2a2a4a;white-space:nowrap;width:220px;">${label}</td>
+<td style="padding:6px 12px;color:#e2e8f0;border:1px solid #2a2a4a;">${value}</td>
+</tr>`;
+}).join("\n")}
+</table>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const textBlob = new Blob([rows.map(([l, v]) => `${l}\t${v}`).join("\n")], { type: "text/plain" });
+    navigator.clipboard.write([new ClipboardItem({ "text/html": blob, "text/plain": textBlob })]);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1800);
+  };
+
+  const CopyBtn = ({ text, id, tableRows }: { text: string; id: string; tableRows?: [string, string][] }) => (
+    <div className="flex gap-1">
+      <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
+        {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
+        {copied === id ? "Copiado!" : "Copiar"}
+      </Button>
+      {tableRows && (
+        <Button variant="outline" size="sm" onClick={() => copyAsHtmlTable(tableRows, id + "-tbl")}>
+          {copied === id + "-tbl" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Table className="w-4 h-4 mr-1" />}
+          {copied === id + "-tbl" ? "Copiado!" : "Tabela"}
+        </Button>
+      )}
+    </div>
   );
 
   const mascaraOempOi = `NOME SOLICITANTE: CEC CAIXA

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity, PlusCircle } from "lucide-react";
+import { Store, Search, FileText, FileCheck, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity, PlusCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -190,6 +190,14 @@ export function AppSidebar() {
                   <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <ListChecks className="mr-2 h-4 w-4" />
                     <span>Consulta Massa</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/validacao" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <FileCheck className="mr-2 h-4 w-4" />
+                    <span>Validacao</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

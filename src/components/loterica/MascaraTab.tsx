@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Check, Plus, Table } from "lucide-react";
+import { buildMailtoUrl } from "@/lib/validacaoEmail";
+import { Copy, Check, Mail, Plus, Table } from "lucide-react";
 
 type Defeito = {
   value: string;
@@ -275,7 +276,21 @@ ${rows.map(([label, value], i) => {
     setTimeout(() => setCopied(null), 1800);
   };
 
-  const CopyBtn = ({ text, id, tableRows }: { text: string; id: string; tableRows?: [string, string][] }) => (
+  const sendByEmail = (subject: string, body: string) => {
+    window.location.href = buildMailtoUrl({ subject, body });
+  };
+
+  const CopyBtn = ({
+    text,
+    id,
+    tableRows,
+    emailSubject,
+  }: {
+    text: string;
+    id: string;
+    tableRows?: [string, string][];
+    emailSubject: string;
+  }) => (
     <div className="flex gap-1">
       <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
         {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
@@ -287,6 +302,10 @@ ${rows.map(([label, value], i) => {
           {copied === id + "-tbl" ? "Copiado!" : "Tabela"}
         </Button>
       )}
+      <Button variant="outline" size="sm" onClick={() => sendByEmail(emailSubject, text)}>
+        <Mail className="w-4 h-4 mr-1" />
+        Email
+      </Button>
     </div>
   );
 
@@ -466,7 +485,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara OEMP OI</CardTitle>
-            <CopyBtn text={mascaraOempOi} id="oemp" tableRows={rowsOemp} />
+            <CopyBtn text={mascaraOempOi} id="oemp" tableRows={rowsOemp} emailSubject={`Mascara OEMP OI - ${codUl || nomeUl || "UL"}`} />
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
@@ -484,7 +503,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Abertura MAM/SCT</CardTitle>
-            <CopyBtn text={mascaraMamSct} id="mam" tableRows={rowsMam} />
+            <CopyBtn text={mascaraMamSct} id="mam" tableRows={rowsMam} emailSubject={`Mascara MAM SCT - ${codUl || nomeUl || "UL"}`} />
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
@@ -502,7 +521,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara WT Telecom</CardTitle>
-            <CopyBtn text={mascaraWtTelecom} id="wt" tableRows={rowsWt} />
+            <CopyBtn text={mascaraWtTelecom} id="wt" tableRows={rowsWt} emailSubject={`Mascara WT Telecom - ${codUl || nomeUl || "UL"}`} />
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
@@ -520,7 +539,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara ATIVA</CardTitle>
-            <CopyBtn text={mascaraAtiva} id="ativa" tableRows={rowsAtiva} />
+            <CopyBtn text={mascaraAtiva} id="ativa" tableRows={rowsAtiva} emailSubject={`Mascara ATIVA - ${codUl || nomeUl || "UL"}`} />
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
@@ -538,7 +557,7 @@ Contato de Autorizacao: ${contatoEnc}`;
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Mascara de Encerramento</CardTitle>
-            <CopyBtn text={mascaraEncerramento} id="enc" tableRows={rowsEnc} />
+            <CopyBtn text={mascaraEncerramento} id="enc" tableRows={rowsEnc} emailSubject={`Mascara de Encerramento - ${codUl || nomeUl || "UL"}`} />
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

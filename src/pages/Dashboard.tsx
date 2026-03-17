@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react
 import { useNavigate } from "react-router-dom";
 import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
+import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile, type ImportBasePlanilhaProgress } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
@@ -42,7 +43,7 @@ const asString = (value: unknown) => {
 const parseCodUlTerms = (value: string) => {
   const parts = String(value || "")
     .split(/[\n,;\t]+/)
-    .map((term) => term.trim())
+    .map((term) => normalizeCodUlTerm(term))
     .filter(Boolean);
 
   const seen = new Set<string>();
@@ -56,6 +57,23 @@ const parseCodUlTerms = (value: string) => {
   }
 
   return result;
+};
+
+const buildDashboardSearchFilter = (value: string) => {
+  const term = String(value || "").trim();
+  if (!term) return "";
+
+  const filters = new Set<string>([
+    `nome_loterica.ilike.%${term}%`,
+    `ccto_oi.ilike.%${term}%`,
+    `cidade.ilike.%${term}%`,
+  ]);
+
+  for (const candidate of buildCodUlSearchVariants(term)) {
+    filters.add(`cod_ul.ilike.%${candidate}%`);
+  }
+
+  return [...filters].join(",");
 };
 
 const formatDateTimePtBr = (value: unknown) => {
@@ -187,7 +205,8 @@ const Dashboard = () => {
   const search = localSearch;
 
   const fetchLotericas = useCallback(async () => {
-    if (!search.trim()) {
+    const term = search.trim();
+    if (!term) {
       setLotericas([]);
       setTotal(0);
       setLoading(false);
@@ -195,9 +214,27 @@ const Dashboard = () => {
     }
     setLoading(true);
     try {
-      const s = `%${search.trim()}%`;
-      let query = supabase.from("lotericas").select("*", { count: "exact" })
-        .or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`);
+      const exactCandidates = buildCodUlExactCandidates(term);
+
+      if (exactCandidates.length > 1 || (exactCandidates.length === 1 && exactCandidates[0] !== term.toUpperCase())) {
+        const { data, count, error } = await supabase
+          .from("lotericas")
+          .select("*", { count: "exact" })
+          .in("cod_ul", exactCandidates)
+          .order("cod_ul")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) {
+          console.error("Erro ao buscar lotericas por codigo", error);
+        } else if ((count || 0) > 0) {
+          setLotericas(data || []);
+          setTotal(count || 0);
+          return;
+        }
+      }
+
+      const orFilter = buildDashboardSearchFilter(term);
+      const query = supabase.from("lotericas").select("*", { count: "exact" }).or(orFilter);
 
       const { data, count, error } = await query
         .order("cod_ul")
@@ -240,32 +277,38 @@ const Dashboard = () => {
       return;
     }
 
-    const singleTerm = parsedTerms[0] || term;
+    const singleTerm = parsedTerms[0] || normalizeCodUlTerm(term) || term;
 
     try {
-      // Prefer exact match by codigo (cod_ul) to avoid jumping to unrelated results.
-      const { data: exact, error: exactError } = await supabase
-        .from("lotericas")
-        .select("cod_ul")
-        .eq("cod_ul", singleTerm)
-        .maybeSingle();
+      const exactCandidates = buildCodUlExactCandidates(singleTerm);
+      let codUl: string | undefined;
 
-      if (exactError) {
-        console.error("Erro ao buscar loterica por codigo", exactError);
+      if (exactCandidates.length > 0) {
+        const { data: exactRows, error: exactError } = await supabase
+          .from("lotericas")
+          .select("cod_ul")
+          .in("cod_ul", exactCandidates)
+          .order("cod_ul")
+          .limit(1);
+
+        if (exactError) {
+          console.error("Erro ao buscar loterica por codigo", exactError);
+        } else {
+          codUl = exactRows?.[0]?.cod_ul;
+        }
       }
 
-      const codUl = exact?.cod_ul;
       if (codUl) {
         setLotericaTab("consulta");
         navigate(`/loterica/${encodeURIComponent(codUl)}`);
         return;
       }
 
-      const s = `%${singleTerm}%`;
+      const orFilter = buildDashboardSearchFilter(singleTerm);
       const { data, error } = await supabase
         .from("lotericas")
         .select("cod_ul")
-        .or(`cod_ul.ilike.${s},nome_loterica.ilike.${s},ccto_oi.ilike.${s},cidade.ilike.${s}`)
+        .or(orFilter)
         .order("cod_ul")
         .limit(1);
 

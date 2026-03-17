@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,7 +64,7 @@ const parseCodUlTerms = (value: string | undefined) => {
   const decoded = safeDecode(String(value || ""));
   const parts = decoded
     .split(/[\n,;\t ]+/)
-    .map((term) => String(term || "").trim())
+    .map((term) => normalizeCodUlTerm(term))
     .filter(Boolean);
 
   const seen = new Set<string>();
@@ -647,3 +648,4 @@ const LotericaDetail = () => {
 };
 
 export default LotericaDetail;
+

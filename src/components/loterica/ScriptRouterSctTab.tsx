@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Download, FileCode2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -384,6 +385,12 @@ const loadTemplate = async (templateId: TemplateId) => {
   return text;
 };
 
+const buildCodUlLookupFilter = (value: string) => {
+  return buildCodUlSearchVariants(value)
+    .map((candidate) => `cod_ul.ilike.%${candidate}%`)
+    .join(",");
+};
+
 const applyTemplateReplacements = (templateId: TemplateId, template: string, context: ScriptContext) => {
   let output = template.replace(/\(mudar\)\s*/gi, "");
   const sysname = `${context.codUl}_RT02`;
@@ -453,7 +460,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   }, []);
 
   const handleLookup = useCallback(async (forcedCode?: string) => {
-    const lookupCode = normalizeText(forcedCode ?? codUlInput);
+    const lookupCode = normalizeCodUlTerm(forcedCode ?? codUlInput);
     if (!lookupCode) {
       setError("Informe o codigo UL para carregar os dados.");
       return null;
@@ -463,22 +470,31 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     setError("");
 
     try {
-      const { data, error: exactError } = await (supabase as any)
-        .from("lotericas")
-        .select(LOOKUP_SELECT)
-        .eq("cod_ul", lookupCode)
-        .maybeSingle();
+      const exactCandidates = buildCodUlExactCandidates(lookupCode);
+      let selected: any = null;
 
-      if (exactError) {
-        throw new Error(exactError.message || "Falha ao consultar a loterica.");
+      if (exactCandidates.length > 0) {
+        const { data: exactRows, error: exactError } = await (supabase as any)
+          .from("lotericas")
+          .select(LOOKUP_SELECT)
+          .in("cod_ul", exactCandidates)
+          .order("cod_ul")
+          .limit(1);
+
+        if (exactError) {
+          throw new Error(exactError.message || "Falha ao consultar a loterica.");
+        }
+
+        selected = exactRows?.[0] || null;
       }
 
-      let selected = data;
       if (!selected) {
+        const lookupFilter = buildCodUlLookupFilter(lookupCode);
         const { data: fallbackData, error: fallbackError } = await (supabase as any)
           .from("lotericas")
           .select(LOOKUP_SELECT)
-          .ilike("cod_ul", lookupCode)
+          .or(lookupFilter)
+          .order("cod_ul")
           .limit(1);
 
         if (fallbackError) {

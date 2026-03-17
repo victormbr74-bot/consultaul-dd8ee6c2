@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildCodUlExactCandidates } from "@/lib/lotericaCodUl";
 
 export type LinkTarget = "primario" | "secundario";
 export type MatchField = "cod_ul" | "ccto_oi" | "ccto_oemp" | "designacao_nova";
@@ -146,7 +147,11 @@ const fetchByColumn = async (column: MatchField, terms: string[]) => {
 
     const queryTerms = Array.from(new Set(
       chunk
-        .map((term) => [normalizeText(term), normalizeKey(term)])
+        .map((term) =>
+          column === "cod_ul"
+            ? buildCodUlExactCandidates(term)
+            : [normalizeText(term), normalizeKey(term)],
+        )
         .flat()
         .filter(Boolean),
     ));

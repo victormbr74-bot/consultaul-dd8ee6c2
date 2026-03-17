@@ -36,6 +36,36 @@ const firstFilled = (...values: unknown[]) => {
   return "";
 };
 
+const normalizeHeader = (value: string) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+const getRawByAliases = (raw: Record<string, unknown>, aliases: string[]) => {
+  const exact = new Map<string, unknown>();
+  const loose = new Map<string, unknown>();
+
+  for (const [key, value] of Object.entries(raw)) {
+    const exactKey = key.trim().toUpperCase();
+    const looseKey = normalizeHeader(key);
+
+    if (exactKey && !exact.has(exactKey)) exact.set(exactKey, value);
+    if (looseKey && !loose.has(looseKey)) loose.set(looseKey, value);
+  }
+
+  for (const alias of aliases) {
+    const exactHit = exact.get(alias.trim().toUpperCase());
+    if (asText(exactHit)) return asText(exactHit);
+
+    const looseHit = loose.get(normalizeHeader(alias));
+    if (asText(looseHit)) return asText(looseHit);
+  }
+
+  return "";
+};
+
 const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
@@ -70,17 +100,33 @@ export const resolveValidationDesignacao = (
     return firstFilled(
       form.designacao_nova,
       form.ccto_oi,
-      raw["DESIGINACAO NOVA"],
-      raw["DESIGNACAO NOVA"],
-      raw["DESIGNACAO"],
+      getRawByAliases(raw, [
+        "DESIGINACAO NOVA",
+        "DESIGNACAO NOVA",
+        "DESIGNAÇÃO NOVA",
+        "DESIGNACAO",
+        "DESIGNAÇÃO",
+        "DESIGNACAO 1",
+        "DESIGNAÇÃO 1",
+      ]),
       "NAO INFORMADO",
     );
   }
 
   return firstFilled(
-    raw["CIRCUITO OEMP"],
     form.ccto_oemp,
-    raw["CCTO OEMP"],
+    getRawByAliases(raw, [
+      "CCTO OEMP",
+      "CIRCUITO OEMP",
+      "CIRCUITO SECUNDARIO",
+      "CIRCUITO SECUNDÁRIO",
+      "DESIGNACAO 2",
+      "DESIGNAÇÃO 2",
+      "DESIGNACAO2",
+      "DESIGNAÇÃO2",
+      "DESIGNACAO SECUNDARIA",
+      "DESIGNAÇÃO SECUNDÁRIA",
+    ]),
     "NAO INFORMADO",
   );
 };

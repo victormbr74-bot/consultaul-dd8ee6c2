@@ -33,18 +33,32 @@ describe("validacaoEmail", () => {
     ).toBe("BHE6912964");
   });
 
-  it("prefers the circuito OEMP for secundario", () => {
+  it("prefers ccto_oemp as the designacao for secundario", () => {
     expect(
       resolveValidationDesignacao(
         {
-          ccto_oemp: "CCTO-SEC",
+          ccto_oemp: "CCTO-SECUNDARIO-01",
           raw_data: {
             "CIRCUITO OEMP": "OEMP-123456",
           },
         },
         "secundario",
       ),
-    ).toBe("OEMP-123456");
+    ).toBe("CCTO-SECUNDARIO-01");
+  });
+
+  it("falls back to secondary aliases from raw_data when ccto_oemp is empty", () => {
+    expect(
+      resolveValidationDesignacao(
+        {
+          ccto_oemp: "",
+          raw_data: {
+            "Designação 2": "SEC-ALIAS-02",
+          },
+        },
+        "secundario",
+      ),
+    ).toBe("SEC-ALIAS-02");
   });
 
   it("builds the validation email body with all requested columns", () => {

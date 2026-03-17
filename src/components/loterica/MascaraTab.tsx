@@ -37,7 +37,7 @@ const DEFEITOS_OEMP: Defeito[] = [
   { value: "TROCA DE NOBREAK", desc: "FAVOR REALIZAR A TROCA DO NOBREAK NA UNIDADE" },
   { value: "PONTO LOGICO", desc: "UL reclama de falha em ponto logico. Favor verificar falha e realizar reparo nos pontos!" },
   { value: "CABO DE REDE", desc: "UL reclama de falha no cabo de rede. Favor verificar falha e realizar reparo ou troca no cabo!" },
-  { value: "LINK INOPERANTE", desc: "LINK BACKUP INOPERANTE, FAVOR VERIFICAR." },
+  { value: "LINK INOPERANTE", desc: "LINK INOPERANTE, FAVOR VERIFICAR." },
   { value: "LINK INTERMITENTE", desc: "LINK INTERMITENTE" },
   { value: "LINK ALTA LATENCIA", desc: "LINK COM ALTA LATENCIA, FAVOR ANALISAR" },
   { value: "LINK PERCA DE PACOTE", desc: "LINK COM PERCA DE PACOTE, FAVOR ANALISAR" },

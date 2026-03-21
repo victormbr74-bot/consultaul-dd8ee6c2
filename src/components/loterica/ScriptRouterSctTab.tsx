@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Download, FileCode2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
+import { extractRouterScriptVariant, ROUTER_SCRIPT_VARIANT_LABELS, type RouterScriptVariant } from "@/lib/routerScript";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,6 +112,11 @@ const OPERADORA_4G_OPTIONS: Array<{ value: Operadora4g; label: string }> = [
   { value: "tim", label: "TIM" },
   { value: "arqia", label: "Arqia" },
   { value: "nao-se-aplica", label: "Nao se aplica" },
+];
+const SCRIPT_VARIANT_OPTIONS: Array<{ value: RouterScriptVariant; label: string }> = [
+  { value: "completo", label: "Completo" },
+  { value: "bgp", label: "Parcial BGP" },
+  { value: "nqa", label: "Parcial NQA" },
 ];
 
 const toUpperNoAccent = (value: unknown) => {
@@ -438,9 +444,10 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const [technology, setTechnology] = useState<LinkTechnology>("vsat");
   const [switchTopology, setSwitchTopology] = useState<SwitchTopology>("sem-switch");
   const [operadora4g, setOperadora4g] = useState<Operadora4g>("nao-se-aplica");
+  const [scriptVariant, setScriptVariant] = useState<RouterScriptVariant>("completo");
 
   const [loterica, setLoterica] = useState<LotericaLookupRow | null>(null);
-  const [script, setScript] = useState("");
+  const [fullScript, setFullScript] = useState("");
   const [templateLabel, setTemplateLabel] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -505,7 +512,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
       if (!selected) {
         setLoterica(null);
-        setScript("");
+        setFullScript("");
         setTemplateLabel("");
         setWarnings([]);
         setError(`Codigo UL '${lookupCode}' nao encontrado.`);
@@ -533,7 +540,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     } catch (lookupError) {
       console.error("Falha ao consultar loterica para Script Router SCT", lookupError);
       setLoterica(null);
-      setScript("");
+      setFullScript("");
       setTemplateLabel("");
       setWarnings([]);
       setError(String((lookupError as Error)?.message || lookupError || "Falha ao consultar loterica."));
@@ -564,7 +571,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     const loopbackSecundario = extractIpv4(getSecondaryLoopbackValue(activeRow));
     if (!loopbackSecundario) {
-      setScript("");
+      setFullScript("");
       setTemplateLabel("");
       setWarnings([]);
       setError("A UL nao possui loopback secundario valido para gerar o script.");
@@ -574,7 +581,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     const redeLanRaw = getRedeLanValue(activeRow) || getRawValueByAliases(activeRow, ["REDE LAN", "REDE_LAN"]);
     const lanContext = deriveLanContext(redeLanRaw);
     if (!lanContext) {
-      setScript("");
+      setFullScript("");
       setTemplateLabel("");
       setWarnings([]);
       setError("A UL nao possui REDE LAN valida para gerar o script completo.");
@@ -615,12 +622,12 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     try {
       const templateText = await loadTemplate(templateChoice.templateId);
       const generatedScript = applyTemplateReplacements(templateChoice.templateId, templateText, scriptContext);
-      setScript(generatedScript);
+      setFullScript(generatedScript);
       setTemplateLabel(TEMPLATE_META[templateChoice.templateId].label);
       setWarnings(generationWarnings);
     } catch (generationError) {
       console.error("Falha ao gerar Script Router SCT", generationError);
-      setScript("");
+      setFullScript("");
       setTemplateLabel("");
       setWarnings([]);
       setError(String((generationError as Error)?.message || generationError || "Falha ao gerar script."));
@@ -628,6 +635,16 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       setGenerating(false);
     }
   }, [codUlInput, handleLookup, loterica, model, operadora4g, owner, switchTopology, technology]);
+
+  const script = useMemo(() => extractRouterScriptVariant(fullScript, scriptVariant), [fullScript, scriptVariant]);
+  const scriptVariantLabel = ROUTER_SCRIPT_VARIANT_LABELS[scriptVariant];
+  const variantError = useMemo(() => {
+    if (!fullScript || scriptVariant === "completo" || script) return "";
+    return scriptVariant === "bgp"
+      ? "O template selecionado nao possui bloco BGP para gerar o script parcial."
+      : "O template selecionado nao possui bloco NQA para gerar o script parcial.";
+  }, [fullScript, script, scriptVariant]);
+  const displayedError = error || variantError;
 
   const handleCopy = useCallback(async () => {
     if (!script) return;
@@ -650,7 +667,8 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     const fileNameModel = model.toUpperCase().replace(/[^A-Z0-9]+/g, "-");
     const fileCode = normalizeText(loterica?.cod_ul || codUlInput || "SCRIPT");
-    const fileName = `${fileCode}-SCT-${fileNameModel}.txt`;
+    const fileNameSuffix = scriptVariant === "completo" ? "COMPLETO" : scriptVariant.toUpperCase();
+    const fileName = `${fileCode}-SCT-${fileNameModel}-${fileNameSuffix}.txt`;
 
     const blob = new Blob([script], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -661,7 +679,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
-  }, [codUlInput, loterica?.cod_ul, model, script]);
+  }, [codUlInput, loterica?.cod_ul, model, script, scriptVariant]);
 
   const lotericaSummary = loterica
     ? {
@@ -712,11 +730,11 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             onClick={() => void handleGenerate()}
             disabled={loadingLookup || generating}
           >
-            {generating ? "Gerando..." : "Gerar Script Completo"}
+            {generating ? "Gerando..." : scriptVariant === "completo" ? "Gerar Script Completo" : "Gerar Script Parcial"}
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div className="space-y-1.5">
             <Label>Modelo</Label>
             <Select value={model} onValueChange={(value) => setModel(value as RouterModel)}>
@@ -796,6 +814,22 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-1.5">
+            <Label>Tipo de script</Label>
+            <Select value={scriptVariant} onValueChange={(value) => setScriptVariant(value as RouterScriptVariant)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SCRIPT_VARIANT_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {lotericaSummary && (
@@ -823,9 +857,9 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           </div>
         )}
 
-        {error && (
+        {displayedError && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
+            {displayedError}
           </div>
         )}
 
@@ -840,8 +874,11 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Script completo do roteador</Label>
+              <Label className="text-xs text-muted-foreground">
+                {scriptVariant === "completo" ? "Script completo do roteador" : `Script ${scriptVariantLabel.toLowerCase()}`}
+              </Label>
               {templateLabel && <Badge variant="secondary">{templateLabel}</Badge>}
+              <Badge variant="outline">{scriptVariantLabel}</Badge>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -864,7 +901,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           <Textarea
             readOnly
             value={script}
-            placeholder="O script completo sera exibido aqui apos a geracao."
+            placeholder="O script selecionado sera exibido aqui apos a geracao."
             className={cn("min-h-[520px] font-mono text-xs whitespace-pre")}
           />
         </div>

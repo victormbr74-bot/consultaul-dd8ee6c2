@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { copyRichTextToClipboard } from "@/lib/richClipboard";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -241,19 +242,20 @@ const Validacao = () => {
   const copyTable = async () => {
     if (!emailRows.length) return;
 
-    if (navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
-      const htmlBlob = new Blob([emailHtml], { type: "text/html" });
-      const textBlob = new Blob([emailText], { type: "text/plain" });
-      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
-    } else {
-      await navigator.clipboard.writeText(emailText);
-    }
-
+    await copyRichTextToClipboard({ html: emailHtml, text: emailText });
     setCopiedFeedback("table");
   };
 
-  const sendEmail = () => {
+  const sendEmail = async () => {
     if (!emailRows.length) return;
+
+    try {
+      await copyRichTextToClipboard({ html: emailHtml, text: emailText });
+      setCopiedFeedback("email");
+    } catch (error) {
+      console.error("Falha ao copiar tabela para o email", error);
+    }
+
     window.location.href = buildMailtoUrl({
       subject: emailSubject,
       body: emailText,
@@ -400,8 +402,9 @@ const Validacao = () => {
                 {copiedId === "table" ? <Check className="w-4 h-4 mr-1 text-green-600" /> : <TableIcon className="w-4 h-4 mr-1" />}
                 {copiedId === "table" ? "Copiado!" : "Copiar tabela"}
               </Button>
-              <Button size="sm" onClick={sendEmail} disabled={!emailRows.length}>
-                <Mail className="w-4 h-4 mr-1" /> Enviar por email
+              <Button size="sm" onClick={() => void sendEmail()} disabled={!emailRows.length}>
+                {copiedId === "email" ? <Check className="w-4 h-4 mr-1 text-green-600" /> : <Mail className="w-4 h-4 mr-1" />}
+                {copiedId === "email" ? "Tabela pronta" : "Enviar por email"}
               </Button>
             </div>
           </CardHeader>
@@ -481,8 +484,8 @@ const Validacao = () => {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  O botao de email abre o cliente padrao configurado no Windows, como o Outlook. Para manter a tabela formatada, use
-                  tambem a opcao "Copiar tabela".
+                  O botao de email abre o cliente padrao configurado no Windows e ja copia a tabela formatada para colar no corpo da
+                  mensagem.
                 </p>
 
                 <div className="rounded-xl border bg-card overflow-auto">

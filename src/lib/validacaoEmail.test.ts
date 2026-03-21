@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMailtoUrl,
+  buildValidationHtmlTable,
   buildValidationEmailText,
   resolveValidationDesignacao,
   resolveValidationUnidade,
@@ -81,6 +82,27 @@ describe("validacaoEmail", () => {
     expect(text).toContain("Unidade Loterico | Designacao | Primario/Secundario");
     expect(text).toContain("Migracao na rede de transporte");
     expect(text).toContain("WO0000079738107");
+  });
+
+  it("builds the validation email html table", () => {
+    const rows: ValidationEmailRow[] = [
+      {
+        unidadeLoterico: "SAA AG. ITACOLOMI (21-000111-1)",
+        designacao: "BHE6912964",
+        circuito: "Primario",
+        acaoRealizada: "Migracao na rede de transporte",
+        chamado: "REQ000143434307",
+        chamadoOperadora: "WO0000079738107",
+        tipoFalha: "Indisponibilidade (Total)",
+        status: "",
+      },
+    ];
+
+    const html = buildValidationHtmlTable(rows);
+
+    expect(html).toContain("<table");
+    expect(html).toContain("Unidade Loterico");
+    expect(html).toContain("WO0000079738107");
   });
 
   it("encodes subject and body for mailto", () => {

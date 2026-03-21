@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { copyRichTextToClipboard } from "@/lib/richClipboard";
 import { buildMailtoUrl } from "@/lib/validacaoEmail";
 import { Copy, Check, Mail, Plus, Table } from "lucide-react";
 
@@ -109,6 +110,14 @@ const MESES_BR: Record<string, number> = {
   dez: 11,
   dezembro: 11,
 };
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 const MascaraTab = ({ form }: MascaraTabProps) => {
   const [copied, setCopied] = useState<string | null>(null);
@@ -236,12 +245,12 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const endereco = form.endereco || "";
   const contato = form.contato || "";
   const designacaoOi = form.designacao_nova || form.ccto_oi || "";
-  const circuitoOemp = form.ccto_oemp || raw["CIRCUITO OEMP"] || "NAO OEMP";
+  const circuitoOemp = String(form.ccto_oemp || raw["CIRCUITO OEMP"] || "NAO OEMP");
   const operadora = form.operadora || "";
-  const simCard = raw["SIM CARD 4G"] || "";
-  const modeloRoteador = raw["MODELO ROTEADOR"] || "";
-  const cep = raw["CEP"] || "";
-  const cidade = form.cidade || raw["MUNICIPIO"] || "";
+  const simCard = String(raw["SIM CARD 4G"] || "");
+  const modeloRoteador = String(raw["MODELO ROTEADOR"] || "");
+  const cep = String(raw["CEP"] || "");
+  const cidade = String(form.cidade || raw["MUNICIPIO"] || "");
   const uf = form.uf || "";
 
   const defeitoOempDesc = useMemo(
@@ -253,30 +262,45 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
     [defeitoAtiva],
   );
 
-  const copy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  const setCopiedFeedback = (id: string) => {
     setCopied(id);
     setTimeout(() => setCopied(null), 1800);
   };
 
-  const copyAsHtmlTable = (rows: [string, string][], id: string) => {
-    const html = `<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;width:100%;max-width:620px;">
+  const copy = async (text: string, id: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedFeedback(id);
+  };
+
+  const buildTableText = (rows: [string, string][]) => rows.map(([label, value]) => `${label}\t${value}`).join("\n");
+
+  const buildTableHtml = (rows: [string, string][]) => `<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;width:100%;max-width:620px;">
 ${rows.map(([label, value], i) => {
   const bg = i % 2 === 0 ? "#1a1a2e" : "#16213e";
   return `<tr style="background:${bg};">
-<td style="padding:6px 12px;font-weight:bold;color:#a8b2d1;border:1px solid #2a2a4a;white-space:nowrap;width:220px;">${label}</td>
-<td style="padding:6px 12px;color:#e2e8f0;border:1px solid #2a2a4a;">${value}</td>
+<td style="padding:6px 12px;font-weight:bold;color:#a8b2d1;border:1px solid #2a2a4a;white-space:nowrap;width:220px;">${escapeHtml(label)}</td>
+<td style="padding:6px 12px;color:#e2e8f0;border:1px solid #2a2a4a;">${escapeHtml(value).replace(/\n/g, "<br />")}</td>
 </tr>`;
 }).join("\n")}
 </table>`;
-    const blob = new Blob([html], { type: "text/html" });
-    const textBlob = new Blob([rows.map(([l, v]) => `${l}\t${v}`).join("\n")], { type: "text/plain" });
-    navigator.clipboard.write([new ClipboardItem({ "text/html": blob, "text/plain": textBlob })]);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 1800);
+
+  const copyAsHtmlTable = async (rows: [string, string][], id: string) => {
+    await copyRichTextToClipboard({
+      html: buildTableHtml(rows),
+      text: buildTableText(rows),
+    });
+    setCopiedFeedback(id);
   };
 
-  const sendByEmail = (subject: string, body: string) => {
+  const sendByEmail = async (subject: string, body: string, tableRows?: [string, string][], feedbackId?: string) => {
+    if (tableRows?.length && feedbackId) {
+      try {
+        await copyAsHtmlTable(tableRows, feedbackId);
+      } catch (error) {
+        console.error("Falha ao copiar tabela para o email", error);
+      }
+    }
+
     window.location.href = buildMailtoUrl({ subject, body });
   };
 
@@ -292,19 +316,19 @@ ${rows.map(([label, value], i) => {
     emailSubject: string;
   }) => (
     <div className="flex gap-1">
-      <Button variant="outline" size="sm" onClick={() => copy(text, id)}>
+      <Button variant="outline" size="sm" onClick={() => void copy(text, id)}>
         {copied === id ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Copy className="w-4 h-4 mr-1" />}
         {copied === id ? "Copiado!" : "Copiar"}
       </Button>
       {tableRows && (
-        <Button variant="outline" size="sm" onClick={() => copyAsHtmlTable(tableRows, id + "-tbl")}>
+        <Button variant="outline" size="sm" onClick={() => void copyAsHtmlTable(tableRows, id + "-tbl")}>
           {copied === id + "-tbl" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Table className="w-4 h-4 mr-1" />}
           {copied === id + "-tbl" ? "Copiado!" : "Tabela"}
         </Button>
       )}
-      <Button variant="outline" size="sm" onClick={() => sendByEmail(emailSubject, text)}>
-        <Mail className="w-4 h-4 mr-1" />
-        Email
+      <Button variant="outline" size="sm" onClick={() => void sendByEmail(emailSubject, text, tableRows, id + "-mail")}>
+        {copied === id + "-mail" ? <Check className="w-4 h-4 mr-1 text-green-500" /> : <Mail className="w-4 h-4 mr-1" />}
+        {copied === id + "-mail" ? "Tabela pronta" : "Email"}
       </Button>
     </div>
   );

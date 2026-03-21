@@ -3,6 +3,7 @@ import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,8 @@ import {
 
 
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "SEM DADOS";
+const DEFAULT_PACKET_COUNT = 2;
+const MAX_PACKET_COUNT = 20;
 
 interface LookupNatItem {
   query: string;
@@ -78,12 +81,23 @@ const normalizeCircuitSpacing = (value: string) => {
   return normalized;
 };
 
-const buildPingCommands = (items: LookupNatItem[]): string => {
+const parsePacketCount = (value: string) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_PACKET_COUNT;
+  return Math.min(MAX_PACKET_COUNT, Math.max(1, parsed));
+};
+
+const buildPingCommands = (items: LookupNatItem[], packetCount: number): string => {
   const valid = items.filter((i) => i.status === "ok" && i.ip);
   if (!valid.length) return "";
 
+  const timeoutSeconds = Math.max(2, packetCount + 1);
+
   return valid
-    .map((item, idx) => `ping -c 2 -q -w 2 ${item.ip} #### ${item.codUl} #### ${String(idx + 1).padStart(2, "0")}`)
+    .map(
+      (item, idx) =>
+        `ping -c ${packetCount} -q -w ${timeoutSeconds} ${item.ip} #### ${item.codUl} #### ${String(idx + 1).padStart(2, "0")}`,
+    )
     .join("\n");
 };
 
@@ -141,12 +155,14 @@ const evaluateNatStatus = (row: ParsedLinuxPing): { status: PingStatus; reason: 
 const PingaoNatTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [packetCountInput, setPacketCountInput] = useState(String(DEFAULT_PACKET_COUNT));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [querySummary, setQuerySummary] = useState<LookupNatItem[]>([]);
-  const [script, setScript] = useState("");
   const [pingResultInput, setPingResultInput] = useState("");
   const [analysisRows, setAnalysisRows] = useState<AnalyzedNatRow[]>([]);
+  const packetCount = useMemo(() => parsePacketCount(packetCountInput), [packetCountInput]);
+  const script = useMemo(() => buildPingCommands(querySummary, packetCount), [packetCount, querySummary]);
 
   const pingSummary = useMemo(() => {
     const total = analysisRows.length;
@@ -169,7 +185,6 @@ const PingaoNatTab = () => {
     if (!terms.length) {
       setError("Informe ao menos um código UL, circuito ou IP.");
       setQuerySummary([]);
-      setScript("");
       return;
     }
 
@@ -225,10 +240,8 @@ const PingaoNatTab = () => {
 
       const summary = [...directSummary, ...lookupSummary];
       setQuerySummary(summary);
-      setScript(buildPingCommands(summary));
     } catch (err) {
       setQuerySummary([]);
-      setScript("");
       setError(String((err as Error)?.message || err || "Falha ao gerar Pingão NAT."));
     } finally {
       setLoading(false);
@@ -298,6 +311,21 @@ const PingaoNatTab = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="max-w-[220px] space-y-1.5">
+            <Label htmlFor="pingao-nat-packet-count">Quantidade de pacotes por IP</Label>
+            <Input
+              id="pingao-nat-packet-count"
+              inputMode="numeric"
+              min={1}
+              max={MAX_PACKET_COUNT}
+              type="number"
+              value={packetCountInput}
+              onChange={(event) => setPacketCountInput(event.target.value.replace(/\D/g, "").slice(0, 2))}
+              onBlur={() => setPacketCountInput(String(packetCount))}
+            />
+            <p className="text-xs text-muted-foreground">O valor define o parametro `-c` de cada comando ping.</p>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="pingao-nat-input">Códigos UL ou circuitos (um por linha)</Label>
             <Textarea
@@ -318,7 +346,6 @@ const PingaoNatTab = () => {
               onClick={() => {
                 setInput("");
                 setQuerySummary([]);
-                setScript("");
                 setError("");
               }}
             >

@@ -3,6 +3,7 @@ import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -22,7 +23,8 @@ import {
 
 
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
-const PINGAO_REPEAT = 2;
+const DEFAULT_PACKET_COUNT = 2;
+const MAX_PACKET_COUNT = 20;
 
 type LinkProfile = "primario" | "secundario" | "brisanet" | "4g" | "vsat";
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "ALTA LATENCIA" | "SEM DADOS";
@@ -240,7 +242,13 @@ const isIpAddress = (value: string) => {
   return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value.trim()) && parseIpOctets(value.trim()) !== null;
 };
 
-const buildTclScriptFromIps = (ips: string[]) => {
+const parsePacketCount = (value: string) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_PACKET_COUNT;
+  return Math.min(MAX_PACKET_COUNT, Math.max(1, parsed));
+};
+
+const buildTclScriptFromIps = (ips: string[], repeatCount: number) => {
   const unique: string[] = [];
   const seen = new Set<string>();
 
@@ -261,7 +269,7 @@ const buildTclScriptFromIps = (ips: string[]) => {
         .split(".")
         .map((octet) => padOctet(octet))
         .join(".");
-      return `"${padded} source ${SOURCE_INTERFACE} repeat ${PINGAO_REPEAT}"`;
+      return `"${padded} source ${SOURCE_INTERFACE} repeat ${repeatCount}"`;
     })
     .join("\n");
 
@@ -409,13 +417,18 @@ const PingaoTab = () => {
   const [target, setTarget] = useState<LinkTarget>("primario");
   const [lookupMode, setLookupMode] = useState<LookupMode>("auto");
   const [input, setInput] = useState("");
+  const [packetCountInput, setPacketCountInput] = useState(String(DEFAULT_PACKET_COUNT));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [querySummary, setQuerySummary] = useState<LookupSummaryItem[]>([]);
-  const [script, setScript] = useState("");
 
   const [pingResultInput, setPingResultInput] = useState("");
   const [analysisRows, setAnalysisRows] = useState<AnalyzedPingRow[]>([]);
+  const packetCount = useMemo(() => parsePacketCount(packetCountInput), [packetCountInput]);
+  const script = useMemo(
+    () => buildTclScriptFromIps(querySummary.filter((item) => item.status === "ok").map((item) => item.ip), packetCount),
+    [packetCount, querySummary],
+  );
 
   const pingSummary = useMemo(() => {
     const total = analysisRows.length;
@@ -440,7 +453,6 @@ const PingaoTab = () => {
     if (nextTarget === target) return;
     setTarget(nextTarget);
     setQuerySummary([]);
-    setScript("");
     setAnalysisRows([]);
   };
 
@@ -449,7 +461,6 @@ const PingaoTab = () => {
     if (!terms.length) {
       setError("Informe ao menos um codigo UL, circuito ou IP.");
       setQuerySummary([]);
-      setScript("");
       return;
     }
 
@@ -528,10 +539,8 @@ const PingaoTab = () => {
 
       const summary = [...directSummary, ...lookupSummary];
       setQuerySummary(summary);
-      setScript(buildTclScriptFromIps(summary.filter((item) => item.status === "ok").map((item) => item.ip)));
     } catch (lookupError) {
       setQuerySummary([]);
-      setScript("");
       setError(String((lookupError as Error)?.message || lookupError || "Falha ao gerar Pingao."));
     } finally {
       setLoading(false);
@@ -664,6 +673,21 @@ const PingaoTab = () => {
             </RadioGroup>
           </div>
 
+          <div className="max-w-[220px] space-y-1.5">
+            <Label htmlFor="pingao-packet-count">Quantidade de pacotes por IP</Label>
+            <Input
+              id="pingao-packet-count"
+              inputMode="numeric"
+              min={1}
+              max={MAX_PACKET_COUNT}
+              type="number"
+              value={packetCountInput}
+              onChange={(event) => setPacketCountInput(event.target.value.replace(/\D/g, "").slice(0, 2))}
+              onBlur={() => setPacketCountInput(String(packetCount))}
+            />
+            <p className="text-xs text-muted-foreground">O valor define o parametro `repeat` do script TCL.</p>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="pingao-input">Codigos UL ou CCTO (um por linha)</Label>
             <Textarea
@@ -684,7 +708,6 @@ const PingaoTab = () => {
               onClick={() => {
                 setInput("");
                 setQuerySummary([]);
-                setScript("");
                 setError("");
               }}
             >

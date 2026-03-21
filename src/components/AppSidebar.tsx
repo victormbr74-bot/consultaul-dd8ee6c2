@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function AppSidebar() {
+  const appVersionLabel = `v${__APP_VERSION__}`;
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, profile, signOut } = useAuth();
@@ -138,6 +139,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>
+            <span className="order-last text-[9px] text-sidebar-foreground/40">Versao {appVersionLabel}</span>
             <span className="text-[10px] text-sidebar-foreground/50">{"Gestão de unidades"}</span>
           </div>
         </div>

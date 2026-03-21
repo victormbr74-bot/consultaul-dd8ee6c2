@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, Copy, FileText, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -152,6 +152,32 @@ const MobileResultList = ({
         })}
       </div>
     </ScrollArea>
+  </div>
+);
+
+const DesktopDiffCell = ({
+  cell,
+  rowIndex,
+  side,
+}: {
+  cell: DiffCell;
+  rowIndex: number;
+  side: "left" | "right";
+}) => (
+  <div
+    style={{ gridColumn: side === "left" ? 1 : 2, gridRow: rowIndex + 1 }}
+    className={cn(
+      "grid min-h-[48px] grid-cols-[56px_minmax(0,1fr)] border-b",
+      side === "left" && "border-r",
+      diffCellTone(cell, side),
+    )}
+  >
+    <div className="border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+      {cell.lineNumber ?? ""}
+    </div>
+    <div className={cn("border-l-4 px-3 py-2", diffCellBorder(cell, side))}>
+      <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-6">{renderDiffText(cell, side)}</pre>
+    </div>
   </div>
 );
 
@@ -345,37 +371,22 @@ const TextCompareTab = () => {
                     <DiffColumnHeader label="Texto comparado" description={`${result.summary.rightLineCount} linhas`} />
                   </div>
                   <ScrollArea className="h-[560px]">
-                    <div className="grid min-w-[980px] grid-cols-2">
+                    <div className="grid min-w-[980px] grid-cols-2" style={{ gridAutoRows: "minmax(48px, auto)" }}>
                       {result.rows.map((row, index) => (
-                        <Fragment key={`row-${index}-${row.left.lineNumber ?? "empty"}-${row.right.lineNumber ?? "empty"}`}>
-                          <div
-                            className={cn(
-                              "grid min-h-[48px] grid-cols-[56px_minmax(0,1fr)] border-b border-r",
-                              diffCellTone(row.left, "left"),
-                            )}
-                          >
-                            <div className="border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
-                              {row.left.lineNumber ?? ""}
-                            </div>
-                            <div className={cn("border-l-4 px-3 py-2", diffCellBorder(row.left, "left"))}>
-                              <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-6">
-                                {renderDiffText(row.left, "left")}
-                              </pre>
-                            </div>
-                          </div>
-                          <div
-                            className={cn("grid min-h-[48px] grid-cols-[56px_minmax(0,1fr)] border-b", diffCellTone(row.right, "right"))}
-                          >
-                            <div className="border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
-                              {row.right.lineNumber ?? ""}
-                            </div>
-                            <div className={cn("border-l-4 px-3 py-2", diffCellBorder(row.right, "right"))}>
-                              <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-6">
-                                {renderDiffText(row.right, "right")}
-                              </pre>
-                            </div>
-                          </div>
-                        </Fragment>
+                        <DesktopDiffCell
+                          key={`left-${index}-${row.left.lineNumber ?? "empty"}`}
+                          cell={row.left}
+                          rowIndex={index}
+                          side="left"
+                        />
+                      ))}
+                      {result.rows.map((row, index) => (
+                        <DesktopDiffCell
+                          key={`right-${index}-${row.right.lineNumber ?? "empty"}`}
+                          cell={row.right}
+                          rowIndex={index}
+                          side="right"
+                        />
                       ))}
                     </div>
                   </ScrollArea>

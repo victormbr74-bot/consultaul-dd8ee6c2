@@ -13,18 +13,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   getRedeLanValue,
+  getPrimaryLoopbackValue,
   getSecondaryLoopbackValue,
   normalizeText,
   type LotericaLookupRow,
 } from "@/components/loterica/lotericaLookup";
 
-type RouterModel = "huawei" | "hp1002-4" | "hpmsr900" | "hpmsr931" | "hpmsr920";
-type LinkTechnology = "4g" | "vsat";
+type RouterRole = "principal" | "backup";
+type RouterModel = "cisco1900" | "huawei" | "hp20-11" | "hp1002-4" | "hpmsr900" | "hpmsr931" | "hpmsr920";
+type LinkTechnology = "fibra" | "4g" | "vsat";
 type OwnerType = "oi" | "sencinet";
 type SwitchTopology = "com-switch" | "sem-switch";
 type Operadora4g = "vivo" | "tim" | "arqia" | "nao-se-aplica";
 
-type TemplateId = "huawei-4g" | "hpmsr920-4g" | "hpmsr900-vsat-s-sw" | "hp1002-4-vsat";
+type TemplateId =
+  | "cisco1900-principal-sencinet"
+  | "cisco1900-principal-oi"
+  | "huawei-4g"
+  | "hp20-11-oi-4g"
+  | "hpmsr920-4g"
+  | "hpmsr900-vsat-s-sw"
+  | "hp1002-4-vsat";
 
 interface ScriptRouterSctTabProps {
   initialCodUl?: string;
@@ -45,6 +54,8 @@ interface SwitchContext {
 
 interface ScriptContext {
   codUl: string;
+  primaryLoopback: string;
+  primaryTunnelIp: string;
   loopbackSecundario: string;
   lanNetwork: string;
   lanRouter: string;
@@ -64,9 +75,21 @@ const LOOKUP_SELECT =
   "cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data";
 
 const TEMPLATE_META: Record<TemplateId, { label: string; filePath: string }> = {
+  "cisco1900-principal-sencinet": {
+    label: "Cisco 1900 Principal Sencinet",
+    filePath: "/router-sct-templates/cisco1900-principal-sencinet.txt",
+  },
+  "cisco1900-principal-oi": {
+    label: "Cisco 1900 Principal OI",
+    filePath: "/router-sct-templates/cisco1900-principal-oi.txt",
+  },
   "huawei-4g": {
     label: "Huawei 4G",
     filePath: "/router-sct-templates/huawei-4g.txt",
+  },
+  "hp20-11-oi-4g": {
+    label: "HP20-11 4G OI",
+    filePath: "/router-sct-templates/hp20-11-oi-4g.txt",
   },
   "hpmsr920-4g": {
     label: "HPMSR920 4G",
@@ -85,11 +108,18 @@ const TEMPLATE_META: Record<TemplateId, { label: string; filePath: string }> = {
 const templateCache = new Map<TemplateId, string>();
 
 const MODEL_OPTIONS: Array<{ value: RouterModel; label: string }> = [
+  { value: "cisco1900", label: "Cisco 1900" },
   { value: "huawei", label: "HUAWEI" },
+  { value: "hp20-11", label: "HP20-11" },
   { value: "hp1002-4", label: "HP 1002-4" },
   { value: "hpmsr900", label: "HPMSR900" },
   { value: "hpmsr931", label: "HPMSR931" },
   { value: "hpmsr920", label: "HPMSR920" },
+];
+
+const ROUTER_ROLE_OPTIONS: Array<{ value: RouterRole; label: string }> = [
+  { value: "principal", label: "Principal" },
+  { value: "backup", label: "Backup" },
 ];
 
 const OWNER_OPTIONS: Array<{ value: OwnerType; label: string }> = [
@@ -98,6 +128,7 @@ const OWNER_OPTIONS: Array<{ value: OwnerType; label: string }> = [
 ];
 
 const TECH_OPTIONS: Array<{ value: LinkTechnology; label: string }> = [
+  { value: "fibra", label: "Fibra" },
   { value: "4g", label: "4G" },
   { value: "vsat", label: "VSAT" },
 ];
@@ -266,14 +297,28 @@ const deriveSwitchContext = (switchValue: string): SwitchContext | null => {
   return { ip, network, virtual };
 };
 
+const deriveTunnelIpFromPrimaryLoopback = (loopback: string) => {
+  const parts = loopback.split(".");
+  if (parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part))) return "";
+  if (parts[0] !== "10") return "";
+  return ["15", parts[1], parts[2], parts[3]].join(".");
+};
+
 const detectModel = (row: LotericaLookupRow): RouterModel => {
   const source = toUpperNoAccent(getRawValueByAliases(row, ["MODELO ROTEADOR"]));
+  if (source.includes("CISCO") || source.includes("1900") || source.includes("1921")) return "cisco1900";
   if (source.includes("HUAWEI")) return "huawei";
+  if (source.includes("20-11") || source.includes("2011")) return "hp20-11";
   if (source.includes("1002")) return "hp1002-4";
   if (source.includes("931")) return "hpmsr931";
   if (source.includes("920")) return "hpmsr920";
   if (source.includes("900")) return "hpmsr900";
   return "hpmsr900";
+};
+
+const detectBackupModel = (row: LotericaLookupRow): Exclude<RouterModel, "cisco1900"> => {
+  const detected = detectModel(row);
+  return detected === "cisco1900" ? "hpmsr900" : detected;
 };
 
 const detectOwner = (row: LotericaLookupRow): OwnerType => {
@@ -303,7 +348,7 @@ const detectTechnology = (row: LotericaLookupRow): LinkTechnology => {
   }
 
   const model = detectModel(row);
-  if (model === "huawei" || model === "hpmsr920") return "4g";
+  if (model === "huawei" || model === "hp20-11" || model === "hpmsr920") return "4g";
   return "vsat";
 };
 
@@ -326,6 +371,7 @@ const detectSwitchTopology = (row: LotericaLookupRow): SwitchTopology => {
 };
 
 const chooseTemplate = (
+  routerRole: RouterRole,
   model: RouterModel,
   technology: LinkTechnology,
   owner: OwnerType,
@@ -334,10 +380,26 @@ const chooseTemplate = (
   const warnings: string[] = [];
   let templateId: TemplateId;
 
+  if (routerRole === "principal") {
+    templateId = owner === "oi" ? "cisco1900-principal-oi" : "cisco1900-principal-sencinet";
+    if (technology !== "fibra") {
+      warnings.push("Roteador principal usa tecnologia Fibra. A opcao foi ajustada para o template principal.");
+    }
+    return { templateId, warnings };
+  }
+
   if (model === "huawei") {
     templateId = "huawei-4g";
     if (technology !== "4g") {
       warnings.push("Nao existe template Huawei VSAT nos anexos. Foi usado Huawei 4G.");
+    }
+  } else if (model === "hp20-11") {
+    templateId = "hp20-11-oi-4g";
+    if (technology !== "4g") {
+      warnings.push("Nao existe template HP20-11 VSAT nos anexos. Foi usado HP20-11 4G.");
+    }
+    if (owner !== "oi") {
+      warnings.push("O template HP20-11 disponivel nos anexos e o de loterica OWNER=OI.");
     }
   } else if (model === "hpmsr920") {
     templateId = "hpmsr920-4g";
@@ -362,7 +424,10 @@ const chooseTemplate = (
     warnings.push("Nao existe template dedicado para HPMSR931 VSAT nos anexos. Foi usado HPMSR900 VSAT.");
   }
 
-  if (switchTopology === "com-switch" && (templateId === "hpmsr900-vsat-s-sw" || templateId === "hp1002-4-vsat")) {
+  if (
+    switchTopology === "com-switch" &&
+    (templateId === "hp20-11-oi-4g" || templateId === "hpmsr900-vsat-s-sw" || templateId === "hp1002-4-vsat")
+  ) {
     warnings.push("Os anexos para este modelo estao na variante S-SW. Revisar comandos de switch antes de aplicar.");
   }
 
@@ -370,7 +435,7 @@ const chooseTemplate = (
     warnings.push("Template base contem blocos de switch. Revisar e remover comandos de switch se necessario.");
   }
 
-  if (owner === "oi") {
+  if (owner === "oi" && templateId !== "hp20-11-oi-4g") {
     warnings.push("Nao ha template separado por OWNER=OI nos anexos. Foi usado o template base do modelo.");
   }
 
@@ -399,13 +464,58 @@ const buildCodUlLookupFilter = (value: string) => {
 
 const applyTemplateReplacements = (templateId: TemplateId, template: string, context: ScriptContext) => {
   let output = template.replace(/\(mudar\)\s*/gi, "");
-  const sysname = `${context.codUl}_RT02`;
-  const sysnameMatch = output.match(/^\s*sysname\s+([^\r\n]+)/m);
 
+  const sysname = `${context.codUl}_RT02`;
+  const hostname = `${context.codUl}_RT01`;
+  const sysnameMatch = output.match(/^\s*sysname\s+([^\r\n]+)/m);
   if (sysnameMatch?.[1]) {
     output = replaceToken(output, normalizeText(sysnameMatch[1]), sysname);
+    output = output.replace(/^(\s*sysname\s+)[^\r\n]+/m, `$1${sysname}`);
   }
-  output = output.replace(/^(\s*sysname\s+)[^\r\n]+/m, `$1${sysname}`);
+
+  const hostnameMatch = output.match(/^\s*hostname\s+([^\r\n]+)/m);
+  if (hostnameMatch?.[1]) {
+    output = replaceToken(output, normalizeText(hostnameMatch[1]), hostname);
+    output = output.replace(/^(\s*hostname\s+)[^\r\n]+/m, `$1${hostname}`);
+  }
+
+  if (templateId === "cisco1900-principal-sencinet" || templateId === "cisco1900-principal-oi") {
+    output = replaceToken(
+      output,
+      templateId === "cisco1900-principal-sencinet" ? "10.50.181.203" : "10.50.181.24",
+      context.primaryLoopback,
+    );
+    output = replaceToken(
+      output,
+      templateId === "cisco1900-principal-sencinet" ? "15.50.181.203" : "15.50.181.24",
+      context.primaryTunnelIp,
+    );
+    output = replaceToken(
+      output,
+      templateId === "cisco1900-principal-sencinet" ? "99.244.92.241" : "99.245.60.129",
+      context.lanRouter,
+    );
+    output = replaceToken(
+      output,
+      templateId === "cisco1900-principal-sencinet" ? "99.244.92.240" : "99.245.60.128",
+      context.lanNetwork,
+    );
+
+    if (context.switchIp) {
+      output = replaceToken(
+        output,
+        templateId === "cisco1900-principal-sencinet" ? "10.51.22.85" : "10.51.22.129",
+        context.switchIp,
+      );
+    }
+    if (context.switchNetwork) {
+      output = replaceToken(
+        output,
+        templateId === "cisco1900-principal-sencinet" ? "10.51.22.84" : "10.51.22.128",
+        context.switchNetwork,
+      );
+    }
+  }
 
   if (templateId === "huawei-4g") {
     output = replaceToken(output, "10.50.129.59", context.loopbackSecundario);
@@ -415,6 +525,12 @@ const applyTemplateReplacements = (templateId: TemplateId, template: string, con
     if (context.switchIp) output = replaceToken(output, "10.51.76.76", context.switchIp);
     if (context.switchNetwork) output = replaceToken(output, "10.51.76.72", context.switchNetwork);
     if (context.switchVirtual) output = replaceToken(output, "10.51.76.73", context.switchVirtual);
+  }
+
+  if (templateId === "hp20-11-oi-4g") {
+    output = replaceToken(output, "10.51.56.85", context.loopbackSecundario);
+    output = replaceToken(output, "10.51.50.98", context.loopbackSecundario);
+    output = replaceToken(output, "99.246.25.17", context.lanVirtual);
   }
 
   if (templateId === "hpmsr900-vsat-s-sw" || templateId === "hp1002-4-vsat") {
@@ -439,6 +555,7 @@ const applyTemplateReplacements = (templateId: TemplateId, template: string, con
 
 const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const [codUlInput, setCodUlInput] = useState("");
+  const [routerRole, setRouterRole] = useState<RouterRole>("backup");
   const [model, setModel] = useState<RouterModel>("hpmsr900");
   const [owner, setOwner] = useState<OwnerType>("sencinet");
   const [technology, setTechnology] = useState<LinkTechnology>("vsat");
@@ -530,11 +647,17 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       setLoterica(normalizedRow);
       setCodUlInput(normalizeText(normalizedRow.cod_ul));
 
-      setModel(detectModel(normalizedRow));
       setOwner(detectOwner(normalizedRow));
-      setTechnology(detectTechnology(normalizedRow));
-      setOperadora4g(detectOperadora4g(normalizedRow));
       setSwitchTopology(detectSwitchTopology(normalizedRow));
+      if (routerRole === "principal") {
+        setModel("cisco1900");
+        setTechnology("fibra");
+        setOperadora4g("nao-se-aplica");
+      } else {
+        setModel(detectBackupModel(normalizedRow));
+        setTechnology(detectTechnology(normalizedRow));
+        setOperadora4g(detectOperadora4g(normalizedRow));
+      }
 
       return normalizedRow;
     } catch (lookupError) {
@@ -548,7 +671,26 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     } finally {
       setLoadingLookup(false);
     }
-  }, [codUlInput]);
+  }, [codUlInput, routerRole]);
+
+  useEffect(() => {
+    if (routerRole === "principal") {
+      setModel("cisco1900");
+      setTechnology("fibra");
+      setOperadora4g("nao-se-aplica");
+      return;
+    }
+
+    if (!loterica) {
+      if (model === "cisco1900") setModel("hpmsr900");
+      if (technology === "fibra") setTechnology("vsat");
+      return;
+    }
+
+    setModel(detectBackupModel(loterica));
+    setTechnology(detectTechnology(loterica));
+    setOperadora4g(detectOperadora4g(loterica));
+  }, [loterica, model, routerRole, technology]);
 
   useEffect(() => {
     const initial = normalizeText(initialCodUl);
@@ -569,8 +711,17 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     if (!activeRow) return;
 
+    const primaryLoopback = extractIpv4(getPrimaryLoopbackValue(activeRow));
     const loopbackSecundario = extractIpv4(getSecondaryLoopbackValue(activeRow));
-    if (!loopbackSecundario) {
+    if (routerRole === "principal" && !primaryLoopback) {
+      setFullScript("");
+      setTemplateLabel("");
+      setWarnings([]);
+      setError("A UL nao possui loopback principal valido para gerar o script do roteador principal.");
+      return;
+    }
+
+    if (routerRole === "backup" && !loopbackSecundario) {
       setFullScript("");
       setTemplateLabel("");
       setWarnings([]);
@@ -591,23 +742,26 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     const switchRaw = getRawValueByAliases(activeRow, ["IP SWITCH", "LOOPBACK SWITCH"]);
     const switchContext = deriveSwitchContext(switchRaw);
 
-    const templateChoice = chooseTemplate(model, technology, owner, switchTopology);
+    const templateChoice = chooseTemplate(routerRole, model, technology, owner, switchTopology);
     const generationWarnings = [...templateChoice.warnings];
 
     if (switchTopology === "com-switch" && !switchContext?.ip) {
       generationWarnings.push("Topologia com switch selecionada, mas a UL nao possui IP SWITCH valido.");
     }
 
-    if (technology !== "4g" && operadora4g !== "nao-se-aplica") {
+    if (routerRole === "backup" && technology !== "4g" && operadora4g !== "nao-se-aplica") {
       generationWarnings.push("Operadora 4G foi ignorada porque a tecnologia selecionada e VSAT.");
     }
 
-    if (technology === "4g" && operadora4g === "nao-se-aplica") {
+    if (routerRole === "backup" && technology === "4g" && operadora4g === "nao-se-aplica") {
       generationWarnings.push("Tecnologia 4G selecionada sem operadora definida (Vivo, TIM ou Arqia).");
     }
 
+    const primaryTunnelIp = deriveTunnelIpFromPrimaryLoopback(primaryLoopback);
     const scriptContext: ScriptContext = {
       codUl: normalizeText(activeRow.cod_ul),
+      primaryLoopback,
+      primaryTunnelIp,
       loopbackSecundario,
       lanNetwork: lanContext.network,
       lanRouter: lanContext.router,
@@ -634,7 +788,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     } finally {
       setGenerating(false);
     }
-  }, [codUlInput, handleLookup, loterica, model, operadora4g, owner, switchTopology, technology]);
+  }, [codUlInput, handleLookup, loterica, model, operadora4g, owner, routerRole, switchTopology, technology]);
 
   const script = useMemo(() => extractRouterScriptVariant(fullScript, scriptVariant), [fullScript, scriptVariant]);
   const scriptVariantLabel = ROUTER_SCRIPT_VARIANT_LABELS[scriptVariant];
@@ -685,11 +839,28 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     ? {
         codUl: normalizeText(loterica.cod_ul),
         nome: normalizeText(loterica.nome_loterica) || "-",
+        loopbackPrincipal: extractIpv4(getPrimaryLoopbackValue(loterica)) || "-",
         loopbackSecundario: extractIpv4(getSecondaryLoopbackValue(loterica)) || "-",
         redeLan: getRedeLanValue(loterica) || "-",
         switchIp: getRawValueByAliases(loterica, ["IP SWITCH", "LOOPBACK SWITCH"]) || "-",
       }
     : null;
+
+  const availableModelOptions = useMemo(
+    () =>
+      MODEL_OPTIONS.filter((item) =>
+        routerRole === "principal" ? item.value === "cisco1900" : item.value !== "cisco1900",
+      ),
+    [routerRole],
+  );
+
+  const availableTechOptions = useMemo(
+    () =>
+      TECH_OPTIONS.filter((item) =>
+        routerRole === "principal" ? item.value === "fibra" : item.value !== "fibra",
+      ),
+    [routerRole],
+  );
 
   return (
     <Card>
@@ -734,7 +905,23 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+          <div className="space-y-1.5">
+            <Label>Roteador</Label>
+            <Select value={routerRole} onValueChange={(value) => setRouterRole(value as RouterRole)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROUTER_ROLE_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Modelo</Label>
             <Select value={model} onValueChange={(value) => setModel(value as RouterModel)}>
@@ -742,7 +929,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MODEL_OPTIONS.map((item) => (
+                {availableModelOptions.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -774,7 +961,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TECH_OPTIONS.map((item) => (
+                {availableTechOptions.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -785,7 +972,11 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
           <div className="space-y-1.5">
             <Label>Operadora 4G</Label>
-            <Select value={operadora4g} onValueChange={(value) => setOperadora4g(value as Operadora4g)}>
+            <Select
+              value={operadora4g}
+              onValueChange={(value) => setOperadora4g(value as Operadora4g)}
+              disabled={routerRole === "principal" || technology !== "4g"}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -833,7 +1024,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         </div>
 
         {lotericaSummary && (
-          <div className="rounded-lg border bg-muted/20 p-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-lg border bg-muted/20 p-3 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
             <div>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Codigo UL</p>
               <p className="font-mono text-xs mt-1">{lotericaSummary.codUl}</p>
@@ -841,6 +1032,10 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             <div>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Loterica</p>
               <p className="text-sm mt-1">{lotericaSummary.nome}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Loopback Principal</p>
+              <p className="font-mono text-xs mt-1">{lotericaSummary.loopbackPrincipal}</p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Loopback Secundario</p>

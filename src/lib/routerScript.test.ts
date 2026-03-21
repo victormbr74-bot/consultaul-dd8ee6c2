@@ -66,6 +66,45 @@ route-policy OUT_TO_BB permit node 10
     expect(bgpScript).not.toContain("ip as-path 31 permit");
   });
 
+  it("extracts Cisco BGP support blocks including route-maps and prefix-lists", () => {
+    const script = `router bgp 64765
+ bgp router-id 10.50.181.24
+ neighbor 10.202.4.117 remote-as 10429
+ !
+ address-family ipv4
+  network 10.50.181.24 mask 255.255.255.255
+  neighbor 10.202.4.117 activate
+  neighbor 10.202.4.117 route-map ROTAS_DC in
+  neighbor 15.50.255.80 route-map OUT_TO_BB out
+ exit-address-family
+!
+ip prefix-list LAN_TFL seq 10 permit 99.244.0.0/14 le 28
+ip prefix-list OUT_TO_BB seq 10 permit 10.50.181.24/32
+ip prefix-list ROTAS_DC seq 10 permit 172.16.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 10 permit 172.16.0.0/16 le 32
+!
+route-map ROTAS_DC permit 10
+ match ip address prefix-list ROTAS_DC
+!
+route-map LAN_TFL permit 10
+ match ip address prefix-list LAN_TFL
+!
+route-map OUT_TO_BB permit 10
+ match ip address prefix-list OUT_TO_BB
+!
+ip sla 1
+ icmp-echo 10.19.0.1 source-interface Loopback10`;
+
+    const bgpScript = extractRouterScriptVariant(script, "bgp");
+
+    expect(bgpScript).toContain("router bgp 64765");
+    expect(bgpScript).toContain("route-map ROTAS_DC permit 10");
+    expect(bgpScript).toContain("route-map LAN_TFL permit 10");
+    expect(bgpScript).toContain("route-map OUT_TO_BB permit 10");
+    expect(bgpScript).toContain("ip prefix-list STATIC_TO_BGP seq 10");
+    expect(bgpScript).not.toContain("ip sla 1");
+  });
+
   it("extracts NQA entries, schedules and server enable lines", () => {
     const script = `nqa entry wan_vrrp 50
  type icmp-echo
@@ -83,5 +122,22 @@ user-interface vty 0 4`;
     expect(nqaScript).toContain("nqa server enable");
     expect(nqaScript).not.toContain("interface LoopBack1");
     expect(nqaScript).not.toContain("user-interface vty 0 4");
+  });
+
+  it("extracts Cisco IP SLA blocks as the NQA-equivalent partial script", () => {
+    const script = `track 1 ip sla 1 reachability
+ip sla 1
+ icmp-echo 10.19.0.1 source-interface Loopback10
+ frequency 5
+ip sla schedule 1 life forever start-time now
+router bgp 64765
+ bgp router-id 10.50.181.24`;
+
+    const nqaScript = extractRouterScriptVariant(script, "nqa");
+
+    expect(nqaScript).toContain("track 1 ip sla 1 reachability");
+    expect(nqaScript).toContain("ip sla 1");
+    expect(nqaScript).toContain("ip sla schedule 1 life forever start-time now");
+    expect(nqaScript).not.toContain("router bgp 64765");
   });
 });

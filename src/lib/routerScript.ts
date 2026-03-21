@@ -6,10 +6,14 @@ export const ROUTER_SCRIPT_VARIANT_LABELS: Record<RouterScriptVariant, string> =
   nqa: "Parcial NQA",
 };
 
-const BGP_PREFIX_PATTERN = /^\s*ip\s+(?:ip-prefix|prefix-list)\s+OUT_TO_BB\b/i;
+const BGP_PREFIX_PATTERN = /^\s*ip\s+(?:ip-prefix|prefix-list)\s+(?:OUT_TO_BB|LAN_TFL|ROTAS_DC|STATIC_TO_BGP)\b/i;
+const BGP_ROUTE_MAP_PATTERN = /^\s*route-map\s+(?:OUT_TO_BB|LAN_TFL|ROTAS_DC)\b/i;
 const NQA_ENTRY_PATTERN = /^\s*nqa\s+(?:test-instance|entry)\b/i;
 const NQA_SCHEDULE_PATTERN = /^\s*nqa\s+schedule\b/i;
 const NQA_SERVER_PATTERN = /^\s*nqa\s+server\s+enable\b/i;
+const IP_SLA_BLOCK_PATTERN = /^\s*ip\s+sla\s+\d+\b/i;
+const IP_SLA_SCHEDULE_PATTERN = /^\s*ip\s+sla\s+schedule\b/i;
+const TRACK_IP_SLA_PATTERN = /^\s*track\s+\d+\s+ip\s+sla\s+\d+\s+reachability\b/i;
 
 const normalizeScript = (script: string) => script.replace(/\r\n/g, "\n");
 
@@ -70,6 +74,7 @@ const isBgpBlockStart = (lines: string[], index: number) => {
   const currentLine = lines[index]?.trim() || "";
   const nextLine = lines[index + 1]?.trim() || "";
 
+  if (/^router\s+bgp\s+\d+/i.test(currentLine)) return true;
   if (/^bgp\s+\d+/i.test(currentLine)) return true;
   return /^\d+$/.test(currentLine) && /^router-id\b/i.test(nextLine);
 };
@@ -87,6 +92,13 @@ export const extractRouterScriptVariant = (script: string, variant: RouterScript
 
     if (variant === "bgp") {
       if (isBgpBlockStart(lines, index)) {
+        const block = collectIndentedBlock(lines, index);
+        if (block.text) segments.push(block.text);
+        index = block.nextIndex;
+        continue;
+      }
+
+      if (BGP_ROUTE_MAP_PATTERN.test(line)) {
         const block = collectIndentedBlock(lines, index);
         if (block.text) segments.push(block.text);
         index = block.nextIndex;
@@ -126,6 +138,27 @@ export const extractRouterScriptVariant = (script: string, variant: RouterScript
       if (NQA_SERVER_PATTERN.test(line)) {
         segments.push(line.trimEnd());
         index += 1;
+        continue;
+      }
+
+      if (IP_SLA_BLOCK_PATTERN.test(line)) {
+        const block = collectIndentedBlock(lines, index);
+        if (block.text) segments.push(block.text);
+        index = block.nextIndex;
+        continue;
+      }
+
+      if (IP_SLA_SCHEDULE_PATTERN.test(line)) {
+        const block = collectMatchingRun(lines, index, (candidate) => IP_SLA_SCHEDULE_PATTERN.test(candidate));
+        if (block.text) segments.push(block.text);
+        index = block.nextIndex;
+        continue;
+      }
+
+      if (TRACK_IP_SLA_PATTERN.test(line)) {
+        const block = collectMatchingRun(lines, index, (candidate) => TRACK_IP_SLA_PATTERN.test(candidate));
+        if (block.text) segments.push(block.text);
+        index = block.nextIndex;
         continue;
       }
     }

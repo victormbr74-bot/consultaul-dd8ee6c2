@@ -1,4 +1,9 @@
-import type { RouterScriptVariant } from "@/lib/routerScript";
+import {
+  COMPLETE_ROUTER_SCRIPT_VARIANT,
+  isExtractableRouterScriptVariant,
+  normalizeRouterScriptVariantValue,
+  type RouterScriptVariant,
+} from "@/lib/routerScript";
 
 export type RouterRole = "principal" | "backup";
 export type RouterModel = "cisco1900" | "huawei" | "hp20-11" | "hp1002-4" | "hpmsr900" | "hpmsr931" | "hpmsr920";
@@ -245,8 +250,9 @@ const pickBestTemplate = (
   variant: RouterScriptVariant,
   options: TemplateMatchOptions = {},
 ) => {
+  const normalizedVariant = normalizeRouterScriptVariantValue(variant);
   const ranked = templates
-    .filter((template) => template.is_active && template.script_variant === variant)
+    .filter((template) => template.is_active && normalizeRouterScriptVariantValue(template.script_variant) === normalizedVariant)
     .map((template) => ({
       template,
       match: scoreTemplateSpecificity(template, selection, options),
@@ -264,8 +270,12 @@ export const resolveCustomRouterScriptTemplate = (
   templates: RouterScriptCustomTemplateRow[],
   selection: RouterScriptTemplateSelection,
 ): RouterScriptTemplateMatch | null => {
+  const normalizedSelection: RouterScriptTemplateSelection = {
+    ...selection,
+    scriptVariant: normalizeRouterScriptVariantValue(selection.scriptVariant),
+  };
   const strategies: TemplateMatchOptions[] = [{}];
-  if (selection.routerRole === "backup") {
+  if (normalizedSelection.routerRole === "backup") {
     strategies.push(
       { allowCompatibleModel: true },
       { allowCompatibleModel: true, allowTechnologyFallback: true },
@@ -289,24 +299,25 @@ export const resolveCustomRouterScriptTemplate = (
   }
 
   for (const options of strategies) {
-    const exactVariant = pickBestTemplate(templates, selection, selection.scriptVariant, options);
+    const exactVariant = pickBestTemplate(templates, normalizedSelection, normalizedSelection.scriptVariant, options);
     if (exactVariant) {
       return {
         template: exactVariant.template,
-        baseVariant: selection.scriptVariant,
+        baseVariant: normalizedSelection.scriptVariant,
         warnings: Array.from(new Set(exactVariant.match.warnings)),
       };
     }
   }
 
-  if (selection.scriptVariant === "completo") return null;
+  if (normalizedSelection.scriptVariant === COMPLETE_ROUTER_SCRIPT_VARIANT) return null;
+  if (!isExtractableRouterScriptVariant(normalizedSelection.scriptVariant)) return null;
 
   for (const options of strategies) {
-    const fullVariant = pickBestTemplate(templates, selection, "completo", options);
+    const fullVariant = pickBestTemplate(templates, normalizedSelection, COMPLETE_ROUTER_SCRIPT_VARIANT, options);
     if (fullVariant) {
       return {
         template: fullVariant.template,
-        baseVariant: "completo",
+        baseVariant: COMPLETE_ROUTER_SCRIPT_VARIANT,
         warnings: Array.from(new Set(fullVariant.match.warnings)),
       };
     }

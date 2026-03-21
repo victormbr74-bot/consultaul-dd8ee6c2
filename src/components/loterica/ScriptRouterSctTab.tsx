@@ -3,7 +3,17 @@ import { Check, Copy, Download, FileCode2, Pencil, Plus, RefreshCw, Search, Tras
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
-import { extractRouterScriptVariant, ROUTER_SCRIPT_VARIANT_LABELS, type RouterScriptVariant } from "@/lib/routerScript";
+import {
+  COMPLETE_ROUTER_SCRIPT_VARIANT,
+  EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS,
+  extractRouterScriptVariant,
+  getRouterScriptVariantLabel,
+  isCompleteRouterScriptVariant,
+  isExtractableRouterScriptVariant,
+  normalizeRouterScriptVariantValue,
+  type RouterScriptMode,
+  type RouterScriptVariant,
+} from "@/lib/routerScript";
 import {
   ROUTER_SCRIPT_PLACEHOLDER_HINTS,
   ROUTER_SCRIPT_TEMPLATE_ANY,
@@ -107,6 +117,7 @@ interface TemplateChoice {
 interface CustomTemplateFormState {
   id: string | null;
   name: string;
+  scriptMode: RouterScriptMode;
   routerRole: RouterRole;
   model: TemplateScopeValue<RouterModel>;
   technology: TemplateScopeValue<LinkTechnology>;
@@ -194,11 +205,47 @@ const OPERADORA_4G_OPTIONS: Array<{ value: Operadora4g; label: string }> = [
   { value: "brisanet", label: "Brisanet" },
   { value: "nao-se-aplica", label: "Nao se aplica" },
 ];
-const SCRIPT_VARIANT_OPTIONS: Array<{ value: RouterScriptVariant; label: string }> = [
-  { value: "completo", label: "Completo" },
-  { value: "bgp", label: "Parcial BGP" },
-  { value: "nqa", label: "Parcial NQA" },
+const SCRIPT_MODE_OPTIONS: Array<{ value: RouterScriptMode; label: string }> = [
+  { value: "completo", label: "Script Completo" },
+  { value: "parcial", label: "Script Parcial" },
 ];
+const DEFAULT_PARTIAL_SCRIPT_VARIANT = EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS[0];
+const buildScriptVariantFromMode = (mode: RouterScriptMode, partialVariant: RouterScriptVariant) =>
+  mode === "completo" ? COMPLETE_ROUTER_SCRIPT_VARIANT : normalizeRouterScriptVariantValue(partialVariant);
+
+const comparePartialScriptVariants = (left: RouterScriptVariant, right: RouterScriptVariant) => {
+  const leftNormalized = normalizeRouterScriptVariantValue(left);
+  const rightNormalized = normalizeRouterScriptVariantValue(right);
+  const leftBuiltinIndex = EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS.findIndex((variant) => variant === leftNormalized);
+  const rightBuiltinIndex = EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS.findIndex((variant) => variant === rightNormalized);
+
+  if (leftBuiltinIndex !== -1 || rightBuiltinIndex !== -1) {
+    if (leftBuiltinIndex === -1) return 1;
+    if (rightBuiltinIndex === -1) return -1;
+    return leftBuiltinIndex - rightBuiltinIndex;
+  }
+
+  return getRouterScriptVariantLabel(leftNormalized).localeCompare(getRouterScriptVariantLabel(rightNormalized), "pt-BR");
+};
+
+const buildPartialScriptVariantOptions = (variants: RouterScriptVariant[]) => {
+  const uniqueVariants = Array.from(
+    new Set(
+      variants
+        .map((value) => normalizeRouterScriptVariantValue(value))
+        .filter((value) => value && !isCompleteRouterScriptVariant(value)),
+    ),
+  ).sort(comparePartialScriptVariants);
+
+  if (!uniqueVariants.length) {
+    uniqueVariants.push(DEFAULT_PARTIAL_SCRIPT_VARIANT);
+  }
+
+  return uniqueVariants.map((value) => ({
+    value,
+    label: getRouterScriptVariantLabel(value),
+  }));
+};
 const TEMPLATE_FORM_MODEL_OPTIONS: Array<{ value: TemplateScopeValue<RouterModel>; label: string }> = [
   { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
   ...MODEL_OPTIONS,
@@ -236,13 +283,14 @@ const createEmptyCustomTemplateForm = (
 ): CustomTemplateFormState => ({
   id: null,
   name: "",
+  scriptMode: isCompleteRouterScriptVariant(currentVariant) ? "completo" : "parcial",
   routerRole: currentRole,
   model: currentModel,
   technology: currentTechnology,
   owner: currentOwner,
   operadora4g: currentOperadora4g,
   switchTopology: currentSwitchTopology,
-  scriptVariant: currentVariant,
+  scriptVariant: isCompleteRouterScriptVariant(currentVariant) ? DEFAULT_PARTIAL_SCRIPT_VARIANT : normalizeRouterScriptVariantValue(currentVariant),
   content: "",
   notes: "",
   isActive: true,
@@ -309,7 +357,7 @@ const inferImportedTemplateDraft = (
       : null;
   const explicitRole = /\bPRI\b/.test(signal) || signal.includes("PRINCIPAL")
     ? "principal"
-    : signal.includes("BKP") || signal.includes("BACKUP")
+    : signal.includes("BKP") || signal.includes("BACKUP") || signal.includes("SECUNDARIO")
       ? "backup"
       : null;
 
@@ -317,9 +365,7 @@ const inferImportedTemplateDraft = (
     explicitRole ||
     (explicitTechnology === "vsat" || explicitTechnology === "4g"
       ? "backup"
-      : explicitTechnology === null && /\bPRI\b/.test(signal)
-        ? "principal"
-        : fallback.routerRole);
+      : "principal");
   const technology =
     explicitTechnology ||
     (routerRole === "principal" ? "fibra" : fallbackTechnology);
@@ -350,17 +396,19 @@ const inferImportedTemplateDraft = (
     ? "bgp"
     : /\bNQA\b/.test(signal)
       ? "nqa"
-      : "completo";
+      : COMPLETE_ROUTER_SCRIPT_VARIANT;
+  const scriptMode: RouterScriptMode = scriptVariant === COMPLETE_ROUTER_SCRIPT_VARIANT ? "completo" : "parcial";
 
   return {
     name,
+    scriptMode,
     routerRole,
     model,
     technology,
     owner,
     operadora4g,
     switchTopology,
-    scriptVariant,
+    scriptVariant: scriptMode === "completo" ? DEFAULT_PARTIAL_SCRIPT_VARIANT : normalizeRouterScriptVariantValue(scriptVariant),
     content,
     notes: `Importado de ${fileName}`,
     sourceFileName: fileName,
@@ -718,7 +766,7 @@ const normalizeCustomTemplateRow = (value: Record<string, unknown>): RouterScrip
       ? ROUTER_SCRIPT_TEMPLATE_ANY
       : (normalizeText(value.operadora_4g) as TemplateScopeValue<Operadora4g>),
   switch_topology: normalizeText(value.switch_topology) as TemplateScopeValue<SwitchTopology>,
-  script_variant: normalizeText(value.script_variant) as RouterScriptVariant,
+  script_variant: normalizeRouterScriptVariantValue(value.script_variant),
   content: String(value.content ?? ""),
   notes: normalizeText(value.notes) || null,
   is_active: Boolean(value.is_active ?? true),
@@ -865,7 +913,8 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const [technology, setTechnology] = useState<LinkTechnology>("vsat");
   const [switchTopology, setSwitchTopology] = useState<SwitchTopology>("sem-switch");
   const [operadora4g, setOperadora4g] = useState<Operadora4g>("nao-se-aplica");
-  const [scriptVariant, setScriptVariant] = useState<RouterScriptVariant>("completo");
+  const [scriptMode, setScriptMode] = useState<RouterScriptMode>("completo");
+  const [partialScriptVariant, setPartialScriptVariant] = useState<RouterScriptVariant>(DEFAULT_PARTIAL_SCRIPT_VARIANT);
 
   const [loterica, setLoterica] = useState<LotericaLookupRow | null>(null);
   const [fullScript, setFullScript] = useState("");
@@ -888,6 +937,30 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const initRef = useRef(false);
   const copyTimeoutRef = useRef<number | null>(null);
   const templateFileInputRef = useRef<HTMLInputElement | null>(null);
+  const scriptVariant = useMemo(
+    () => buildScriptVariantFromMode(scriptMode, partialScriptVariant),
+    [partialScriptVariant, scriptMode],
+  );
+  const partialScriptVariantOptions = useMemo(
+    () =>
+      buildPartialScriptVariantOptions([
+        ...EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS,
+        ...BUNDLED_ROUTER_SCRIPT_TEMPLATES.map((template) => template.script_variant),
+        ...customTemplates.map((template) => template.script_variant),
+        partialScriptVariant,
+      ]),
+    [customTemplates, partialScriptVariant],
+  );
+  const adminPartialScriptVariantOptions = useMemo(
+    () =>
+      buildPartialScriptVariantOptions([
+        ...EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS,
+        ...BUNDLED_ROUTER_SCRIPT_TEMPLATES.map((template) => template.script_variant),
+        ...customTemplates.map((template) => template.script_variant),
+        customTemplateForm.scriptVariant,
+      ]),
+    [customTemplateForm.scriptVariant, customTemplates],
+  );
 
   useEffect(() => {
     return () => {
@@ -966,6 +1039,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         setCustomTemplateForm((current) => ({
           ...current,
           name: imported.name,
+          scriptMode: imported.scriptMode,
           routerRole: imported.routerRole,
           model: imported.model,
           technology: imported.technology,
@@ -997,11 +1071,12 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             template.owner === draft.owner &&
             template.operadora_4g === draft.operadora4g &&
             template.switch_topology === draft.switchTopology &&
-            template.script_variant === draft.scriptVariant
+            normalizeRouterScriptVariantValue(template.script_variant) === buildScriptVariantFromMode(draft.scriptMode, draft.scriptVariant)
           )
         );
 
       for (const imported of loadedFiles) {
+        const importedScriptVariant = buildScriptVariantFromMode(imported.scriptMode, imported.scriptVariant);
         const payload = {
           name: imported.name,
           router_role: imported.routerRole,
@@ -1010,7 +1085,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           owner: imported.owner,
           operadora_4g: imported.operadora4g,
           switch_topology: imported.switchTopology,
-          script_variant: imported.scriptVariant,
+          script_variant: importedScriptVariant,
           content: imported.content,
           notes: imported.notes,
           is_active: true,
@@ -1057,13 +1132,16 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     setCustomTemplateForm({
       id: template.id,
       name: template.name,
+      scriptMode: isCompleteRouterScriptVariant(template.script_variant) ? "completo" : "parcial",
       routerRole: template.router_role,
       model: template.model,
       technology: template.technology,
       owner: template.owner,
       operadora4g: template.operadora_4g,
       switchTopology: template.switch_topology,
-      scriptVariant: template.script_variant,
+      scriptVariant: isCompleteRouterScriptVariant(template.script_variant)
+        ? DEFAULT_PARTIAL_SCRIPT_VARIANT
+        : normalizeRouterScriptVariantValue(template.script_variant),
       content: template.content,
       notes: template.notes || "",
       isActive: template.is_active,
@@ -1108,6 +1186,19 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     const name = normalizeText(customTemplateForm.name);
     const content = customTemplateForm.content.trim();
+    const rawPartialVariant = normalizeText(customTemplateForm.scriptVariant);
+    if (customTemplateForm.scriptMode === "parcial" && !rawPartialVariant) {
+      setCustomTemplatesError("Informe o tipo do script parcial.");
+      return;
+    }
+
+    const normalizedPartialVariant = normalizeRouterScriptVariantValue(customTemplateForm.scriptVariant);
+    if (customTemplateForm.scriptMode === "parcial" && normalizedPartialVariant === COMPLETE_ROUTER_SCRIPT_VARIANT) {
+      setCustomTemplatesError("Use um tipo parcial diferente de 'completo'.");
+      return;
+    }
+
+    const persistedScriptVariant = buildScriptVariantFromMode(customTemplateForm.scriptMode, customTemplateForm.scriptVariant);
     if (!name) {
       setCustomTemplatesError("Informe um nome para o modelo.");
       return;
@@ -1131,7 +1222,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         owner: customTemplateForm.owner,
         operadora_4g: customTemplateForm.operadora4g,
         switch_topology: customTemplateForm.switchTopology,
-        script_variant: customTemplateForm.scriptVariant,
+        script_variant: persistedScriptVariant,
         content,
         notes: normalizeText(customTemplateForm.notes) || null,
         is_active: customTemplateForm.isActive,
@@ -1433,16 +1524,20 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     }
     return generatedBaseVariant === scriptVariant ? fullScript : "";
   }, [fullScript, generatedBaseVariant, scriptVariant]);
-  const scriptVariantLabel = ROUTER_SCRIPT_VARIANT_LABELS[scriptVariant];
+  const scriptVariantLabel = getRouterScriptVariantLabel(scriptVariant);
   const variantError = useMemo(() => {
     if (!fullScript) return "";
     if (generatedBaseVariant !== "completo" && generatedBaseVariant !== scriptVariant) {
-      return `O modelo gerado e do tipo ${ROUTER_SCRIPT_VARIANT_LABELS[generatedBaseVariant].toLowerCase()}. Gere novamente para ${scriptVariantLabel.toLowerCase()}.`;
+      return `O modelo gerado e do tipo ${getRouterScriptVariantLabel(generatedBaseVariant).toLowerCase()}. Gere novamente para ${scriptVariantLabel.toLowerCase()}.`;
     }
     if (scriptVariant === "completo" || script) return "";
-    return scriptVariant === "bgp"
-      ? "O template selecionado nao possui bloco BGP para gerar o script parcial."
-      : "O template selecionado nao possui bloco NQA para gerar o script parcial.";
+    if (scriptVariant === "bgp") {
+      return "O template selecionado nao possui bloco BGP para gerar o script parcial.";
+    }
+    if (scriptVariant === "nqa") {
+      return "O template selecionado nao possui bloco NQA para gerar o script parcial.";
+    }
+    return `Nao existe template parcial salvo do tipo ${scriptVariantLabel.toLowerCase()} para os campos selecionados.`;
   }, [fullScript, generatedBaseVariant, script, scriptVariant, scriptVariantLabel]);
   const displayedError = error || variantError;
 
@@ -1556,7 +1651,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
           <div className="space-y-1.5">
             <Label>Roteador</Label>
             <Select value={routerRole} onValueChange={(value) => setRouterRole(value as RouterRole)}>
@@ -1658,13 +1753,33 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tipo de script</Label>
-            <Select value={scriptVariant} onValueChange={(value) => setScriptVariant(value as RouterScriptVariant)}>
+            <Label>Modo do script</Label>
+            <Select value={scriptMode} onValueChange={(value) => setScriptMode(value as RouterScriptMode)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SCRIPT_VARIANT_OPTIONS.map((item) => (
+                {SCRIPT_MODE_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Tipo parcial</Label>
+            <Select
+              value={partialScriptVariant}
+              onValueChange={(value) => setPartialScriptVariant(value as RouterScriptVariant)}
+              disabled={scriptMode !== "parcial"}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {partialScriptVariantOptions.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -1786,7 +1901,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
               <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
                 Modelo ADM encontrado para a selecao atual: <span className="font-medium">{matchingCustomTemplate.template.name}</span>
                 {" • "}
-                {ROUTER_SCRIPT_VARIANT_LABELS[matchingCustomTemplate.baseVariant]}
+                {getRouterScriptVariantLabel(matchingCustomTemplate.baseVariant)}
               </div>
             )}
 
@@ -1834,7 +1949,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="outline">{template.router_role}</Badge>
-                        <Badge variant="outline">{template.script_variant}</Badge>
+                        <Badge variant="outline">{getRouterScriptVariantLabel(template.script_variant)}</Badge>
                         <Badge variant="outline">
                           {template.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "Qualquer" : ROUTER_MODEL_LABELS[template.model]}
                         </Badge>
@@ -1931,18 +2046,27 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Tipo</Label>
+                    <Label>Modo do script</Label>
                     <Select
-                      value={customTemplateForm.scriptVariant}
+                      value={customTemplateForm.scriptMode}
                       onValueChange={(value) =>
-                        setCustomTemplateForm((current) => ({ ...current, scriptVariant: value as RouterScriptVariant }))
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          scriptMode: value as RouterScriptMode,
+                          scriptVariant:
+                            value === "completo"
+                              ? current.scriptVariant
+                              : isCompleteRouterScriptVariant(current.scriptVariant) || !normalizeText(current.scriptVariant)
+                                ? DEFAULT_PARTIAL_SCRIPT_VARIANT
+                                : current.scriptVariant,
+                        }))
                       }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {SCRIPT_VARIANT_OPTIONS.map((item) => (
+                        {SCRIPT_MODE_OPTIONS.map((item) => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -1950,6 +2074,22 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {customTemplateForm.scriptMode === "parcial" && (
+                    <div className="space-y-1.5">
+                      <Label>Tipo parcial</Label>
+                      <Input
+                        value={customTemplateForm.scriptVariant}
+                        onChange={(event) =>
+                          setCustomTemplateForm((current) => ({ ...current, scriptVariant: event.target.value }))
+                        }
+                        placeholder="Ex.: bgp, nqa, ospf"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Tipos existentes: {adminPartialScriptVariantOptions.map((item) => item.label).join(", ")}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label>Modelo</Label>

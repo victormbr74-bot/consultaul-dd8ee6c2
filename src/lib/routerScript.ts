@@ -1,9 +1,55 @@
-export type RouterScriptVariant = "completo" | "bgp" | "nqa";
+export const COMPLETE_ROUTER_SCRIPT_VARIANT = "completo" as const;
+export const EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS = ["bgp", "nqa"] as const;
 
-export const ROUTER_SCRIPT_VARIANT_LABELS: Record<RouterScriptVariant, string> = {
-  completo: "Completo",
+export type ExtractableRouterScriptVariant = (typeof EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS)[number];
+export type RouterScriptVariant = string;
+export type RouterScriptMode = "completo" | "parcial";
+
+const BUILTIN_ROUTER_SCRIPT_VARIANT_LABELS: Record<string, string> = {
+  [COMPLETE_ROUTER_SCRIPT_VARIANT]: "Completo",
   bgp: "Parcial BGP",
   nqa: "Parcial NQA",
+};
+
+export const normalizeRouterScriptVariantValue = (value: unknown): RouterScriptVariant => {
+  const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || COMPLETE_ROUTER_SCRIPT_VARIANT;
+};
+
+export const isCompleteRouterScriptVariant = (value: unknown) =>
+  normalizeRouterScriptVariantValue(value) === COMPLETE_ROUTER_SCRIPT_VARIANT;
+
+export const isExtractableRouterScriptVariant = (value: unknown): value is ExtractableRouterScriptVariant => {
+  const normalized = normalizeRouterScriptVariantValue(value);
+  return EXTRACTABLE_ROUTER_SCRIPT_PARTIAL_VARIANTS.some((variant) => variant === normalized);
+};
+
+const toTitleCase = (value: string) =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+
+export const getRouterScriptVariantLabel = (value: unknown) => {
+  const normalized = normalizeRouterScriptVariantValue(value);
+  if (BUILTIN_ROUTER_SCRIPT_VARIANT_LABELS[normalized]) {
+    return BUILTIN_ROUTER_SCRIPT_VARIANT_LABELS[normalized];
+  }
+
+  return `Parcial ${toTitleCase(normalized.replace(/-/g, " "))}`;
+};
+
+export const ROUTER_SCRIPT_VARIANT_LABELS: Record<ExtractableRouterScriptVariant | typeof COMPLETE_ROUTER_SCRIPT_VARIANT, string> = {
+  [COMPLETE_ROUTER_SCRIPT_VARIANT]: getRouterScriptVariantLabel(COMPLETE_ROUTER_SCRIPT_VARIANT),
+  bgp: getRouterScriptVariantLabel("bgp"),
+  nqa: getRouterScriptVariantLabel("nqa"),
 };
 
 const BGP_PREFIX_PATTERN = /^\s*ip\s+(?:ip-prefix|prefix-list)\s+(?:OUT_TO_BB|LAN_TFL|ROTAS_DC|STATIC_TO_BGP)\b/i;
@@ -80,9 +126,11 @@ const isBgpBlockStart = (lines: string[], index: number) => {
 };
 
 export const extractRouterScriptVariant = (script: string, variant: RouterScriptVariant) => {
+  const normalizedVariant = normalizeRouterScriptVariantValue(variant);
   const normalizedScript = normalizeScript(script).trim();
   if (!normalizedScript) return "";
-  if (variant === "completo") return normalizedScript;
+  if (normalizedVariant === COMPLETE_ROUTER_SCRIPT_VARIANT) return normalizedScript;
+  if (!isExtractableRouterScriptVariant(normalizedVariant)) return "";
 
   const lines = normalizedScript.split("\n");
   const segments: string[] = [];
@@ -90,7 +138,7 @@ export const extractRouterScriptVariant = (script: string, variant: RouterScript
   for (let index = 0; index < lines.length; ) {
     const line = lines[index];
 
-    if (variant === "bgp") {
+    if (normalizedVariant === "bgp") {
       if (isBgpBlockStart(lines, index)) {
         const block = collectIndentedBlock(lines, index);
         if (block.text) segments.push(block.text);
@@ -120,7 +168,7 @@ export const extractRouterScriptVariant = (script: string, variant: RouterScript
       }
     }
 
-    if (variant === "nqa") {
+    if (normalizedVariant === "nqa") {
       if (NQA_ENTRY_PATTERN.test(line)) {
         const block = collectIndentedBlock(lines, index);
         if (block.text) segments.push(block.text);

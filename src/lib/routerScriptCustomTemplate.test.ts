@@ -95,6 +95,16 @@ describe("resolveCustomRouterScriptTemplate", () => {
     expect(match?.baseVariant).toBe("completo");
   });
 
+  it("does not fall back to a complete template for a custom partial type", () => {
+    const templates = [
+      buildTemplate({ id: "full", name: "Completo", script_variant: "completo", model: "hp20-11", technology: "4g", owner: "oi" }),
+    ];
+
+    const match = resolveCustomRouterScriptTemplate(templates, { ...selection, scriptVariant: "ospf" });
+
+    expect(match).toBeNull();
+  });
+
   it("chooses the most specific active template", () => {
     const templates = [
       buildTemplate({ id: "generic", name: "Generico", script_variant: "bgp" }),

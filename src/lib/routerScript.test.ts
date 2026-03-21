@@ -9,6 +9,12 @@ describe("extractRouterScriptVariant", () => {
     expect(extractRouterScriptVariant(script, "completo")).toBe(script);
   });
 
+  it("returns an empty string for custom partial variants without extractor support", () => {
+    const script = "router bgp 64765\n bgp router-id 10.50.181.24";
+
+    expect(extractRouterScriptVariant(script, "ospf")).toBe("");
+  });
+
   it("extracts the BGP block even when the template starts with the ASN only", () => {
     const script = `interface Tunnel0/0/0
  source Ethernet0/0/4

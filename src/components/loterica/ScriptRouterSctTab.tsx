@@ -1,11 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Download, FileCode2, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { Check, Copy, Download, FileCode2, Pencil, Plus, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { extractRouterScriptVariant, ROUTER_SCRIPT_VARIANT_LABELS, type RouterScriptVariant } from "@/lib/routerScript";
+import {
+  ROUTER_SCRIPT_PLACEHOLDER_HINTS,
+  ROUTER_SCRIPT_TEMPLATE_ANY,
+  applyCustomTemplatePlaceholders,
+  resolveCustomRouterScriptTemplate,
+  type LinkTechnology,
+  type Operadora4g,
+  type OwnerType,
+  type RouterRole,
+  type RouterModel,
+  type RouterScriptCustomTemplateRow,
+  type RouterScriptPlaceholderContext,
+  type SwitchTopology,
+  type TemplateScopeValue,
+} from "@/lib/routerScriptCustomTemplate";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,13 +34,6 @@ import {
   normalizeText,
   type LotericaLookupRow,
 } from "@/components/loterica/lotericaLookup";
-
-type RouterRole = "principal" | "backup";
-type RouterModel = "cisco1900" | "huawei" | "hp20-11" | "hp1002-4" | "hpmsr900" | "hpmsr931" | "hpmsr920";
-type LinkTechnology = "fibra" | "4g" | "vsat";
-type OwnerType = "oi" | "sencinet";
-type SwitchTopology = "com-switch" | "sem-switch";
-type Operadora4g = "vivo" | "tim" | "arqia" | "nao-se-aplica";
 
 type TemplateId =
   | "cisco1900-principal-sencinet"
@@ -44,16 +53,33 @@ interface LanContext {
   router: string;
   virtual: string;
   aclHost: string;
+  mask: string;
+  prefix: number;
 }
 
 interface SwitchContext {
   ip: string;
   network: string;
   virtual: string;
+  mask: string;
+  prefix: number;
 }
 
 interface ScriptContext {
   codUl: string;
+  nomeLoterica: string;
+  cidade: string;
+  uf: string;
+  contato: string;
+  cctoOi: string;
+  cctoOemp: string;
+  designacaoNova: string;
+  routerRole: RouterRole;
+  routerModel: RouterModel;
+  technology: LinkTechnology;
+  owner: OwnerType;
+  switchTopology: SwitchTopology;
+  operadora4g: Operadora4g;
   primaryLoopback: string;
   primaryTunnelIp: string;
   loopbackSecundario: string;
@@ -61,14 +87,32 @@ interface ScriptContext {
   lanRouter: string;
   lanVirtual: string;
   lanAclHost: string;
+  lanMask: string;
+  lanPrefix: string;
   switchIp: string;
   switchNetwork: string;
   switchVirtual: string;
+  switchMask: string;
+  switchPrefix: string;
 }
 
 interface TemplateChoice {
   templateId: TemplateId;
   warnings: string[];
+}
+
+interface CustomTemplateFormState {
+  id: string | null;
+  name: string;
+  routerRole: RouterRole;
+  model: TemplateScopeValue<RouterModel>;
+  technology: TemplateScopeValue<LinkTechnology>;
+  owner: TemplateScopeValue<OwnerType>;
+  switchTopology: TemplateScopeValue<SwitchTopology>;
+  scriptVariant: RouterScriptVariant;
+  content: string;
+  notes: string;
+  isActive: boolean;
 }
 
 const LOOKUP_SELECT =
@@ -149,6 +193,48 @@ const SCRIPT_VARIANT_OPTIONS: Array<{ value: RouterScriptVariant; label: string 
   { value: "bgp", label: "Parcial BGP" },
   { value: "nqa", label: "Parcial NQA" },
 ];
+const TEMPLATE_FORM_MODEL_OPTIONS: Array<{ value: TemplateScopeValue<RouterModel>; label: string }> = [
+  { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
+  ...MODEL_OPTIONS,
+];
+const TEMPLATE_FORM_TECH_OPTIONS: Array<{ value: TemplateScopeValue<LinkTechnology>; label: string }> = [
+  { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
+  ...TECH_OPTIONS,
+];
+const TEMPLATE_FORM_OWNER_OPTIONS: Array<{ value: TemplateScopeValue<OwnerType>; label: string }> = [
+  { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
+  ...OWNER_OPTIONS,
+];
+const TEMPLATE_FORM_SWITCH_OPTIONS: Array<{ value: TemplateScopeValue<SwitchTopology>; label: string }> = [
+  { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
+  ...SWITCH_OPTIONS,
+];
+const TEMPLATE_FORM_STATUS_OPTIONS = [
+  { value: "ativo", label: "Ativo" },
+  { value: "inativo", label: "Inativo" },
+] as const;
+const CUSTOM_TEMPLATE_ACCEPT = ".txt,.cfg,.conf,.log,text/plain";
+
+const createEmptyCustomTemplateForm = (
+  currentRole: RouterRole,
+  currentModel: RouterModel,
+  currentTechnology: LinkTechnology,
+  currentOwner: OwnerType,
+  currentSwitchTopology: SwitchTopology,
+  currentVariant: RouterScriptVariant,
+): CustomTemplateFormState => ({
+  id: null,
+  name: "",
+  routerRole: currentRole,
+  model: currentModel,
+  technology: currentTechnology,
+  owner: currentOwner,
+  switchTopology: currentSwitchTopology,
+  scriptVariant: currentVariant,
+  content: "",
+  notes: "",
+  isActive: true,
+});
 
 const toUpperNoAccent = (value: unknown) => {
   return normalizeText(value)
@@ -162,6 +248,21 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\
 const replaceToken = (text: string, token: string, replacement: string) => {
   if (!token || !replacement || token === replacement) return text;
   return text.replace(new RegExp(escapeRegExp(token), "g"), replacement);
+};
+
+const readTextFile = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Falha ao ler o arquivo do modelo."));
+    reader.readAsText(file);
+  });
+
+const formatDateTimePtBr = (value: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("pt-BR");
 };
 
 const extractIpv4 = (value: unknown) => {
@@ -270,6 +371,8 @@ const deriveLanContext = (redeLanValue: string): LanContext | null => {
   const networkNumber = (ipNumber & prefixToMaskNumber(prefix)) >>> 0;
   const network = numberToIpv4(networkNumber);
   if (!network) return null;
+  const mask = numberToIpv4(prefixToMaskNumber(prefix));
+  if (!mask) return null;
 
   const isNetworkInput = ipNumber === networkNumber;
   const router = numberToIpv4(isNetworkInput ? (networkNumber + 3) >>> 0 : ipNumber);
@@ -278,7 +381,7 @@ const deriveLanContext = (redeLanValue: string): LanContext | null => {
 
   if (!router || !virtual || !aclHost) return null;
 
-  return { network, router, virtual, aclHost };
+  return { network, router, virtual, aclHost, mask, prefix };
 };
 
 const deriveSwitchContext = (switchValue: string): SwitchContext | null => {
@@ -292,9 +395,10 @@ const deriveSwitchContext = (switchValue: string): SwitchContext | null => {
   const networkNumber = (ipNumber & prefixToMaskNumber(prefix)) >>> 0;
   const network = numberToIpv4(networkNumber);
   const virtual = numberToIpv4((networkNumber + 1) >>> 0);
-  if (!network || !virtual) return null;
+  const mask = numberToIpv4(prefixToMaskNumber(prefix));
+  if (!network || !virtual || !mask) return null;
 
-  return { ip, network, virtual };
+  return { ip, network, virtual, mask, prefix };
 };
 
 const deriveTunnelIpFromPrimaryLoopback = (loopback: string) => {
@@ -462,6 +566,60 @@ const buildCodUlLookupFilter = (value: string) => {
     .join(",");
 };
 
+const normalizeCustomTemplateRow = (value: Record<string, unknown>): RouterScriptCustomTemplateRow => ({
+  id: normalizeText(value.id),
+  name: normalizeText(value.name),
+  router_role: normalizeText(value.router_role) as RouterRole,
+  model: normalizeText(value.model) as TemplateScopeValue<RouterModel>,
+  technology: normalizeText(value.technology) as TemplateScopeValue<LinkTechnology>,
+  owner: normalizeText(value.owner) as TemplateScopeValue<OwnerType>,
+  switch_topology: normalizeText(value.switch_topology) as TemplateScopeValue<SwitchTopology>,
+  script_variant: normalizeText(value.script_variant) as RouterScriptVariant,
+  content: String(value.content ?? ""),
+  notes: normalizeText(value.notes) || null,
+  is_active: Boolean(value.is_active ?? true),
+  created_at: normalizeText(value.created_at) || null,
+  updated_at: normalizeText(value.updated_at) || null,
+  updated_by: normalizeText(value.updated_by) || null,
+});
+
+const applyCustomRouterTemplate = (template: string, context: ScriptContext) => {
+  const placeholderContext: RouterScriptPlaceholderContext = {
+    codUl: context.codUl,
+    hostname: `${context.codUl}_RT01`,
+    sysname: `${context.codUl}_RT02`,
+    nomeLoterica: context.nomeLoterica,
+    cidade: context.cidade,
+    uf: context.uf,
+    contato: context.contato,
+    cctoOi: context.cctoOi,
+    cctoOemp: context.cctoOemp,
+    designacaoNova: context.designacaoNova,
+    routerRole: context.routerRole,
+    routerModel: context.routerModel,
+    technology: context.technology,
+    owner: context.owner,
+    switchTopology: context.switchTopology,
+    operadora4g: context.operadora4g,
+    primaryLoopback: context.primaryLoopback,
+    primaryTunnelIp: context.primaryTunnelIp,
+    loopbackSecundario: context.loopbackSecundario,
+    lanNetwork: context.lanNetwork,
+    lanRouter: context.lanRouter,
+    lanVirtual: context.lanVirtual,
+    lanAclHost: context.lanAclHost,
+    lanMask: context.lanMask,
+    lanPrefix: context.lanPrefix,
+    switchIp: context.switchIp,
+    switchNetwork: context.switchNetwork,
+    switchVirtual: context.switchVirtual,
+    switchMask: context.switchMask,
+    switchPrefix: context.switchPrefix,
+  };
+
+  return applyCustomTemplatePlaceholders(template, placeholderContext);
+};
+
 const applyTemplateReplacements = (templateId: TemplateId, template: string, context: ScriptContext) => {
   let output = template.replace(/\(mudar\)\s*/gi, "");
 
@@ -554,6 +712,7 @@ const applyTemplateReplacements = (templateId: TemplateId, template: string, con
 };
 
 const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
+  const { isAdmin, user } = useAuth();
   const [codUlInput, setCodUlInput] = useState("");
   const [routerRole, setRouterRole] = useState<RouterRole>("backup");
   const [model, setModel] = useState<RouterModel>("hpmsr900");
@@ -565,15 +724,25 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
   const [loterica, setLoterica] = useState<LotericaLookupRow | null>(null);
   const [fullScript, setFullScript] = useState("");
+  const [generatedBaseVariant, setGeneratedBaseVariant] = useState<RouterScriptVariant>("completo");
   const [templateLabel, setTemplateLabel] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState<RouterScriptCustomTemplateRow[]>([]);
+  const [customTemplatesLoading, setCustomTemplatesLoading] = useState(false);
+  const [customTemplatesError, setCustomTemplatesError] = useState("");
+  const [customTemplateSaving, setCustomTemplateSaving] = useState(false);
+  const [customTemplateNotice, setCustomTemplateNotice] = useState("");
+  const [customTemplateForm, setCustomTemplateForm] = useState<CustomTemplateFormState>(() =>
+    createEmptyCustomTemplateForm("backup", "hpmsr900", "vsat", "sencinet", "sem-switch", "completo"),
+  );
 
   const initRef = useRef(false);
   const copyTimeoutRef = useRef<number | null>(null);
+  const templateFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -582,6 +751,196 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       }
     };
   }, []);
+
+  const resetCustomTemplateForm = useCallback(() => {
+    setCustomTemplateForm(createEmptyCustomTemplateForm(routerRole, model, technology, owner, switchTopology, scriptVariant));
+    setCustomTemplateNotice("");
+  }, [model, owner, routerRole, scriptVariant, switchTopology, technology]);
+
+  const fetchCustomTemplates = useCallback(async () => {
+    if (!isAdmin) {
+      setCustomTemplates([]);
+      setCustomTemplatesError("");
+      return;
+    }
+
+    setCustomTemplatesLoading(true);
+    setCustomTemplatesError("");
+
+    try {
+      const { data, error: queryError } = await (supabase as any)
+        .from("router_script_templates")
+        .select("*")
+        .order("updated_at", { ascending: false });
+
+      if (queryError) {
+        const message = String(queryError.message || "");
+        if (message.includes("router_script_templates") && message.includes("Could not find the table")) {
+          setCustomTemplates([]);
+          setCustomTemplatesError(
+            "Banco desatualizado: falta a tabela router_script_templates.\n" +
+              "Aplique a migracao Supabase '20260306140000_router_script_templates.sql'.",
+          );
+          return;
+        }
+
+        throw new Error(message || "Falha ao carregar modelos customizados.");
+      }
+
+      const rows = Array.isArray(data) ? data.map((row) => normalizeCustomTemplateRow(row as Record<string, unknown>)) : [];
+      setCustomTemplates(rows);
+    } catch (loadError) {
+      console.error("Falha ao carregar modelos customizados do Script Router", loadError);
+      setCustomTemplates([]);
+      setCustomTemplatesError(String((loadError as Error)?.message || loadError || "Falha ao carregar modelos customizados."));
+    } finally {
+      setCustomTemplatesLoading(false);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    void fetchCustomTemplates();
+  }, [fetchCustomTemplates]);
+
+  const handleTemplateFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await readTextFile(file);
+      setCustomTemplateForm((current) => ({
+        ...current,
+        name: current.name || file.name.replace(/\.[^.]+$/u, ""),
+        content: text,
+      }));
+      setCustomTemplateNotice(`Arquivo '${file.name}' carregado no editor.`);
+    } catch (fileError) {
+      console.error("Falha ao ler modelo customizado", fileError);
+      setCustomTemplatesError(String((fileError as Error)?.message || fileError || "Falha ao ler o arquivo."));
+    } finally {
+      event.target.value = "";
+    }
+  }, []);
+
+  const handleEditCustomTemplate = useCallback((template: RouterScriptCustomTemplateRow) => {
+    setCustomTemplateForm({
+      id: template.id,
+      name: template.name,
+      routerRole: template.router_role,
+      model: template.model,
+      technology: template.technology,
+      owner: template.owner,
+      switchTopology: template.switch_topology,
+      scriptVariant: template.script_variant,
+      content: template.content,
+      notes: template.notes || "",
+      isActive: template.is_active,
+    });
+    setCustomTemplateNotice(`Editando o modelo '${template.name}'.`);
+  }, []);
+
+  const handleDeleteCustomTemplate = useCallback(async (template: RouterScriptCustomTemplateRow) => {
+    if (!isAdmin) return;
+    if (!window.confirm(`Excluir o modelo '${template.name}'?`)) return;
+
+    setCustomTemplateSaving(true);
+    setCustomTemplateNotice("");
+    setCustomTemplatesError("");
+
+    try {
+      const { error: deleteError } = await (supabase as any)
+        .from("router_script_templates")
+        .delete()
+        .eq("id", template.id);
+
+      if (deleteError) {
+        throw new Error(deleteError.message || "Falha ao excluir o modelo.");
+      }
+
+      if (customTemplateForm.id === template.id) {
+        resetCustomTemplateForm();
+      }
+
+      setCustomTemplateNotice(`Modelo '${template.name}' excluido.`);
+      await fetchCustomTemplates();
+    } catch (deleteError) {
+      console.error("Falha ao excluir modelo customizado", deleteError);
+      setCustomTemplatesError(String((deleteError as Error)?.message || deleteError || "Falha ao excluir o modelo."));
+    } finally {
+      setCustomTemplateSaving(false);
+    }
+  }, [customTemplateForm.id, fetchCustomTemplates, isAdmin, resetCustomTemplateForm]);
+
+  const handleSaveCustomTemplate = useCallback(async () => {
+    if (!isAdmin) return;
+
+    const name = normalizeText(customTemplateForm.name);
+    const content = customTemplateForm.content.trim();
+    if (!name) {
+      setCustomTemplatesError("Informe um nome para o modelo.");
+      return;
+    }
+    if (!content) {
+      setCustomTemplatesError("Cole o conteudo do modelo ou carregue um arquivo TXT.");
+      return;
+    }
+
+    setCustomTemplateSaving(true);
+    setCustomTemplateNotice("");
+    setCustomTemplatesError("");
+
+    try {
+      let successMessage = "";
+      const payload = {
+        name,
+        router_role: customTemplateForm.routerRole,
+        model: customTemplateForm.model,
+        technology: customTemplateForm.technology,
+        owner: customTemplateForm.owner,
+        switch_topology: customTemplateForm.switchTopology,
+        script_variant: customTemplateForm.scriptVariant,
+        content,
+        notes: normalizeText(customTemplateForm.notes) || null,
+        is_active: customTemplateForm.isActive,
+        updated_by: user?.id || null,
+      };
+
+      if (customTemplateForm.id) {
+        const { error: updateError } = await (supabase as any)
+          .from("router_script_templates")
+          .update(payload)
+          .eq("id", customTemplateForm.id);
+
+        if (updateError) {
+          throw new Error(updateError.message || "Falha ao atualizar o modelo.");
+        }
+
+        successMessage = `Modelo '${name}' atualizado.`;
+      } else {
+        const { error: insertError } = await (supabase as any)
+          .from("router_script_templates")
+          .insert({
+            ...payload,
+            created_by: user?.id || null,
+          });
+
+        if (insertError) {
+          throw new Error(insertError.message || "Falha ao cadastrar o modelo.");
+        }
+
+        successMessage = `Modelo '${name}' cadastrado.`;
+      }
+
+      resetCustomTemplateForm();
+      await fetchCustomTemplates();
+      setCustomTemplateNotice(successMessage);
+    } catch (saveError) {
+      console.error("Falha ao salvar modelo customizado", saveError);
+      setCustomTemplatesError(String((saveError as Error)?.message || saveError || "Falha ao salvar o modelo."));
+    } finally {
+      setCustomTemplateSaving(false);
+    }
+  }, [customTemplateForm, fetchCustomTemplates, isAdmin, resetCustomTemplateForm, user?.id]);
 
   const handleLookup = useCallback(async (forcedCode?: string) => {
     const lookupCode = normalizeCodUlTerm(forcedCode ?? codUlInput);
@@ -630,6 +989,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       if (!selected) {
         setLoterica(null);
         setFullScript("");
+        setGeneratedBaseVariant("completo");
         setTemplateLabel("");
         setWarnings([]);
         setError(`Codigo UL '${lookupCode}' nao encontrado.`);
@@ -664,6 +1024,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       console.error("Falha ao consultar loterica para Script Router SCT", lookupError);
       setLoterica(null);
       setFullScript("");
+      setGeneratedBaseVariant("completo");
       setTemplateLabel("");
       setWarnings([]);
       setError(String((lookupError as Error)?.message || lookupError || "Falha ao consultar loterica."));
@@ -715,6 +1076,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     const loopbackSecundario = extractIpv4(getSecondaryLoopbackValue(activeRow));
     if (routerRole === "principal" && !primaryLoopback) {
       setFullScript("");
+      setGeneratedBaseVariant("completo");
       setTemplateLabel("");
       setWarnings([]);
       setError("A UL nao possui loopback principal valido para gerar o script do roteador principal.");
@@ -723,6 +1085,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     if (routerRole === "backup" && !loopbackSecundario) {
       setFullScript("");
+      setGeneratedBaseVariant("completo");
       setTemplateLabel("");
       setWarnings([]);
       setError("A UL nao possui loopback secundario valido para gerar o script.");
@@ -733,6 +1096,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     const lanContext = deriveLanContext(redeLanRaw);
     if (!lanContext) {
       setFullScript("");
+      setGeneratedBaseVariant("completo");
       setTemplateLabel("");
       setWarnings([]);
       setError("A UL nao possui REDE LAN valida para gerar o script completo.");
@@ -760,6 +1124,19 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     const primaryTunnelIp = deriveTunnelIpFromPrimaryLoopback(primaryLoopback);
     const scriptContext: ScriptContext = {
       codUl: normalizeText(activeRow.cod_ul),
+      nomeLoterica: normalizeText(activeRow.nome_loterica),
+      cidade: normalizeText(activeRow.cidade),
+      uf: normalizeText(activeRow.uf),
+      contato: normalizeText(activeRow.contato),
+      cctoOi: normalizeText(activeRow.ccto_oi),
+      cctoOemp: normalizeText(activeRow.ccto_oemp),
+      designacaoNova: normalizeText(activeRow.designacao_nova),
+      routerRole,
+      routerModel: model,
+      technology,
+      owner,
+      switchTopology,
+      operadora4g,
       primaryLoopback,
       primaryTunnelIp,
       loopbackSecundario,
@@ -767,37 +1144,71 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       lanRouter: lanContext.router,
       lanVirtual: lanContext.virtual,
       lanAclHost: lanContext.aclHost,
+      lanMask: lanContext.mask,
+      lanPrefix: String(lanContext.prefix),
       switchIp: switchContext?.ip || "",
       switchNetwork: switchContext?.network || "",
       switchVirtual: switchContext?.virtual || "",
+      switchMask: switchContext?.mask || "",
+      switchPrefix: switchContext ? String(switchContext.prefix) : "",
     };
 
     setGenerating(true);
     try {
+      const customTemplateMatch = resolveCustomRouterScriptTemplate(customTemplates, {
+        routerRole,
+        model,
+        technology,
+        owner,
+        switchTopology,
+        scriptVariant,
+      });
+
+      if (customTemplateMatch) {
+        const generatedScript = applyCustomRouterTemplate(customTemplateMatch.template.content, scriptContext);
+        setFullScript(generatedScript);
+        setGeneratedBaseVariant(customTemplateMatch.baseVariant);
+        setTemplateLabel(`ADM - ${customTemplateMatch.template.name}`);
+        setWarnings(generationWarnings);
+        return;
+      }
+
       const templateText = await loadTemplate(templateChoice.templateId);
       const generatedScript = applyTemplateReplacements(templateChoice.templateId, templateText, scriptContext);
       setFullScript(generatedScript);
+      setGeneratedBaseVariant("completo");
       setTemplateLabel(TEMPLATE_META[templateChoice.templateId].label);
       setWarnings(generationWarnings);
     } catch (generationError) {
       console.error("Falha ao gerar Script Router SCT", generationError);
       setFullScript("");
+      setGeneratedBaseVariant("completo");
       setTemplateLabel("");
       setWarnings([]);
       setError(String((generationError as Error)?.message || generationError || "Falha ao gerar script."));
     } finally {
       setGenerating(false);
     }
-  }, [codUlInput, handleLookup, loterica, model, operadora4g, owner, routerRole, switchTopology, technology]);
+  }, [codUlInput, customTemplates, handleLookup, loterica, model, operadora4g, owner, routerRole, scriptVariant, switchTopology, technology]);
 
-  const script = useMemo(() => extractRouterScriptVariant(fullScript, scriptVariant), [fullScript, scriptVariant]);
+  const script = useMemo(() => {
+    if (!fullScript) return "";
+    if (generatedBaseVariant === "completo") {
+      return scriptVariant === "completo" ? fullScript : extractRouterScriptVariant(fullScript, scriptVariant);
+    }
+    return generatedBaseVariant === scriptVariant ? fullScript : "";
+  }, [fullScript, generatedBaseVariant, scriptVariant]);
   const scriptVariantLabel = ROUTER_SCRIPT_VARIANT_LABELS[scriptVariant];
   const variantError = useMemo(() => {
-    if (!fullScript || scriptVariant === "completo" || script) return "";
+    if (!fullScript) return "";
+    if (generatedBaseVariant !== "completo" && generatedBaseVariant !== scriptVariant) {
+      return `O modelo gerado e do tipo ${ROUTER_SCRIPT_VARIANT_LABELS[generatedBaseVariant].toLowerCase()}. Gere novamente para ${scriptVariantLabel.toLowerCase()}.`;
+    }
+    if (scriptVariant === "completo" || script) return "";
     return scriptVariant === "bgp"
       ? "O template selecionado nao possui bloco BGP para gerar o script parcial."
       : "O template selecionado nao possui bloco NQA para gerar o script parcial.";
-  }, [fullScript, script, scriptVariant]);
+  }, [fullScript, generatedBaseVariant, script, scriptVariant, scriptVariantLabel]);
   const displayedError = error || variantError;
 
   const handleCopy = useCallback(async () => {
@@ -860,6 +1271,18 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         routerRole === "principal" ? item.value === "fibra" : item.value !== "fibra",
       ),
     [routerRole],
+  );
+  const matchingCustomTemplate = useMemo(
+    () =>
+      resolveCustomRouterScriptTemplate(customTemplates, {
+        routerRole,
+        model,
+        technology,
+        owner,
+        switchTopology,
+        scriptVariant,
+      }),
+    [customTemplates, model, owner, routerRole, scriptVariant, switchTopology, technology],
   );
 
   return (
@@ -1100,6 +1523,372 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             className={cn("min-h-[520px] font-mono text-xs whitespace-pre")}
           />
         </div>
+
+        {isAdmin && (
+          <div className="rounded-lg border p-4 space-y-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">ADM</Badge>
+                  <h3 className="font-semibold leading-none">Modelos Customizados</h3>
+                </div>
+                <CardDescription>
+                  Cadastre modelos completos ou parciais e use placeholders para adaptar automaticamente aos dados da loterica.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={resetCustomTemplateForm}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Novo
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void fetchCustomTemplates()}
+                  disabled={customTemplatesLoading || customTemplateSaving}
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Atualizar
+                </Button>
+              </div>
+            </div>
+
+            {matchingCustomTemplate && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                Modelo ADM encontrado para a selecao atual: <span className="font-medium">{matchingCustomTemplate.template.name}</span>
+                {" • "}
+                {ROUTER_SCRIPT_VARIANT_LABELS[matchingCustomTemplate.baseVariant]}
+              </div>
+            )}
+
+            {customTemplatesError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive whitespace-pre-line">
+                {customTemplatesError}
+              </div>
+            )}
+
+            {customTemplateNotice && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+                {customTemplateNotice}
+              </div>
+            )}
+
+            <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium">Modelos salvos</p>
+                  <p className="text-xs text-muted-foreground">
+                    {customTemplatesLoading ? "Carregando..." : `${customTemplates.length} modelo(s) carregado(s)`}
+                  </p>
+                </div>
+
+                <div className="space-y-2 max-h-[720px] overflow-y-auto pr-1">
+                  {!customTemplatesLoading && customTemplates.length === 0 && (
+                    <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                      Nenhum modelo customizado cadastrado.
+                    </div>
+                  )}
+
+                  {customTemplates.map((template) => (
+                    <div key={template.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{template.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Atualizado em {formatDateTimePtBr(template.updated_at || template.created_at)}
+                          </p>
+                        </div>
+                        <Badge variant={template.is_active ? "secondary" : "outline"}>
+                          {template.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline">{template.router_role}</Badge>
+                        <Badge variant="outline">{template.script_variant}</Badge>
+                        <Badge variant="outline">{template.model}</Badge>
+                        <Badge variant="outline">{template.technology}</Badge>
+                        <Badge variant="outline">{template.owner}</Badge>
+                        <Badge variant="outline">{template.switch_topology}</Badge>
+                      </div>
+
+                      {template.notes && <p className="text-xs text-muted-foreground whitespace-pre-line">{template.notes}</p>}
+
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleEditCustomTemplate(template)}>
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleDeleteCustomTemplate(template)}
+                          disabled={customTemplateSaving}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  ref={templateFileInputRef}
+                  type="file"
+                  accept={CUSTOM_TEMPLATE_ACCEPT}
+                  className="hidden"
+                  onChange={handleTemplateFileChange}
+                />
+
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {customTemplateForm.id ? "Editar modelo" : "Novo modelo"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Modelos parciais aceitam o mesmo mecanismo de placeholders dos completos.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => templateFileInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Carregar TXT
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-1.5 xl:col-span-2">
+                    <Label>Nome do modelo</Label>
+                    <Input
+                      value={customTemplateForm.name}
+                      onChange={(event) =>
+                        setCustomTemplateForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="Ex.: HP20-11 OI BGP"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Roteador</Label>
+                    <Select
+                      value={customTemplateForm.routerRole}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({ ...current, routerRole: value as RouterRole }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROUTER_ROLE_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={customTemplateForm.scriptVariant}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({ ...current, scriptVariant: value as RouterScriptVariant }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SCRIPT_VARIANT_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Modelo</Label>
+                    <Select
+                      value={customTemplateForm.model}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          model: value as TemplateScopeValue<RouterModel>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_MODEL_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tecnologia</Label>
+                    <Select
+                      value={customTemplateForm.technology}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          technology: value as TemplateScopeValue<LinkTechnology>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_TECH_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Owner</Label>
+                    <Select
+                      value={customTemplateForm.owner}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          owner: value as TemplateScopeValue<OwnerType>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_OWNER_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Switch</Label>
+                    <Select
+                      value={customTemplateForm.switchTopology}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          switchTopology: value as TemplateScopeValue<SwitchTopology>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_SWITCH_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Status</Label>
+                    <Select
+                      value={customTemplateForm.isActive ? "ativo" : "inativo"}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({ ...current, isActive: value === "ativo" }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_STATUS_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Conteudo do modelo</Label>
+                  <Textarea
+                    value={customTemplateForm.content}
+                    onChange={(event) =>
+                      setCustomTemplateForm((current) => ({ ...current, content: event.target.value }))
+                    }
+                    placeholder="Cole aqui o script completo ou parcial."
+                    className="min-h-[280px] font-mono text-xs whitespace-pre"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Observacoes</Label>
+                  <Textarea
+                    value={customTemplateForm.notes}
+                    onChange={(event) =>
+                      setCustomTemplateForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    placeholder="Opcional. Use para anotar owner, circuito base ou orientacoes."
+                    className="min-h-[96px] text-sm"
+                  />
+                </div>
+
+                <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <p className="text-sm font-medium">Placeholders disponiveis</p>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {ROUTER_SCRIPT_PLACEHOLDER_HINTS.map((item) => (
+                      <div key={item.token} className="text-xs">
+                        <p className="font-mono text-foreground">{item.token}</p>
+                        <p className="text-muted-foreground">{item.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void handleSaveCustomTemplate()}
+                    disabled={customTemplateSaving}
+                  >
+                    {customTemplateSaving ? "Salvando..." : customTemplateForm.id ? "Atualizar modelo" : "Cadastrar modelo"}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={resetCustomTemplateForm} disabled={customTemplateSaving}>
+                    Limpar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

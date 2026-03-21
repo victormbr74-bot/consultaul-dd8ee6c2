@@ -5,7 +5,7 @@ export type RouterModel = "cisco1900" | "huawei" | "hp20-11" | "hp1002-4" | "hpm
 export type LinkTechnology = "fibra" | "4g" | "vsat";
 export type OwnerType = "oi" | "sencinet";
 export type SwitchTopology = "com-switch" | "sem-switch";
-export type Operadora4g = "vivo" | "tim" | "arqia" | "nao-se-aplica";
+export type Operadora4g = "vivo" | "tim" | "arqia" | "claro" | "brisanet" | "nao-se-aplica";
 export type TemplateScopeValue<T extends string> = T | "any";
 
 export const ROUTER_MODEL_LABELS: Record<RouterModel, string> = {
@@ -30,13 +30,13 @@ export const normalizeRouterModelValue = (value: unknown): RouterModel => {
 
   if (!token) return "hpmsr900";
   if (token.includes("CISCO") || token.includes("1900") || token.includes("1921")) return "cisco1900";
-  if (token.includes("HUAWEI")) return "huawei";
+  if (token.includes("HUAWEI") || token.includes("AR121")) return "huawei";
   if (token.includes("2011")) return "hp20-11";
   if (token.includes("10024") || token.includes("1002")) return "hp1002-4";
   if (token.includes("931")) return "hpmsr931";
   if (token.includes("920")) return "hpmsr920";
   if (token.includes("900")) return "hpmsr900";
-  if (token === "HPMSR" || token === "HP") return "hpmsr900";
+  if (token === "HPMSR" || token === "HP" || token === "MSR" || token === "HPEMSR" || token === "HPE") return "hpmsr900";
 
   return "hpmsr900";
 };
@@ -103,6 +103,7 @@ export interface RouterScriptPlaceholderContext {
 export interface RouterScriptTemplateMatch {
   template: RouterScriptCustomTemplateRow;
   baseVariant: RouterScriptVariant;
+  warnings: string[];
 }
 
 export const ROUTER_SCRIPT_TEMPLATE_ANY = "any" as const;
@@ -140,8 +141,13 @@ export const ROUTER_SCRIPT_PLACEHOLDER_HINTS: Array<{ token: string; description
   { token: "{{SWITCH_PREFIX}}", description: "Prefixo CIDR do switch." },
 ];
 
-const matchScope = <T extends string>(templateValue: TemplateScopeValue<T>, selectedValue: T) =>
-  templateValue === ROUTER_SCRIPT_TEMPLATE_ANY || templateValue === selectedValue;
+const getRouterModelFamily = (model: RouterModel) => {
+  if (model === "hpmsr900" || model === "hpmsr920" || model === "hpmsr931") return "hpmsr";
+  return model;
+};
+
+const isCompatibleRouterModel = (templateModel: RouterModel, selectedModel: RouterModel) =>
+  getRouterModelFamily(templateModel) === getRouterModelFamily(selectedModel);
 
 const compareIsoDateDesc = (left: string | null, right: string | null) => {
   const leftTime = left ? Date.parse(left) : 0;
@@ -149,58 +155,142 @@ const compareIsoDateDesc = (left: string | null, right: string | null) => {
   return rightTime - leftTime;
 };
 
-const scoreTemplateSpecificity = (template: RouterScriptCustomTemplateRow, selection: RouterScriptTemplateSelection) => {
+interface TemplateMatchOptions {
+  allowCompatibleModel?: boolean;
+  allowTechnologyFallback?: boolean;
+  allowOwnerFallback?: boolean;
+  allowSwitchTopologyFallback?: boolean;
+}
+
+interface TemplateMatchScore {
+  score: number;
+  warnings: string[];
+}
+
+const scoreTemplateSpecificity = (
+  template: RouterScriptCustomTemplateRow,
+  selection: RouterScriptTemplateSelection,
+  options: TemplateMatchOptions = {},
+): TemplateMatchScore | null => {
   let score = 0;
+  const warnings: string[] = [];
 
-  if (template.router_role !== selection.routerRole) return -1;
-  if (!matchScope(template.model, selection.model)) return -1;
-  if (!matchScope(template.technology, selection.technology)) return -1;
-  if (!matchScope(template.owner, selection.owner)) return -1;
-  if (!matchScope(template.switch_topology, selection.switchTopology)) return -1;
+  if (template.router_role !== selection.routerRole) return null;
 
-  if (template.model !== ROUTER_SCRIPT_TEMPLATE_ANY) score += 16;
-  if (template.technology !== ROUTER_SCRIPT_TEMPLATE_ANY) score += 8;
-  if (template.owner !== ROUTER_SCRIPT_TEMPLATE_ANY) score += 4;
-  if (template.switch_topology !== ROUTER_SCRIPT_TEMPLATE_ANY) score += 2;
+  if (template.model !== ROUTER_SCRIPT_TEMPLATE_ANY) {
+    if (template.model === selection.model) {
+      score += 16;
+    } else if (options.allowCompatibleModel && isCompatibleRouterModel(template.model, selection.model)) {
+      score += 12;
+      warnings.push("Modelo exato nao encontrado. Foi usado um template compativel da familia do roteador.");
+    } else {
+      return null;
+    }
+  }
 
-  return score;
+  if (template.technology !== ROUTER_SCRIPT_TEMPLATE_ANY) {
+    if (template.technology === selection.technology) {
+      score += 8;
+    } else if (options.allowTechnologyFallback) {
+      score += 1;
+      warnings.push("Tecnologia exata nao encontrada. Foi usado um template relacionado do mesmo modelo.");
+    } else {
+      return null;
+    }
+  }
+
+  if (template.owner !== ROUTER_SCRIPT_TEMPLATE_ANY) {
+    if (template.owner === selection.owner) {
+      score += 4;
+    } else if (options.allowOwnerFallback) {
+      score += 1;
+      warnings.push("Owner exato nao encontrado. Foi usado um template relacionado do mesmo modelo.");
+    } else {
+      return null;
+    }
+  }
+
+  if (template.switch_topology !== ROUTER_SCRIPT_TEMPLATE_ANY) {
+    if (template.switch_topology === selection.switchTopology) {
+      score += 2;
+    } else if (options.allowSwitchTopologyFallback) {
+      score += 1;
+      warnings.push("Topologia de switch exata nao encontrada. Foi usado um template relacionado do mesmo modelo.");
+    } else {
+      return null;
+    }
+  }
+
+  return { score, warnings };
 };
 
 const pickBestTemplate = (
   templates: RouterScriptCustomTemplateRow[],
   selection: RouterScriptTemplateSelection,
   variant: RouterScriptVariant,
+  options: TemplateMatchOptions = {},
 ) => {
   const ranked = templates
     .filter((template) => template.is_active && template.script_variant === variant)
     .map((template) => ({
       template,
-      score: scoreTemplateSpecificity(template, selection),
+      match: scoreTemplateSpecificity(template, selection, options),
     }))
-    .filter((entry) => entry.score >= 0)
+    .filter((entry): entry is { template: RouterScriptCustomTemplateRow; match: TemplateMatchScore } => Boolean(entry.match))
     .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score;
+      if (right.match.score !== left.match.score) return right.match.score - left.match.score;
       return compareIsoDateDesc(left.template.updated_at, right.template.updated_at);
     });
 
-  return ranked[0]?.template ?? null;
+  return ranked[0] ?? null;
 };
 
 export const resolveCustomRouterScriptTemplate = (
   templates: RouterScriptCustomTemplateRow[],
   selection: RouterScriptTemplateSelection,
 ): RouterScriptTemplateMatch | null => {
-  const exactVariant = pickBestTemplate(templates, selection, selection.scriptVariant);
-  if (exactVariant) {
-    return { template: exactVariant, baseVariant: selection.scriptVariant };
+  const strategies: TemplateMatchOptions[] = [{}];
+  if (selection.routerRole === "backup") {
+    strategies.push(
+      { allowCompatibleModel: true },
+      { allowCompatibleModel: true, allowTechnologyFallback: true },
+      { allowCompatibleModel: true, allowTechnologyFallback: true, allowOwnerFallback: true },
+      {
+        allowCompatibleModel: true,
+        allowTechnologyFallback: true,
+        allowOwnerFallback: true,
+        allowSwitchTopologyFallback: true,
+      },
+    );
+  } else {
+    strategies.push({ allowCompatibleModel: true });
+  }
+
+  for (const options of strategies) {
+    const exactVariant = pickBestTemplate(templates, selection, selection.scriptVariant, options);
+    if (exactVariant) {
+      return {
+        template: exactVariant.template,
+        baseVariant: selection.scriptVariant,
+        warnings: Array.from(new Set(exactVariant.match.warnings)),
+      };
+    }
   }
 
   if (selection.scriptVariant === "completo") return null;
 
-  const fullVariant = pickBestTemplate(templates, selection, "completo");
-  if (!fullVariant) return null;
+  for (const options of strategies) {
+    const fullVariant = pickBestTemplate(templates, selection, "completo", options);
+    if (fullVariant) {
+      return {
+        template: fullVariant.template,
+        baseVariant: "completo",
+        warnings: Array.from(new Set(fullVariant.match.warnings)),
+      };
+    }
+  }
 
-  return { template: fullVariant, baseVariant: "completo" };
+  return null;
 };
 
 const buildPlaceholderMap = (context: RouterScriptPlaceholderContext) => ({

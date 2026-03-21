@@ -104,6 +104,28 @@ describe("resolveCustomRouterScriptTemplate", () => {
 
     expect(match?.template.id).toBe("specific");
   });
+
+  it("finds a compatible HPMSR backup template when only the same family exists", () => {
+    const templates = [
+      buildTemplate({ id: "family", name: "Familia HPMSR", script_variant: "bgp", model: "hpmsr931", technology: "4g", owner: "oi" }),
+    ];
+
+    const match = resolveCustomRouterScriptTemplate(templates, { ...selection, model: "hpmsr900" });
+
+    expect(match?.template.id).toBe("family");
+    expect(match?.warnings).toContain("Modelo exato nao encontrado. Foi usado um template compativel da familia do roteador.");
+  });
+
+  it("falls back to the same backup model even when the technology differs", () => {
+    const templates = [
+      buildTemplate({ id: "same-model", name: "Mesmo modelo", script_variant: "bgp", model: "hpmsr900", technology: "vsat", owner: "oi" }),
+    ];
+
+    const match = resolveCustomRouterScriptTemplate(templates, { ...selection, model: "hpmsr900", technology: "4g" });
+
+    expect(match?.template.id).toBe("same-model");
+    expect(match?.warnings).toContain("Tecnologia exata nao encontrada. Foi usado um template relacionado do mesmo modelo.");
+  });
 });
 
 describe("applyCustomTemplatePlaceholders", () => {
@@ -144,5 +166,11 @@ describe("normalizeRouterModelValue", () => {
     expect(normalizeRouterModelValue("HP 1002-4")).toBe("hp1002-4");
     expect(normalizeRouterModelValue("Cisco 1921")).toBe("cisco1900");
     expect(normalizeRouterModelValue("Huawei")).toBe("huawei");
+  });
+
+  it("recognizes aliases found in the script source file", () => {
+    expect(normalizeRouterModelValue("HPE MSR931")).toBe("hpmsr931");
+    expect(normalizeRouterModelValue("MSR 900 OWNER OI")).toBe("hpmsr900");
+    expect(normalizeRouterModelValue("AR121")).toBe("huawei");
   });
 });

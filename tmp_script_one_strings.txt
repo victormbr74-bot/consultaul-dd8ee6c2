@@ -1,0 +1,111 @@
+###### Roteador HP 900 #######
+timer keepalive 10 hold 30
+idle-timeout 5 30
+description connected Vsat device
+description connected to NNI VIVO - principal
+RTHP**********************************************************************************
+nqa schedule icmp loop1 start-time now lifetime forever
+nqa schedule latencia icmp start-time now lifetime forever
+clock timezone BRZ minus 03:00:00
+nqa schedule latencia icmq start-time now lifetime forever
+nqa schedule icmp loop10 start-time now lifetime forever
+primary authentication 172.31.248.45 key cipher $c$3$Vh34gFTy9HZ5X+VL/7NF/7O1ys+uMcVoYruPjuihUfs=
+HP900 - Vsat
+HP900 - Vsat S/SW BKP
+sa duration time-based 900
+nqa schedule icmp loopback10 start-time now lifetime forever
+snmp-agent usm-user v3 lotericos GRP_LOTERICOS cipher authentication-mode sha $c$3$zILObWonwJ6T3qEOn6TupfkyUSiGHP12uxlHqzLpK7/I1a9gig8= privacy-mode des56 $c$3$mOLIVkGzI0Ww7KJJRjRaJ4b4lMYG7Mej2UaMDexhdkAJmA== acl 2950
+HP900 4G Owner Oi - S/SW (ARQIA)
+ipsec sa global-duration time-based 900
+HP900 4G Owner SCT - S/SW (ARQIA)
+HP900 4G C/SW (TIM)
+nqa schedule icmp loopback_switch start-time now lifetime forever
+HP900 4G Owner Oi - S/SW (TIM)
+secondary authentication 172.31.252.45 key cipher $c$3$uaPdOHafT3NoNfV25EKv+PC1Kd8Lq2Fm1bH4GC73luI=
+HP900 4G Owner SCT - S/SW (TIM)
+MSR 900 OWNER OI C/SW VIVO
+HP900 OWNER OI C/SW VIVO
+###### Roteador HP 1002 #######
+idle-timeout 3 0
+clock timezone BRT minus 03:00:00
+acl basic 2931
+monitoring and recording at any time, without notice or permission.
+ssh server authentication-timeout 10
+peer 10.201.19.133 timer keepalive 10 hold 30
+nqa schedule wan_vrrp 50 start-time now lifetime forever
+snmp-agent community write CGS31SPRO acl 2931
+secondary authentication 172.31.252.45 key cipher $c$3$xwAlkMn/TAhp78zDGJnCXGTOiPDMpHL6syv2G/6yRuU=
+snmp-agent usm-user v3 lotericos user-role network-admin cipher authentication-mode sha $c$3$82gRa+iK52S4S0rLU3emKcBD+5oSRhdxMecW9LA0ZjAINhrkA1I= privacy-mode des56 $c$3$+z+E5lJMAUFg3G7Dj5Fh58jKnZxToyPLuyNIKUju9o4Gbg== acl 2950
+HP 1002 OWNER OI C/SW
+peer 10.201.0.25 timer keepalive 10 hold 30
+peer 192.168.248.254 timer keepalive 10 hold 30
+HP1002 Owner Oi S/SW
+peer 10.201.156.117 timer keepalive 10 hold 30
+password-control login idle-time 0
+nhrp holdtime 90
+HP1002 /ELSYS
+secondary authorization 172.31.252.45 key cipher $c$3$t0cqEWo+Y4CSyAa2YEXllvcFBdtLEplpnfvyhPV36Iw=
+password-control login-attempt 3 exceed lock-time 10
+HP1002 /ELSYS (ARQIA)
+HP1002 /ELSYS S/SW (ARQIA) BKP
+###### HUAWEI #######
+info-center timestamp log format-date
+description gerenciamento CEF circuito VIVO (principal OI)
+Huawei PRI S/SW
+ssh client first-time enable
+description gerenciamento CEF circuito VIVO (principal)
+idle-timeout 10 0
+Huawei
+ipsec sa global-duration time-based 86400
+Huawei AR121 OWNER OI C/SW TIM
+######## Roteador CISCO #######
+description Link VIVO
+clock timezone BRZ -3 0
+Cisco 1900
+license udi pid CISCO1921/K9 sn FTX154985Z1
+neighbor 10.200.218.105 description VIVO
+service timestamps debug datetime msec
+crypto pki token default removal timeout 0
+ip nhrp holdtime 90
+service timestamps log datetime msec
+exec-timeout 15 0
+license boot module c1900 technology-package datak9
+ip sla schedule 1 life forever start-time now
+ip sla schedule 2 life forever start-time now
+timers bgp 10 30
+Cisco 1900 PRI
+license udi pid CISCO1921/K9 sn FTX1619Y00G
+license boot module c1900 technology-package securityk9
+Circuitos PRI cisco
+snmp-agent usm-user v3 lotericos GRP_LOTERICOS cipher authentication-mode sha $c$3$Huwisdna7bQUg3USmNAw7V1wehZcHaHd2IOZkXwty+YUvE4gis8= privacy-mode des56 $c$3$XeLGKQii/Jfp/xwGiB8FzLjduSikZKfTA0AHnTR7anBO1A== acl 2950
+##### HUAWEI #####
+snmp-agent community write CGS31SPRO  acl 2931
+primary authentication 172.31.248.45 key cipher $c$3$pxHp/5eKwodha9zZDZ8hM1EzHQpO1dhns0lj24a9irg=
+acl number 2931 name ACL_GERENCIA_OI_31
+HPE MSR931 OWNER OI C/SW
+peer 10.201.127.225 timer keepalive 10 hold 30
+secondary authentication 172.31.252.45 key cipher $c$3$8lqJ8WGa2S7m17b4dTlIvcQpZZyiAhpwq/4JYIMtvu4=
+vrrp vrid 2 preempt-mode timer delay 5
+peer 10.201.124.89 timer keepalive 10 hold 30
+# Marcacao Padrao HP Critical
+# Marcacao Padrao HP BE
+idle-timeout 3
+# Marcacao Padrao HP Priority
+idle-timeout 15
+#                     CONFIGURACOES TACACS HP/3COM/HUAWEI (MSRX0XX)                    #
+HP20-11 Owner Oi C/SW
+undo acl number 2931
+clock timezone BRT minus 3
+peer 10.201.132.17 timer keepalive 10 hold 30
+Circuito: PDM PDM VM 5013920
+Equipamento: PDM_5013920_CEF
+sysname PDM_5013920_CEF
+peer 10.201.116.193 timer keepalive 10 hold 30
+super password level 3 cipher $c$3$gVX9vWaI/4THVlnc61a8OR5ErrU54gBvwzgu5HFq+LQ=
+HP20-11 Owner Oi S/SW
+peer 10.201.82.229 timer keepalive 10 hold 30
+peer 10.201.73.105 timer keepalive 10 hold 30
+secondary accounting 172.31.252.45 key cipher $c$3$HTCeW54QUc7WIwyb7wsizNbiaAU0zBhpn8twYfmCc8k=
+peer 10.201.79.201 timer keepalive 10 hold 30
+HP931 Owner Oi S/SW
+peer 10.201.27.145 timer keepalive 10 hold 30

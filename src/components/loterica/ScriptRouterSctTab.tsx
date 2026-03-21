@@ -188,6 +188,8 @@ const OPERADORA_4G_OPTIONS: Array<{ value: Operadora4g; label: string }> = [
   { value: "vivo", label: "Vivo" },
   { value: "tim", label: "TIM" },
   { value: "arqia", label: "Arqia" },
+  { value: "claro", label: "Claro" },
+  { value: "brisanet", label: "Brisanet" },
   { value: "nao-se-aplica", label: "Nao se aplica" },
 ];
 const SCRIPT_VARIANT_OPTIONS: Array<{ value: RouterScriptVariant; label: string }> = [
@@ -414,10 +416,7 @@ const detectModel = (row: LotericaLookupRow): RouterModel => {
   return normalizeRouterModelValue(getRawValueByAliases(row, ["MODELO ROTEADOR"]));
 };
 
-const detectBackupModel = (row: LotericaLookupRow): Exclude<RouterModel, "cisco1900"> => {
-  const detected = detectModel(row);
-  return detected === "cisco1900" ? "hpmsr900" : detected;
-};
+const detectBackupModel = (row: LotericaLookupRow): RouterModel => detectModel(row);
 
 const detectOwner = (row: LotericaLookupRow): OwnerType => {
   const source = toUpperNoAccent(getRawValueByAliases(row, ["OWNER"]));
@@ -426,7 +425,21 @@ const detectOwner = (row: LotericaLookupRow): OwnerType => {
   return "sencinet";
 };
 
-const BACKUP_SIGNAL_KEYWORDS = ["VSAT", "4G", "SIM CARD", "VIVO", "TIM", "ARQIA", "CLARO", "BRISANET"] as const;
+const BACKUP_SIGNAL_KEYWORDS = [
+  "VSAT",
+  "SATELITE",
+  "4G",
+  "SIM CARD",
+  "LTE",
+  "ELSYS",
+  "VIVO",
+  "TIM",
+  "ARQIA",
+  "CLARO",
+  "BRISANET",
+] as const;
+const VSAT_SIGNAL_KEYWORDS = ["VSAT", "SATELITE"] as const;
+const FOUR_G_SIGNAL_KEYWORDS = ["4G", "SIM CARD", "LTE", "ELSYS", "VIVO", "TIM", "ARQIA", "CLARO", "BRISANET"] as const;
 
 const buildRouterSignal = (row: LotericaLookupRow) => {
   const rawValues =
@@ -457,16 +470,8 @@ const detectRouterRole = (row: LotericaLookupRow): RouterRole => {
 const detectTechnology = (row: LotericaLookupRow, routerRole: RouterRole = detectRouterRole(row)): LinkTechnology => {
   const signal = buildRouterSignal(row);
 
-  if (signal.includes("VSAT")) return "vsat";
-  if (
-    signal.includes("4G") ||
-    signal.includes("TIM") ||
-    signal.includes("VIVO") ||
-    signal.includes("ARQIA") ||
-    signal.includes("CLARO")
-  ) {
-    return "4g";
-  }
+  if (VSAT_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))) return "vsat";
+  if (FOUR_G_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))) return "4g";
 
   if (routerRole === "principal") return "fibra";
 
@@ -485,6 +490,8 @@ const detectOperadora4g = (row: LotericaLookupRow): Operadora4g => {
   if (signal.includes("TIM")) return "tim";
   if (signal.includes("VIVO")) return "vivo";
   if (signal.includes("ARQIA")) return "arqia";
+  if (signal.includes("CLARO")) return "claro";
+  if (signal.includes("BRISANET")) return "brisanet";
   return "nao-se-aplica";
 };
 
@@ -505,10 +512,19 @@ const chooseTemplate = (
 
   if (routerRole === "principal") {
     templateId = owner === "oi" ? "cisco1900-principal-oi" : "cisco1900-principal-sencinet";
+    if (model !== "cisco1900") {
+      warnings.push(`Nao existe template principal nativo para ${ROUTER_MODEL_LABELS[model]}. Foi usado Cisco 1900.`);
+    }
+    if (technology !== "fibra") {
+      warnings.push("Nao existe template principal nativo separado por tecnologia. Foi usada a base Cisco principal.");
+    }
     return { templateId, warnings };
   }
 
-  if (model === "huawei") {
+  if (model === "cisco1900") {
+    templateId = technology === "4g" ? "hpmsr920-4g" : "hpmsr900-vsat-s-sw";
+    warnings.push("Nao existe template dedicado de backup para Cisco 1900 nos anexos. Foi usado um template base compativel.");
+  } else if (model === "huawei") {
     templateId = "huawei-4g";
     if (technology !== "4g") {
       warnings.push("Nao existe template Huawei VSAT nos anexos. Foi usado Huawei 4G.");
@@ -1025,19 +1041,15 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
       const detectedRole = detectRouterRole(normalizedRow);
       const detectedTechnology = detectTechnology(normalizedRow, detectedRole);
+      const detectedModel = detectedRole === "principal" ? detectModel(normalizedRow) : detectBackupModel(normalizedRow);
 
       setLoterica(normalizedRow);
       setCodUlInput(normalizeText(normalizedRow.cod_ul));
       setRouterRole(detectedRole);
       setOwner(detectOwner(normalizedRow));
       setSwitchTopology(detectSwitchTopology(normalizedRow));
-      if (detectedRole === "principal") {
-        setModel("cisco1900");
-        setTechnology(detectedTechnology);
-      } else {
-        setModel(detectBackupModel(normalizedRow));
-        setTechnology(detectedTechnology);
-      }
+      setModel(detectedModel);
+      setTechnology(detectedTechnology);
       setOperadora4g(detectedTechnology === "4g" ? detectOperadora4g(normalizedRow) : "nao-se-aplica");
 
       return normalizedRow;
@@ -1057,9 +1069,9 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
   useEffect(() => {
     if (routerRole === "principal") {
-      setModel("cisco1900");
       if (!loterica) return;
 
+      setModel(detectModel(loterica));
       const detectedTechnology = detectTechnology(loterica, "principal");
       setTechnology(detectedTechnology);
       setOperadora4g(detectedTechnology === "4g" ? detectOperadora4g(loterica) : "nao-se-aplica");
@@ -1067,7 +1079,6 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     }
 
     if (!loterica) {
-      setModel((current) => (current === "cisco1900" ? "hpmsr900" : current));
       setTechnology((current) => (current === "fibra" ? "vsat" : current));
       return;
     }
@@ -1194,7 +1205,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         setFullScript(generatedScript);
         setGeneratedBaseVariant(customTemplateMatch.baseVariant);
         setTemplateLabel(`ADM - ${customTemplateMatch.template.name}`);
-        setWarnings(generationWarnings);
+        setWarnings(Array.from(new Set([...generationWarnings, ...customTemplateMatch.warnings])));
         return;
       }
 
@@ -1203,7 +1214,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       setFullScript(generatedScript);
       setGeneratedBaseVariant("completo");
       setTemplateLabel(TEMPLATE_META[templateChoice.templateId].label);
-      setWarnings(generationWarnings);
+      setWarnings(Array.from(new Set(generationWarnings)));
     } catch (generationError) {
       console.error("Falha ao gerar Script Router SCT", generationError);
       setFullScript("");
@@ -1282,13 +1293,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       }
     : null;
 
-  const availableModelOptions = useMemo(
-    () =>
-      MODEL_OPTIONS.filter((item) =>
-        routerRole === "principal" ? item.value === "cisco1900" : item.value !== "cisco1900",
-      ),
-    [routerRole],
-  );
+  const availableModelOptions = useMemo(() => MODEL_OPTIONS, []);
 
   const availableTechOptions = useMemo(
     () =>

@@ -1,16 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type MainField = {
   label: string;
   mono?: boolean;
   key?: string;
   rawKeys?: string[];
+  multiline?: boolean;
+  rows?: number;
+  wide?: boolean;
 };
 
 const FIELDS: MainField[] = [
-  { key: "nome_loterica", label: "Nome" },
+  { key: "nome_loterica", label: "Nome", multiline: true, rows: 2, wide: true },
   { key: "ccto_oi", label: "CCTO OI" },
   { label: "Circuito Meraki", rawKeys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
   { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
@@ -20,8 +25,8 @@ const FIELDS: MainField[] = [
   { key: "ip_wan", label: "IP WAN", mono: true },
   { key: "loopback_wan", label: "Loopback Principal", mono: true },
   { key: "loopback_lan", label: "Loopback Secund\u00E1rio", mono: true },
-  { key: "endereco", label: "Endere\u00E7o" },
-  { key: "contato", label: "Contato" },
+  { key: "endereco", label: "Endere\u00E7o", multiline: true, rows: 3, wide: true },
+  { key: "contato", label: "Contato", multiline: true, rows: 2, wide: true },
   { key: "status", label: "Status" },
   { key: "cidade", label: "Cidade" },
   { key: "uf", label: "UF" },
@@ -75,21 +80,39 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
           <CardTitle className="text-lg">{"Dados Edit\u00E1veis"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {FIELDS.map((f) => (
-              <div key={f.key || f.label} className="space-y-1.5">
+              <div
+                key={f.key || f.label}
+                className={cn("space-y-1.5", f.wide ? "md:col-span-2 xl:col-span-3" : "")}
+              >
                 <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                <Input
-                  className={f.mono ? "font-mono text-xs" : ""}
-                  value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
-                  onChange={(e) => {
-                    if (f.key) {
-                      setForm({ ...form, [f.key]: e.target.value });
-                      return;
-                    }
-                    setRawValue(f.rawKeys || [], e.target.value);
-                  }}
-                />
+                {f.multiline ? (
+                  <Textarea
+                    rows={f.rows || 3}
+                    className={cn("resize-y", f.mono ? "font-mono text-xs" : "")}
+                    value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
+                    onChange={(e) => {
+                      if (f.key) {
+                        setForm({ ...form, [f.key]: e.target.value });
+                        return;
+                      }
+                      setRawValue(f.rawKeys || [], e.target.value);
+                    }}
+                  />
+                ) : (
+                  <Input
+                    className={f.mono ? "font-mono text-xs" : ""}
+                    value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
+                    onChange={(e) => {
+                      if (f.key) {
+                        setForm({ ...form, [f.key]: e.target.value });
+                        return;
+                      }
+                      setRawValue(f.rawKeys || [], e.target.value);
+                    }}
+                  />
+                )}
               </div>
             ))}
           </div>

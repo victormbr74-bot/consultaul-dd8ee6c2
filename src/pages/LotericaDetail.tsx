@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { useLotericaUpdatesAccess } from "@/hooks/useLotericaUpdatesAccess";
 import { normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,15 +41,15 @@ const RAW_EDITABLE_KEYS: string[][] = [
   ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"],
   ["EMPRESA OEMP"],
   ["TIPO LOTERICA", "TIPO UL"],
-  ["PERIMETRO", "PERÍMETRO"],
+  ["PERIMETRO", "PER\u00CDMETRO"],
   ["TECNOLOGIA"],
   ["MODELO ROTEADOR"],
   ["SIM CARD 4G"],
   ["OWNER"],
   ["RESP BACKUP"],
-  ["REGIAO", "REGIÃO"],
+  ["REGIAO", "REGI\u00C3O"],
   ["CEP"],
-  ["MIGRACAO", "MIGRAÇÃO"],
+  ["MIGRACAO", "MIGRA\u00C7\u00C3O"],
   ["HOMOLOGADO"],
 ];
 
@@ -90,7 +91,9 @@ const getRawValueByAliases = (obj: any, aliases: string[]) => {
 const normalizeLotericaRecord = (row: any) => {
   const raw = row?.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
   const rawRedeLan = String(raw["REDE LAN"] || "").trim();
-  const rawLoopbackSec = String(raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUNDÁRIO"] || raw["LOOPBACK SECUNDÃƒÂRIO"] || "").trim();
+  const rawLoopbackSec = String(
+    raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUND\u00C1RIO"] || raw["LOOPBACK SECUNDÃƒÆ’Ã‚ÂRIO"] || "",
+  ).trim();
   const currentLoopbackLan = String(row?.loopback_lan || "").trim();
 
   // Corrige registros antigos onde loopback_lan foi importado como REDE LAN.
@@ -150,9 +153,11 @@ const LotericaDetail = () => {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
-  const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
-  const [lotericaUpdatesError, setLotericaUpdatesError] = useState<string | null>(null);
+  const {
+    enabled: lotericaUpdatesEnabled,
+    loading: lotericaUpdatesLoading,
+    error: lotericaUpdatesError,
+  } = useLotericaUpdatesAccess();
 
   useLayoutEffect(() => {
     setShowLotericaTabs(true);
@@ -234,43 +239,6 @@ const LotericaDetail = () => {
 
     void fetchLotericas();
   }, [requestedCodes]);
-
-  useEffect(() => {
-    const fetchLotericaUpdatesSetting = async () => {
-      setLotericaUpdatesLoading(true);
-      setLotericaUpdatesError(null);
-      try {
-        const { data, error } = await (supabase as any)
-          .from("app_settings")
-          .select("value_boolean")
-          .eq("key", "loterica_updates_enabled")
-          .maybeSingle();
-
-        if (error) {
-          const msg = String((error as any)?.message || "");
-          if (msg.includes("app_settings") && msg.includes("Could not find the table")) {
-            setLotericaUpdatesEnabled(true);
-            setLotericaUpdatesError(
-              "Banco desatualizado: falta a tabela app_settings.\n" +
-                "Aplique a migracao Supabase '20260306103000_loterica_updates_global_toggle.sql'.",
-            );
-            return;
-          }
-          throw new Error(msg || "Erro ao carregar configuracao de atualizacao.");
-        }
-
-        setLotericaUpdatesEnabled(Boolean((data as any)?.value_boolean ?? true));
-      } catch (error) {
-        console.error("Falha inesperada ao carregar configuracao de atualizacao", error);
-        setLotericaUpdatesEnabled(true);
-        setLotericaUpdatesError(error instanceof Error ? error.message : "Erro ao carregar configuracao de atualizacao.");
-      } finally {
-        setLotericaUpdatesLoading(false);
-      }
-    };
-
-    void fetchLotericaUpdatesSetting();
-  }, []);
 
   const activeForm = activeCode ? formsByCode[activeCode] || lotericas[0] || {} : {};
 
@@ -504,7 +472,7 @@ const LotericaDetail = () => {
           <div className="flex items-center gap-2">
             {!isBulkMode && hasLoadedRows && (
               <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> Histórico
+                <History className="w-4 h-4 mr-1" /> Hist\u00F3rico
               </Button>
             )}
             <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
@@ -542,7 +510,7 @@ const LotericaDetail = () => {
         </div>
       )}
 
-      <main className="container px-4 py-6 max-w-5xl">
+      <main className="container px-4 py-6 max-w-[1400px]">
         {!hasLoadedRows ? (
           <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
             Nenhuma loterica encontrada para os codigos informados.
@@ -589,11 +557,11 @@ const LotericaDetail = () => {
             {showHistory && (
               <Card className="mt-6 animate-fade-in">
                 <CardHeader>
-                  <CardTitle className="text-lg">Histórico de Alterações</CardTitle>
+                  <CardTitle className="text-lg">Hist\u00F3rico de Altera\u00E7\u00F5es</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {history.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhuma alteração registrada.</p>
+                    <p className="text-sm text-muted-foreground">Nenhuma altera\u00E7\u00E3o registrada.</p>
                   ) : (
                     <div className="space-y-3">
                       {history.map((h) => (

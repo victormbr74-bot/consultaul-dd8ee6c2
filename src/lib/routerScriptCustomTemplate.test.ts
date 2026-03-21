@@ -16,6 +16,7 @@ const buildTemplate = (overrides: Partial<RouterScriptCustomTemplateRow>): Route
   model: "any",
   technology: "any",
   owner: "any",
+  operadora_4g: "any",
   switch_topology: "any",
   script_variant: "completo",
   content: "conteudo",
@@ -32,6 +33,7 @@ const selection: RouterScriptTemplateSelection = {
   model: "hp20-11",
   technology: "4g",
   owner: "oi",
+  operadora4g: "tim",
   switchTopology: "sem-switch",
   scriptVariant: "bgp",
 };
@@ -125,6 +127,28 @@ describe("resolveCustomRouterScriptTemplate", () => {
 
     expect(match?.template.id).toBe("same-model");
     expect(match?.warnings).toContain("Tecnologia exata nao encontrada. Foi usado um template relacionado do mesmo modelo.");
+  });
+
+  it("prefers the exact 4G operator when templates share the same model and owner", () => {
+    const templates = [
+      buildTemplate({ id: "tim", name: "TIM", script_variant: "bgp", model: "hp20-11", technology: "4g", owner: "oi", operadora_4g: "tim" }),
+      buildTemplate({ id: "arqia", name: "ARQIA", script_variant: "bgp", model: "hp20-11", technology: "4g", owner: "oi", operadora_4g: "arqia" }),
+      buildTemplate({ id: "generic", name: "Generico", script_variant: "bgp", model: "hp20-11", technology: "4g", owner: "oi" }),
+    ];
+
+    const match = resolveCustomRouterScriptTemplate(templates, { ...selection, operadora4g: "arqia" });
+
+    expect(match?.template.id).toBe("arqia");
+  });
+
+  it("falls back to a generic 4G operator template when the exact one is missing", () => {
+    const templates = [
+      buildTemplate({ id: "generic", name: "Generico", script_variant: "bgp", model: "hp20-11", technology: "4g", owner: "oi" }),
+    ];
+
+    const match = resolveCustomRouterScriptTemplate(templates, { ...selection, operadora4g: "vivo" });
+
+    expect(match?.template.id).toBe("generic");
   });
 });
 

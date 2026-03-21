@@ -1,0 +1,33 @@
+System
+#
+bgp 65002
+ #
+ peer 192.168.248.254 as-number 64765
+peer 192.168.248.254 timer keepalive 10 hold 30
+#
+ address-family ipv4 unicast
+  undo peer 192.168.248.254 route-policy export
+  peer 192.168.248.254 enable
+  peer 192.168.248.254 route-policy NO_ADVERTISE import
+  peer 192.168.248.254 prefix-list FROM_SENCINET import
+  peer 192.168.248.254 prefix-list TO_SENCINET export
+  peer 192.168.248.254 advertise-community
+#
+quit
+quit
+#
+undo route-policy TO_SENCINET permit node 10
+undo route-policy TO_SENCINET permit node 20
+undo route-policy TO_SENCINET permit node 30
+undo route-policy TO_SENCINET deny node 40
+route-policy NO_ADVERTISE permit node 10
+ apply community no-advertise 
+quit
+#
+#
+ ip prefix-list FROM_SENCINET index 1 permit 172.0.0.0 8 less-equal 32
+ ip prefix-list FROM_SENCINET index 10 deny 0.0.0.0 0 less-equal 32
+ ip prefix-list TO_SENCINET index 1 permit 99.244.0.0 14 less-equal 32
+ ip prefix-list TO_SENCINET index 10 deny 0.0.0.0 0 less-equal 32
+#
+s f

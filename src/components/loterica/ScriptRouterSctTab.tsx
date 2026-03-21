@@ -21,6 +21,7 @@ import {
   type SwitchTopology,
   type TemplateScopeValue,
 } from "@/lib/routerScriptCustomTemplate";
+import { BUNDLED_ROUTER_SCRIPT_TEMPLATES } from "@/lib/routerScriptBundledTemplates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +111,7 @@ interface CustomTemplateFormState {
   model: TemplateScopeValue<RouterModel>;
   technology: TemplateScopeValue<LinkTechnology>;
   owner: TemplateScopeValue<OwnerType>;
+  operadora4g: TemplateScopeValue<Operadora4g>;
   switchTopology: TemplateScopeValue<SwitchTopology>;
   scriptVariant: RouterScriptVariant;
   content: string;
@@ -209,6 +211,10 @@ const TEMPLATE_FORM_OWNER_OPTIONS: Array<{ value: TemplateScopeValue<OwnerType>;
   { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
   ...OWNER_OPTIONS,
 ];
+const TEMPLATE_FORM_OPERADORA_4G_OPTIONS: Array<{ value: TemplateScopeValue<Operadora4g>; label: string }> = [
+  { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
+  ...OPERADORA_4G_OPTIONS,
+];
 const TEMPLATE_FORM_SWITCH_OPTIONS: Array<{ value: TemplateScopeValue<SwitchTopology>; label: string }> = [
   { value: ROUTER_SCRIPT_TEMPLATE_ANY, label: "Qualquer" },
   ...SWITCH_OPTIONS,
@@ -224,6 +230,7 @@ const createEmptyCustomTemplateForm = (
   currentModel: RouterModel,
   currentTechnology: LinkTechnology,
   currentOwner: OwnerType,
+  currentOperadora4g: Operadora4g,
   currentSwitchTopology: SwitchTopology,
   currentVariant: RouterScriptVariant,
 ): CustomTemplateFormState => ({
@@ -233,6 +240,7 @@ const createEmptyCustomTemplateForm = (
   model: currentModel,
   technology: currentTechnology,
   owner: currentOwner,
+  operadora4g: currentOperadora4g,
   switchTopology: currentSwitchTopology,
   scriptVariant: currentVariant,
   content: "",
@@ -284,13 +292,14 @@ const detectModelFromTemplateFileName = (value: string, fallback: RouterModel): 
 const inferImportedTemplateDraft = (
   fileName: string,
   content: string,
-  fallback: Pick<CustomTemplateFormState, "routerRole" | "model" | "technology" | "owner" | "switchTopology" | "scriptVariant">,
+  fallback: Pick<CustomTemplateFormState, "routerRole" | "model" | "technology" | "owner" | "operadora4g" | "switchTopology" | "scriptVariant">,
 ): ImportedTemplateDraft => {
   const name = normalizeText(fileName).replace(/\.[^.]+$/u, "");
   const signal = toUpperNoAccent(name);
   const fallbackModel = fallback.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "hpmsr900" : fallback.model;
   const fallbackTechnology = fallback.technology === ROUTER_SCRIPT_TEMPLATE_ANY ? "vsat" : fallback.technology;
   const fallbackOwner = fallback.owner === ROUTER_SCRIPT_TEMPLATE_ANY ? "sencinet" : fallback.owner;
+  const fallbackOperadora4g = fallback.operadora4g === ROUTER_SCRIPT_TEMPLATE_ANY ? "nao-se-aplica" : fallback.operadora4g;
   const fallbackSwitchTopology = fallback.switchTopology === ROUTER_SCRIPT_TEMPLATE_ANY ? "sem-switch" : fallback.switchTopology;
   const model = detectModelFromTemplateFileName(name, fallbackModel);
   const explicitTechnology = VSAT_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))
@@ -319,6 +328,19 @@ const inferImportedTemplateDraft = (
     : signal.includes("SCT") || signal.includes("SENCINET")
       ? "sencinet"
       : fallbackOwner;
+  const operadora4g = signal.includes("TIM")
+    ? "tim"
+    : signal.includes("VIVO")
+      ? "vivo"
+      : signal.includes("ARQIA")
+        ? "arqia"
+        : signal.includes("CLARO")
+          ? "claro"
+          : signal.includes("BRISANET")
+            ? "brisanet"
+            : technology === "4g"
+              ? fallbackOperadora4g
+              : "nao-se-aplica";
   const switchTopology = signal.includes("C/SW") || signal.includes("COM SWITCH") || signal.includes("COMSWITCH")
     ? "com-switch"
     : signal.includes("S/SW") || signal.includes("SEM SWITCH") || signal.includes("SEMSWITCH")
@@ -336,6 +358,7 @@ const inferImportedTemplateDraft = (
     model,
     technology,
     owner,
+    operadora4g,
     switchTopology,
     scriptVariant,
     content,
@@ -690,6 +713,10 @@ const normalizeCustomTemplateRow = (value: Record<string, unknown>): RouterScrip
       : normalizeRouterModelValue(value.model),
   technology: normalizeText(value.technology) as TemplateScopeValue<LinkTechnology>,
   owner: normalizeText(value.owner) as TemplateScopeValue<OwnerType>,
+  operadora_4g:
+    normalizeText(value.operadora_4g) === ROUTER_SCRIPT_TEMPLATE_ANY || !normalizeText(value.operadora_4g)
+      ? ROUTER_SCRIPT_TEMPLATE_ANY
+      : (normalizeText(value.operadora_4g) as TemplateScopeValue<Operadora4g>),
   switch_topology: normalizeText(value.switch_topology) as TemplateScopeValue<SwitchTopology>,
   script_variant: normalizeText(value.script_variant) as RouterScriptVariant,
   content: String(value.content ?? ""),
@@ -698,6 +725,7 @@ const normalizeCustomTemplateRow = (value: Record<string, unknown>): RouterScrip
   created_at: normalizeText(value.created_at) || null,
   updated_at: normalizeText(value.updated_at) || null,
   updated_by: normalizeText(value.updated_by) || null,
+  source: "db",
 });
 
 const applyCustomRouterTemplate = (template: string, context: ScriptContext) => {
@@ -854,7 +882,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const [customTemplateSaving, setCustomTemplateSaving] = useState(false);
   const [customTemplateNotice, setCustomTemplateNotice] = useState("");
   const [customTemplateForm, setCustomTemplateForm] = useState<CustomTemplateFormState>(() =>
-    createEmptyCustomTemplateForm("backup", "hpmsr900", "vsat", "sencinet", "sem-switch", "completo"),
+    createEmptyCustomTemplateForm("backup", "hpmsr900", "vsat", "sencinet", "nao-se-aplica", "sem-switch", "completo"),
   );
 
   const initRef = useRef(false);
@@ -870,9 +898,9 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   }, []);
 
   const resetCustomTemplateForm = useCallback(() => {
-    setCustomTemplateForm(createEmptyCustomTemplateForm(routerRole, model, technology, owner, switchTopology, scriptVariant));
+    setCustomTemplateForm(createEmptyCustomTemplateForm(routerRole, model, technology, owner, operadora4g, switchTopology, scriptVariant));
     setCustomTemplateNotice("");
-  }, [model, owner, routerRole, scriptVariant, switchTopology, technology]);
+  }, [model, operadora4g, owner, routerRole, scriptVariant, switchTopology, technology]);
 
   const fetchCustomTemplates = useCallback(async () => {
     if (!user) {
@@ -942,6 +970,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           model: imported.model,
           technology: imported.technology,
           owner: imported.owner,
+          operadora4g: imported.operadora4g,
           switchTopology: imported.switchTopology,
           scriptVariant: imported.scriptVariant,
           content: imported.content,
@@ -966,6 +995,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             template.model === draft.model &&
             template.technology === draft.technology &&
             template.owner === draft.owner &&
+            template.operadora_4g === draft.operadora4g &&
             template.switch_topology === draft.switchTopology &&
             template.script_variant === draft.scriptVariant
           )
@@ -978,6 +1008,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
           model: imported.model,
           technology: imported.technology,
           owner: imported.owner,
+          operadora_4g: imported.operadora4g,
           switch_topology: imported.switchTopology,
           script_variant: imported.scriptVariant,
           content: imported.content,
@@ -1030,6 +1061,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
       model: template.model,
       technology: template.technology,
       owner: template.owner,
+      operadora4g: template.operadora_4g,
       switchTopology: template.switch_topology,
       scriptVariant: template.script_variant,
       content: template.content,
@@ -1097,6 +1129,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         model: customTemplateForm.model,
         technology: customTemplateForm.technology,
         owner: customTemplateForm.owner,
+        operadora_4g: customTemplateForm.operadora4g,
         switch_topology: customTemplateForm.switchTopology,
         script_variant: customTemplateForm.scriptVariant,
         content,
@@ -1356,11 +1389,12 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
     setGenerating(true);
     try {
-      const customTemplateMatch = resolveCustomRouterScriptTemplate(customTemplates, {
+      const customTemplateMatch = resolveCustomRouterScriptTemplate([...BUNDLED_ROUTER_SCRIPT_TEMPLATES, ...customTemplates], {
         routerRole,
         model,
         technology,
         owner,
+        operadora4g,
         switchTopology,
         scriptVariant,
       });
@@ -1369,7 +1403,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         const generatedScript = applyCustomRouterTemplate(customTemplateMatch.template.content, scriptContext);
         setFullScript(generatedScript);
         setGeneratedBaseVariant(customTemplateMatch.baseVariant);
-        setTemplateLabel(`ADM - ${customTemplateMatch.template.name}`);
+        setTemplateLabel(`${customTemplateMatch.template.source === "base" ? "BASE" : "ADM"} - ${customTemplateMatch.template.name}`);
         setWarnings(Array.from(new Set([...generationWarnings, ...customTemplateMatch.warnings])));
         return;
       }
@@ -1467,15 +1501,16 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   );
   const matchingCustomTemplate = useMemo(
     () =>
-      resolveCustomRouterScriptTemplate(customTemplates, {
+      resolveCustomRouterScriptTemplate([...BUNDLED_ROUTER_SCRIPT_TEMPLATES, ...customTemplates], {
         routerRole,
         model,
         technology,
         owner,
+        operadora4g,
         switchTopology,
         scriptVariant,
       }),
-    [customTemplates, model, owner, routerRole, scriptVariant, switchTopology, technology],
+    [customTemplates, model, operadora4g, owner, routerRole, scriptVariant, switchTopology, technology],
   );
 
   return (
@@ -1805,6 +1840,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                         </Badge>
                         <Badge variant="outline">{template.technology}</Badge>
                         <Badge variant="outline">{template.owner}</Badge>
+                        <Badge variant="outline">{template.operadora_4g}</Badge>
                         <Badge variant="outline">{template.switch_topology}</Badge>
                       </div>
 
@@ -1979,6 +2015,30 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                       </SelectTrigger>
                       <SelectContent>
                         {TEMPLATE_FORM_OWNER_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Operadora 4G</Label>
+                    <Select
+                      value={customTemplateForm.operadora4g}
+                      onValueChange={(value) =>
+                        setCustomTemplateForm((current) => ({
+                          ...current,
+                          operadora4g: value as TemplateScopeValue<Operadora4g>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_FORM_OPERADORA_4G_OPTIONS.map((item) => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>

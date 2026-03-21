@@ -1,0 +1,28 @@
+system-view
+#
+undo ip ip-prefix FROM_SENCINET index 1
+undo ip ip-prefix FROM_SENCINET index 10
+undo ip ip-prefix TO_SENCINET index 1
+undo ip ip-prefix TO_SENCINET index 10
+undo route-policy NO_ADVERTISE permit node 10
+#
+route-policy TO_SENCINET permit node 10
+ if-match community name GERENCIA_OI
+route-policy TO_SENCINET permit node 20
+ if-match as-path 31
+route-policy TO_SENCINET permit node 30
+route-policy TO_SENCINET deny node 40
+#
+bgp 65002
+undo peer 192.168.248.254 ip-prefix import
+undo peer 192.168.248.254 ip-prefix export
+undo peer 192.168.248.254 route-policy NO_ADVERTISE import
+peer 192.168.248.254 as-number 64765
+peer 192.168.248.254 route-policy TO_SENCINET export
+peer 192.168.248.254 ip-prefix FROM_SENCINET import
+peer 192.168.248.254 timer keepalive 10 hold 30
+peer 192.168.248.254 advertise-community
+#
+#
+ ip ip-prefix FROM_SENCINET index 1 permit 99.244.0.0 14 less-equal 32
+ ip ip-prefix FROM_SENCINET index 10 deny 0.0.0.0 0 less-equal 32

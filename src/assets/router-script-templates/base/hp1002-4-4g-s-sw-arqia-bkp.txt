@@ -1,0 +1,541 @@
+#
+ version 7.1.064, Release 0809P33
+#
+ sysname LAB_CEF
+#
+ clock timezone BRT minus 03:00:00
+ clock protocol ntp
+#
+ telnet server enable
+#
+ security-zone intra-zone default permit
+#
+ ip unreachables enable
+ ip ttl-expires enable
+#
+ dhcp enable
+ dhcp server always-broadcast
+#
+ dns proxy enable
+ dns domain oi.net.br
+#
+ lldp global enable
+ lldp compliance cdp
+#              
+ flow-interval 30
+#
+ password-recovery enable
+#
+vlan 1
+#
+traffic classifier class-default operator or
+ if-match acl 3104
+#
+traffic classifier class-default_in operator or
+ if-match dscp default
+#
+traffic classifier critical operator or
+ if-match acl 3102
+#
+traffic classifier critical_in operator or
+ if-match dscp af13 cs3 af31
+#
+traffic classifier priority operator or
+ if-match acl 3103
+#
+traffic classifier priority_in operator or
+ if-match dscp af12 cs2 af21
+#
+traffic classifier sup operator or
+ if-match acl 3020
+#
+traffic classifier sup_in operator or
+ if-match dscp af33
+#
+traffic behavior class-default
+ remark dscp default
+ remark dot1p 1
+ queue af bandwidth pct 24
+ wred dscp
+ wred dscp default low-limit 40 high-limit 120 discard-probability 1
+#
+traffic behavior critical
+ remark dscp af31
+ remark dot1p 3
+ queue af bandwidth pct 50
+#
+traffic behavior priority
+ remark dscp af21
+ remark dot1p 2
+ queue af bandwidth pct 25
+ wred dscp
+ wred dscp af21 low-limit 42 high-limit 126 discard-probability 1
+#
+traffic behavior sup
+ remark dscp af33
+ remark dot1p 6
+ queue af bandwidth pct 1
+#
+traffic behavior traffic_in
+#
+qos policy CE_DC_IN
+ classifier sup_in behavior traffic_in
+ classifier critical_in behavior traffic_in
+ classifier priority_in behavior traffic_in
+ classifier class-default_in behavior traffic_in
+#
+qos policy DC_50-25-25_2M
+ classifier sup behavior sup
+ classifier critical behavior critical
+ classifier priority behavior priority
+ classifier class-default behavior class-default
+#
+policy-based-route 10 permit node 10
+ if-match acl 3010
+ apply precedence flash
+#
+policy-based-route 10 permit node 20
+ if-match acl 3020
+ apply precedence flash
+#
+nqa entry wan_vrrp 50
+ type icmp-echo
+  destination ip 10.98.0.1
+  frequency 10000
+  reaction 1 checked-element probe-fail threshold-type consecutive 2 action-type trigger-only
+  source ip 10.50.255.254
+#
+ nqa schedule wan_vrrp 50 start-time now lifetime forever
+#
+controller Cellular0/0
+#
+interface Aux0
+#
+interface Serial0/0
+#
+interface NULL0
+#
+interface LoopBack1
+ description INTERFACE DE GERENCIA
+ ip address 10.50.255.254 255.255.255.255
+#
+interface Vlan-interface1
+ description LAN TFLs
+ ip address 99.244.33.161 255.255.255.240
+ pim sm
+ ip netstream inbound
+ ip netstream outbound
+ ip forward-broadcast
+ tcp mss 1280
+ dhcp select relay
+ dhcp relay server-address 172.31.248.215
+ dhcp relay server-address 172.31.252.215
+ dhcp relay source-address 99.244.33.161
+#
+interface GigabitEthernet0/0
+ port link-mode route
+ description connected to Elsys LTe module
+ ip address 192.168.10.100 255.255.255.0
+ pim sm
+ igmp enable
+ igmp static-group 230.1.1.2
+#
+interface GigabitEthernet0/5
+ port link-mode route
+#
+interface GigabitEthernet0/1
+ port link-mode bridge
+#
+interface GigabitEthernet0/2
+ port link-mode bridge
+#
+interface GigabitEthernet0/3
+ port link-mode bridge
+#
+interface GigabitEthernet0/4
+ port link-mode bridge
+#
+interface Tunnel10 mode mgre
+ ip address 18.50.255.254 255.248.0.0
+ source GigabitEthernet0/0
+ nhrp network-id 1
+ nhrp holdtime 90
+ nhrp nhs 18.50.255.83 nbma 10.98.0.83
+#
+bgp 64765
+ router-id 10.50.255.254
+ timer keepalive 10 hold 30
+ peer 18.50.255.83 as-number 65055
+ #
+ address-family ipv4 unicast
+  preference 20 200 200
+  network 10.50.255.254 255.255.255.255
+  network 99.244.33.160 255.255.255.240
+  peer 18.50.255.83 enable
+  peer 18.50.255.83 route-policy OUT_TO_BB export
+#
+multicast routing
+#
+route-policy LAN_TFL permit node 10
+ if-match ip address prefix-list LAN_TFL
+#
+route-policy OUT_TO_BB permit node 10
+ if-match ip address prefix-list OUT_TO_BB
+#
+ ip prefix-list LAN_TFL index 10 permit 99.244.0.0 14 less-equal 28
+ ip prefix-list LAN_TFL index 20 permit 10.51.128.0 17 less-equal 28
+ ip prefix-list LAN_TFL index 70 deny 0.0.0.0 0 less-equal 32
+ ip prefix-list OUT_TO_BB index 10 permit 99.244.0.0 14 less-equal 28
+ ip prefix-list OUT_TO_BB index 20 permit 10.50.255.254 32
+#
+ ip as-path 31 permit _65050$
+ ip as-path 31 permit _65025$
+ ip as-path 31 permit _65050_
+ ip as-path 31 permit _65025_
+#
+ scheduler logfile size 16
+#
+line class aux
+ user-role network-admin
+#
+line class tty
+ user-role network-operator
+#
+line class vty
+ authentication-mode scheme
+ user-role level-0
+ history-command max-size 256
+#
+line aux 0
+ authentication-mode scheme
+ user-role network-admin
+ idle-timeout 3 0
+#
+line vty 0 63
+ terminal type vt100
+ authentication-mode scheme
+ user-role level-0
+ protocol inbound ssh
+ idle-timeout 3 0
+ command authorization
+ command accounting
+#
+ ip route-static 0.0.0.0 0 192.168.10.254
+ ip route-static 10.50.255.1 32 192.168.10.254
+ ip route-static 10.50.255.2 32 192.168.10.254
+ ip route-static 10.98.0.80 32 192.168.10.254
+ ip route-static 10.98.0.81 32 192.168.10.254
+ ip route-static 10.98.0.82 32 192.168.10.254
+ ip route-static 10.98.0.83 32 192.168.10.254
+#
+ info-center synchronous
+ info-center loghost source LoopBack1
+ info-center loghost 172.31.249.36 port 20009
+ info-center loghost 172.31.253.36 port 20009
+#
+ snmp-agent
+ snmp-agent local-engineid 800063A28054778A27D82400000001
+ snmp-agent community write CGS31SPRO acl 2931
+ snmp-agent community write RMScperjRW21 acl 2910
+ snmp-agent community read cpeRMSrjRO acl 2910
+ snmp-agent sys-info contact CENTRO DE GERENCIA DE REDES - OI
+ snmp-agent sys-info location OI - R1 - SALVADOR - BA
+ snmp-agent sys-info version all 
+ snmp-agent group v3 GRP_LOTERICOS write-view VIEW_LOTERICOS acl 2950
+ snmp-agent usm-user v3 lotericos user-role network-admin cipher authentication-mode sha $c$3$Pj7WawfuS+5K7gR8j5BGLr/Naf/IlAlFwunqGaZCAfOXn+vw9/c= privacy-mode des56 $c$3$WbliwoErW6JdHwlVjcE5VoIMZerSuOYZpLvfUEYD4Fy/2Q== acl 2950
+#
+ ssh server enable
+ ssh server authentication-timeout 10
+#
+ nqa server enable
+#
+ ip local policy-based-route 10
+#
+ ntp-service enable
+ ntp-service source LoopBack1
+ ntp-service unicast-server 172.31.248.66
+ ntp-service unicast-server 172.31.252.66
+#
+acl basic 2910
+ description ACL_GERENCIA_OI_10
+ rule 0 permit source 200.222.75.0 0.0.0.255
+ rule 5 permit source 200.216.124.0 0.0.0.255
+ rule 10 deny
+#
+acl basic 2931
+ description ACL_GERENCIA_OI_31
+ rule 0 permit source 100.92.0.1 0
+ rule 5 permit source 100.92.0.2 0
+ rule 10 permit source 201.34.3.251 0
+ rule 15 permit source 201.34.3.252 0
+ rule 20 permit source 10.201.53.84 0.0.0.3
+ rule 25 permit source 200.97.144.192 0.0.0.63
+ rule 30 permit source 201.34.3.248 0.0.0.3
+ rule 35 permit source 200.187.151.0 0.0.0.255
+ rule 40 permit source 200.187.153.0 0.0.0.255
+ rule 45 permit source 200.199.241.0 0.0.0.255
+ rule 55 permit source 200.216.124.0 0.0.0.255
+ rule 60 permit source 200.222.0.160 0.0.0.31
+ rule 65 permit source 200.222.14.0 0.0.0.255
+ rule 70 permit source 200.222.75.0 0.0.0.255
+ rule 75 permit source 200.222.131.96 0.0.0.7
+ rule 80 permit source 201.10.4.64 0.0.0.15
+ rule 85 permit source 201.10.124.64 0.0.0.15
+ rule 90 permit source 201.10.132.64 0.0.0.15
+ rule 95 permit source 201.10.198.224 0.0.0.7
+ rule 100 permit source 100.122.32.120 0.0.0.7
+ rule 105 permit source 100.122.34.8 0.0.0.7
+ rule 200 deny logging
+#
+acl basic 2950
+ description ACL_GERENCIA_OI_50
+ rule 0 permit source 172.31.249.0 0.0.0.255
+ rule 5 permit source 172.31.253.0 0.0.0.255
+ rule 10 deny  
+#
+acl advanced 3010
+ description sup_acl
+ rule 0 permit udp precedence routine source-port eq snmp
+ rule 5 permit udp precedence routine destination-port eq snmp
+ rule 10 permit udp precedence routine source-port eq snmptrap
+ rule 15 permit udp precedence routine destination-port eq snmptrap
+ rule 20 permit tcp source-port eq tacacs
+ rule 25 permit tcp destination-port eq tacacs
+ rule 30 permit tcp source-port eq telnet
+ rule 35 permit tcp destination-port eq telnet
+ rule 40 permit udp source-port eq tftp
+ rule 45 permit udp destination-port eq tftp
+ rule 50 permit tcp source-port eq 22
+ rule 55 permit tcp destination-port eq 22
+ rule 60 permit udp source-port eq ntp
+ rule 65 permit udp destination-port eq ntp
+ rule 70 permit udp source-port eq 1967
+ rule 75 permit udp destination-port eq 1967
+#
+acl advanced 3020
+ description rp_acl
+ rule 0 permit ip dscp af33
+ rule 5 permit tcp destination-port eq bgp
+ rule 10 permit tcp source-port eq bgp
+ rule 15 permit ospf
+ rule 20 permit udp destination-port eq rip
+ rule 25 permit udp source-port eq rip
+#
+acl advanced 3102
+ description critical_acl
+ rule 0 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.32.67 0 destination-port eq 443
+ rule 5 permit tcp source 172.16.32.67 0 destination 99.244.0.0 0.3.255.255 source-port eq 443
+ rule 10 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.32.67 0 destination-port eq 1443
+ rule 15 permit tcp source 172.16.32.67 0 destination 99.244.0.0 0.3.255.255 source-port eq 1443
+ rule 20 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.32.67 0 destination-port eq 443
+ rule 25 permit tcp source 172.17.32.67 0 destination 99.244.0.0 0.3.255.255 source-port eq 443
+ rule 30 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.32.67 0 destination-port eq 1443
+ rule 35 permit tcp source 172.17.32.67 0 destination 99.244.0.0 0.3.255.255 source-port eq 1443
+ rule 40 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.32.68 0 destination-port eq dns
+ rule 45 permit udp source 172.16.32.68 0 destination 99.244.0.0 0.3.255.255 source-port eq dns
+ rule 50 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.32.69 0 destination-port eq dns
+ rule 55 permit udp source 172.16.32.69 0 destination 99.244.0.0 0.3.255.255 source-port eq dns
+ rule 60 permit udp source 99.244.0.0 0.3.255.255 destination 172.17.32.68 0 destination-port eq dns
+ rule 65 permit udp source 172.17.32.68 0 destination 99.244.0.0 0.3.255.255 source-port eq dns
+ rule 70 permit ip dscp af31
+ rule 75 deny ip
+#
+acl advanced 3103
+ description priority_acl
+ rule 0 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.32.68 0 destination-port eq ntp
+ rule 5 permit udp source 172.16.32.68 0 destination 99.244.0.0 0.3.255.255 source-port eq ntp
+ rule 10 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.32.69 0 destination-port eq ntp
+ rule 15 permit udp source 172.16.32.69 0 destination 99.244.0.0 0.3.255.255 source-port eq ntp
+ rule 20 permit udp source 99.244.0.0 0.3.255.255 destination 172.17.32.68 0 destination-port eq ntp
+ rule 25 permit udp source 172.17.32.68 0 destination 99.244.0.0 0.3.255.255 source-port eq ntp
+ rule 30 permit udp source 99.244.0.0 0.3.255.255 destination 172.17.32.69 0 destination-port eq ntp
+ rule 35 permit udp source 172.17.32.69 0 destination 99.244.0.0 0.3.255.255 source-port eq ntp
+ rule 40 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.32.50 0 destination-port eq www
+ rule 45 permit tcp source 172.16.32.50 0 destination 99.244.0.0 0.3.255.255 source-port eq www
+ rule 50 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.32.50 0 destination-port eq 443
+ rule 55 permit tcp source 172.16.32.50 0 destination 99.244.0.0 0.3.255.255 source-port eq 443
+ rule 60 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.32.50 0 destination-port eq www
+ rule 65 permit tcp source 172.17.32.50 0 destination 99.244.0.0 0.3.255.255 source-port eq www
+ rule 70 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.32.50 0 destination-port eq 443
+ rule 75 permit tcp source 172.17.32.50 0 destination 99.244.0.0 0.3.255.255 source-port eq 443
+ rule 80 permit icmp source 99.244.0.0 0.3.255.255 destination 172.16.32.68 0
+ rule 85 permit icmp source 172.16.32.68 0 destination 99.244.0.0 0.3.255.255
+ rule 90 permit icmp source 99.244.0.0 0.3.255.255 destination 172.16.32.69 0
+ rule 95 permit icmp source 172.16.32.69 0 destination 99.244.0.0 0.3.255.255
+ rule 100 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.220.37 0 destination-port eq www
+ rule 105 permit tcp source 172.16.220.37 0 destination 99.244.0.0 0.3.255.255 source-port eq www
+ rule 110 permit tcp source 99.244.0.0 0.3.255.255 destination 172.17.220.41 0 destination-port eq www
+ rule 115 permit tcp source 172.16.220.41 0 destination 99.244.0.0 0.3.255.255 source-port eq www
+ rule 120 permit icmp source 99.244.0.0 0.3.255.255 destination 172.16.220.38 0
+ rule 125 permit icmp source 172.16.220.38 0 destination 99.244.0.0 0.3.255.255
+ rule 130 permit icmp source 99.244.0.0 0.3.255.255 destination 172.16.220.39 0
+ rule 135 permit icmp source 172.16.220.39 0 destination 99.244.0.0 0.3.255.255
+ rule 140 permit icmp source 99.244.0.0 0.3.255.255 destination 172.16.220.40 0
+ rule 145 permit icmp source 172.16.220.40 0 destination 99.244.0.0 0.3.255.255
+ rule 150 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.220.38 0 destination-port eq discard
+ rule 155 permit udp source 172.16.220.38 0 destination 99.244.0.0 0.3.255.255 source-port eq discard
+ rule 160 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.220.39 0 destination-port eq echo
+ rule 165 permit udp source 172.16.220.39 0 destination 99.244.0.0 0.3.255.255 source-port eq echo
+ rule 170 permit udp source 99.244.0.0 0.3.255.255 destination 172.16.220.40 0 destination-port eq echo
+ rule 175 permit udp source 172.16.220.40 0 destination 99.244.0.0 0.3.255.255 source-port eq echo
+ rule 180 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.220.38 0 destination-port eq 22
+ rule 185 permit tcp source 172.16.220.38 0 destination 99.244.0.0 0.3.255.255 source-port eq 22
+ rule 190 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.220.39 0 destination-port eq 22
+ rule 195 permit tcp source 172.16.220.39 0 destination 99.244.0.0 0.3.255.255 source-port eq 22
+ rule 200 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.220.40 0 destination-port eq 22
+ rule 205 permit tcp source 172.16.220.40 0 destination 99.244.0.0 0.3.255.255 source-port eq 22
+ rule 210 permit tcp source 99.244.0.0 0.3.255.255 destination 172.24.45.250 0 destination-port eq www
+ rule 215 permit tcp source 172.24.45.250 0 destination 99.244.0.0 0.3.255.255 source-port eq www
+ rule 220 permit tcp source 99.244.0.0 0.3.255.255 destination 172.24.45.250 0 destination-port eq 3306
+ rule 225 permit tcp source 172.24.45.250 0 destination 99.244.0.0 0.3.255.255 source-port eq 3306
+ rule 230 permit tcp source 99.244.0.0 0.3.255.255 destination 172.16.32.92 0 destination-port eq 1952
+ rule 235 permit tcp source 172.16.32.92 0 destination 99.244.0.0 0.3.255.255 source-port eq 1952
+ rule 240 permit tcp source 99.244.0.0 0.3.255.255 destination 172.24.45.246 0 destination-port eq 22
+ rule 245 permit tcp source 172.24.45.246 0 destination 99.244.0.0 0.3.255.255 source-port eq 22
+ rule 250 permit icmp source 99.244.0.0 0.3.255.255 destination 172.17.150.16 0.0.0.15
+ rule 255 permit icmp source 172.17.150.16 0.0.0.15 destination 99.244.0.0 0.3.255.255
+ rule 260 permit icmp source 10.48.0.0 0.3.255.255 destination 172.17.150.16 0.0.0.15
+ rule 265 permit icmp source 172.17.150.16 0.0.0.15 destination 10.48.0.0 0.3.255.255
+ rule 270 permit ip source 172.31.248.0 0.0.7.255
+ rule 275 permit ip destination 172.31.248.0 0.0.7.255
+ rule 280 permit ip source 99.244.0.0 0.3.255.255 destination 172.30.4.176 0.0.0.15
+ rule 285 permit ip source 172.30.4.176 0.0.0.15 destination 99.244.0.0 0.3.255.255
+ rule 290 permit ip source 99.244.0.0 0.3.255.255 destination 10.48.0.0 0.3.255.255
+ rule 295 permit ip source 10.48.0.0 0.3.255.255 destination 99.244.0.0 0.3.255.255
+ rule 300 permit ip source 172.19.217.0 0.0.0.255
+ rule 305 permit ip destination 172.19.217.0 0.0.0.255
+ rule 310 permit ip source 172.19.214.0 0.0.0.15
+ rule 315 permit ip destination 172.19.214.0 0.0.0.15
+ rule 320 permit ip source 172.19.215.0 0.0.0.7
+ rule 325 permit ip destination 172.19.215.0 0.0.0.7
+ rule 330 permit ip source 172.19.26.48 0.0.0.7
+ rule 335 permit ip destination 172.19.26.48 0.0.0.7
+ rule 340 permit ip dscp af21
+ rule 345 deny ip
+#
+acl advanced 3104
+ description be_acl
+ rule 0 permit ip dscp default
+ rule 5 permit ip
+#
+ header login %
+*******************************************************************************
+                              OI - Simples Assim!
+
+    Cliente: CAIXA ECONOMICA FEDERAL
+    Circuito: LAB_CEF
+    Equipamento: LAB_CEF
+
+ Warning! The use of this system is restricted to authorized users.
+ All information and communications on this system are subject to review,
+ monitoring and recording at any time, without notice or permission. 
+ Unauthorized access or use shall be subject to prosecution. 
+                         
+ Atencao! A utilizacao desse sistema e limitado a usuarios autorizados.
+ Todas as informacoes e comunicacoes sobre este sistema estao sujeitos ao
+ monitoramento e gravacao a qualquer momento, sem previo aviso ou autorizacao.
+ O Acesso ou uso nao autorizado estara sujeito as medidas legais.
+
+*******************************************************************************
+%
+ header shell % 
+"NAO ESQUECA SALVAR A CONFIGURACAO DO ROUTER NA NVRAM, APOS CONSOLIDADA(s) A(s) ALTERACAO(OES) !!"
+%
+#
+ password-control enable 
+ undo password-control aging enable 
+ undo password-control history enable 
+ password-control length 6
+ password-control login-attempt 3 exceed lock-time 10
+ password-control update-interval 0
+ password-control login idle-time 0
+#
+ super authentication-mode scheme
+#
+hwtacacs scheme fac-svr-tacacs-template
+ primary authentication 172.31.248.45 key cipher $c$3$OG2gYcO2K6Lr8c5n/P1PJacUxyOdl7H4VYOmztx5jWk=
+ primary authorization 172.31.248.45 key cipher $c$3$SKfaeZvwpgFGoKsT1eMVjLqbM0gCVDaQrQfoVWUXusI=
+ primary accounting 172.31.248.45 key cipher $c$3$JAO2qgefUYzRQM69BqZjpo5EYMJLtwVzc/Sql5S1WY0=
+ secondary authentication 172.31.252.45 key cipher $c$3$wZn48bluoSrRr3DBX3WyAjOGVqXCoOxCcabCCmyv8QM=
+ secondary authorization 172.31.252.45 key cipher $c$3$t0cqEWo+Y4CSyAa2YEXllvcFBdtLEplpnfvyhPV36Iw=
+ secondary accounting 172.31.252.45 key cipher $c$3$ZAuPx0kjzDv4O51/5NXQKgzTYTOcZjLlYpIaJCKnCZg=
+ user-name-format without-domain
+ nas-ip 10.50.255.254
+#
+domain lotericos.net.br
+ authentication super hwtacacs-scheme fac-svr-tacacs-template
+ authorization command hwtacacs-scheme fac-svr-tacacs-template local
+ accounting command hwtacacs-scheme fac-svr-tacacs-template
+ authentication default hwtacacs-scheme fac-svr-tacacs-template local
+ authorization default hwtacacs-scheme fac-svr-tacacs-template local
+ accounting default hwtacacs-scheme fac-svr-tacacs-template local
+#
+domain system
+#
+ domain default enable lotericos.net.br
+#
+role name level-0
+ description Predefined level-0 role
+#
+role name level-1
+ description Predefined level-1 role
+#
+role name level-2
+ description Predefined level-2 role
+#
+role name level-3
+ description Predefined level-3 role
+#
+role name level-4
+ description Predefined level-4 role
+#
+role name level-5
+ description Predefined level-5 role
+#
+role name level-6
+ description Predefined level-6 role
+#
+role name level-7
+ description Predefined level-7 role
+#
+role name level-8
+ description Predefined level-8 role
+#
+role name level-9
+ description Predefined level-9 role
+#
+role name level-10
+ description Predefined level-10 role
+#
+role name level-11
+ description Predefined level-11 role
+#
+role name level-12
+ description Predefined level-12 role
+#
+role name level-13
+ description Predefined level-13 role
+#
+role name level-14
+ description Predefined level-14 role
+#
+user-group system
+#
+local-user admin class manage
+ service-type telnet http
+ authorization-attribute user-role network-admin
+#
+local-user consorcio class manage
+ service-type ssh terminal
+ authorization-attribute user-role level-15
+#
+local-user cpe-rms class manage
+ service-type ssh telnet terminal
+ authorization-attribute user-role level-15
+#
+cwmp
+ cwmp enable
+#
+ ip http enable
+#
+return

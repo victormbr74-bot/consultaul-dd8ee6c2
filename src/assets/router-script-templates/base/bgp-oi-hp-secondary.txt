@@ -1,0 +1,34 @@
+system
+#
+ undo ip ip-prefix LAN_TFL index 10
+ undo ip ip-prefix LAN_TFL index 20
+ ip ip-prefix PERMITE_ESTATICAS index 10 permit 172.16.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 20 permit 172.17.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 30 permit 172.18.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 40 permit 172.24.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 50 permit 172.27.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 60 permit 172.31.0.0 16 less-equal 32
+ ip ip-prefix PERMITE_ESTATICAS index 70 deny 0.0.0.0 0 less-equal 32
+#
+undo route-policy LAN_TFL permit node 10
+undo route-policy ROTAS_DC permit node 10
+#
+route-policy STATIC_TO_BGP permit node 10
+ if-match ip-prefix PERMITE_ESTATICAS
+#
+bgp 64765
+ import-route direct
+ import-route static
+ undo synchronization
+ timer keepalive 10 hold 30
+ peer 192.168.248.253 as-number 65002
+ undo peer 192.168.248.253 route-policy LAN_TFL export
+ undo peer 192.168.248.253 route-policy ROTAS_DC_FROM_OI import
+ undo  peer 192.168.248.253 ip-prefix import
+ peer 192.168.248.253 route-policy STATIC_TO_BGP export
+#
+quit
+quit
+s f
+#
+

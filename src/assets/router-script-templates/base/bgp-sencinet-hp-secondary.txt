@@ -1,0 +1,16 @@
+#
+ ip ip-prefix LAN_TFL index 10 permit 99.244.0.0 14 less-equal 28
+ ip ip-prefix LAN_TFL index 20 deny 0.0.0.0 0 less-equal 32
+#
+route-policy LAN_TFL permit node 10
+ if-match ip-prefix LAN_TFL
+#
+bgp 64765
+ import-route direct
+ import-route static
+ undo synchronization
+ timer keepalive 10 hold 30
+ peer 192.168.248.253 as-number 65002
+ peer 192.168.248.253 route-policy LAN_TFL export
+#
+

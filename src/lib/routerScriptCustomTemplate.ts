@@ -48,6 +48,7 @@ export interface RouterScriptCustomTemplateRow {
   model: TemplateScopeValue<RouterModel>;
   technology: TemplateScopeValue<LinkTechnology>;
   owner: TemplateScopeValue<OwnerType>;
+  operadora_4g: TemplateScopeValue<Operadora4g>;
   switch_topology: TemplateScopeValue<SwitchTopology>;
   script_variant: RouterScriptVariant;
   content: string;
@@ -56,6 +57,7 @@ export interface RouterScriptCustomTemplateRow {
   created_at: string | null;
   updated_at: string | null;
   updated_by: string | null;
+  source?: "db" | "base";
 }
 
 export interface RouterScriptTemplateSelection {
@@ -63,6 +65,7 @@ export interface RouterScriptTemplateSelection {
   model: RouterModel;
   technology: LinkTechnology;
   owner: OwnerType;
+  operadora4g: Operadora4g;
   switchTopology: SwitchTopology;
   scriptVariant: RouterScriptVariant;
 }
@@ -159,6 +162,7 @@ interface TemplateMatchOptions {
   allowCompatibleModel?: boolean;
   allowTechnologyFallback?: boolean;
   allowOwnerFallback?: boolean;
+  allowOperadoraFallback?: boolean;
   allowSwitchTopologyFallback?: boolean;
 }
 
@@ -205,6 +209,17 @@ const scoreTemplateSpecificity = (
     } else if (options.allowOwnerFallback) {
       score += 1;
       warnings.push("Owner exato nao encontrado. Foi usado um template relacionado do mesmo modelo.");
+    } else {
+      return null;
+    }
+  }
+
+  if (template.operadora_4g !== ROUTER_SCRIPT_TEMPLATE_ANY) {
+    if (template.operadora_4g === selection.operadora4g) {
+      score += 3;
+    } else if (options.allowOperadoraFallback) {
+      score += 1;
+      warnings.push("Operadora 4G exata nao encontrada. Foi usado um template relacionado do mesmo modelo.");
     } else {
       return null;
     }
@@ -259,6 +274,13 @@ export const resolveCustomRouterScriptTemplate = (
         allowCompatibleModel: true,
         allowTechnologyFallback: true,
         allowOwnerFallback: true,
+        allowOperadoraFallback: true,
+      },
+      {
+        allowCompatibleModel: true,
+        allowTechnologyFallback: true,
+        allowOwnerFallback: true,
+        allowOperadoraFallback: true,
         allowSwitchTopologyFallback: true,
       },
     );

@@ -1,0 +1,20 @@
+ip ip-prefix PERMITE_ESTATICAS index 10 permit 172.16.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 20 permit 172.17.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 30 permit 172.18.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 40 permit 172.24.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 50 permit 172.27.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 60 permit 172.31.0.0 16 greater-equal 16 less-equal 32
+ip ip-prefix PERMITE_ESTATICAS index 70 deny 0.0.0.0 0 less-equal 32
+
+#
+route-policy STATIC_TO_BGP permit node 10
+ if-match ip-prefix PERMITE_ESTATICAS
+
+bgp 64765 
+#                                        
+ ipv4-family unicast
+  import-route direct
+  import-route static
+  peer 192.168.248.253 enable
+  undo peer 192.168.248.253 route-policy LAN_TFL export
+  peer 192.168.248.253 route-policy STATIC_TO_BGP export

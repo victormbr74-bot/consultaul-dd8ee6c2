@@ -1,0 +1,596 @@
+21-025793-8_RT01#sh running-config 
+Building configuration...
+
+Current configuration : 8659 bytes
+!
+! Last configuration change at 16:48:33 BRZ Fri Jun 13 2025 by glauber.souza
+! NVRAM config last updated at 16:50:55 BRZ Fri Jun 13 2025 by glauber.souza
+! NVRAM config last updated at 16:50:55 BRZ Fri Jun 13 2025 by glauber.souza
+version 15.1
+service config
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname 21-025793-8_RT01
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable password PDOc8N93!XNtREFx$
+!
+aaa new-model
+!
+!
+aaa group server tacacs+ fac-ctc
+ server name fac-ctc
+ ip tacacs source-interface Loopback1
+!
+aaa group server tacacs+ fac-dtc
+ server name fac-dtc
+ ip tacacs source-interface Loopback1
+!
+aaa authentication login default group fac-ctc group fac-dtc local
+aaa authentication ppp default local
+aaa authorization config-commands
+aaa authorization exec default group fac-ctc group fac-dtc local 
+!
+!
+!
+!
+!
+aaa session-id common
+!
+memory-size iomem 25
+clock timezone BRZ -3 0
+!
+no ipv6 cef
+ip source-route
+ip cef
+!         
+!
+!
+!
+!
+no ip domain lookup
+ip domain name sencinet.com
+!
+multilink bundle-name authenticated
+!
+crypto pki token default removal timeout 0
+!
+!
+license udi pid CISCO1921/K9 sn FTX1619Y00G
+license boot module c1900 technology-package securityk9
+!
+!
+username sysop privilege 15 password 0 PDOc8N93!XNtREFx$
+!
+redundancy
+!
+!
+!
+!
+ip tftp source-interface Loopback10
+!
+track 1 ip sla 1 reachability
+! 
+crypto isakmp invalid-spi-recovery
+!
+!
+!
+!
+!
+!
+interface Loopback1
+ description Loop  Primaria
+ ip address 10.51.86.69 255.255.255.255
+!
+interface Loopback2
+ description gerenciamento CEF circuito VIVO (principal OI)
+ ip address 10.51.9.76 255.255.255.255
+!
+interface Loopback10
+ description Loop Secundaria
+ ip address 10.50.181.24 255.255.255.255
+!
+interface Tunnel0
+ bandwidth 512
+ ip address 15.50.181.24 255.248.0.0
+ no ip redirects
+ ip nhrp map multicast 10.98.0.80
+ ip nhrp map 15.50.255.80 10.98.0.80
+ ip nhrp network-id 1
+ ip nhrp holdtime 90
+ ip nhrp nhs 15.50.255.80
+ delay 1000
+ tunnel source GigabitEthernet0/1
+ tunnel mode gre multipoint
+!
+interface Embedded-Service-Engine0/0
+ no ip address
+ shutdown
+!
+interface GigabitEthernet0/0
+ ip address 10.51.22.129 255.255.255.252 secondary
+ ip address 99.245.60.129 255.255.255.240
+ ip helper-address 172.31.252.215
+ ip helper-address 172.31.248.215
+ ip directed-broadcast
+ duplex auto
+ speed auto
+ no keepalive
+!
+interface GigabitEthernet0/0.200
+ description Link VIVO
+ encapsulation dot1Q 200
+ ip address 10.202.4.118 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description Conectado ao device Elsys LTE
+ ip address 192.168.10.100 255.255.255.0
+ duplex auto
+ speed auto
+ no keepalive
+!
+router bgp 64765
+ bgp router-id 10.50.181.24
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ timers bgp 10 30
+ neighbor 10.202.4.117 remote-as 10429
+ neighbor 15.50.255.80 remote-as 65055
+ !
+ address-family ipv4
+  network 10.50.181.24 mask 255.255.255.252
+  network 10.51.22.128 mask 255.255.255.252
+  network 99.245.60.128 mask 255.255.255.240
+  redistribute connected route-map LAN_TFL
+  neighbor 10.202.4.117 activate
+  neighbor 10.202.4.117 route-map ROTAS_DC in
+  neighbor 10.202.4.117 route-map LAN_TFL out
+  neighbor 15.50.255.80 activate
+  neighbor 15.50.255.80 soft-reconfiguration inbound
+  neighbor 15.50.255.80 route-map OUT_TO_BB out
+ exit-address-family
+!
+ip forward-protocol nd
+!
+no ip http server
+no ip http secure-server
+!
+ip route 0.0.0.0 0.0.0.0 192.168.10.254 200
+ip route 10.98.0.80 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.81 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.82 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.83 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.84 255.255.255.255 192.168.10.254 200
+ip tacacs source-interface Loopback1
+!
+!
+ip prefix-list LAN_TFL seq 10 permit 99.244.0.0/14 le 28
+ip prefix-list LAN_TFL seq 20 permit 10.51.0.0/16 le 32
+ip prefix-list LAN_TFL seq 21 permit 10.51.9.76/32
+!
+ip prefix-list OUT_TO_BB seq 10 permit 10.50.181.24/32
+ip prefix-list OUT_TO_BB seq 20 permit 99.245.60.128/28
+ip prefix-list OUT_TO_BB seq 30 permit 10.51.22.128/30
+!
+ip prefix-list ROTAS_DC seq 10 permit 172.16.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 20 permit 172.17.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 30 permit 172.18.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 40 permit 172.24.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 50 permit 172.27.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 60 permit 172.31.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 70 permit 200.218.181.0/24 le 32
+ip prefix-list ROTAS_DC seq 80 permit 10.51.127.255/32
+ip prefix-list ROTAS_DC seq 90 permit 10.51.98.94/32
+!
+ip prefix-list STATIC_TO_BGP seq 10 permit 172.16.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 20 permit 172.17.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 30 permit 172.18.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 40 permit 172.24.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 50 permit 172.27.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 60 permit 172.31.0.0/16 le 32
+ip sla 1
+ icmp-echo 10.19.0.1 source-interface Loopback10
+ frequency 5
+ip sla schedule 1 life forever start-time now
+ip sla 2
+ icmp-echo 10.19.0.1 source-ip 99.245.60.129
+ frequency 5
+ip sla schedule 2 life forever start-time now
+logging trap notifications
+logging origin-id hostname
+logging source-interface Loopback10
+logging host 172.31.249.36 transport udp port 5518
+logging host 172.31.253.36 transport udp port 5518
+access-list 1 permit any
+access-list 50 permit 172.31.249.0 0.0.0.255
+access-list 50 permit 172.31.253.0 0.0.0.255
+access-list 50 permit 200.218.181.0 0.0.0.255
+access-list 50 deny   any log
+access-list 50 permit 172.31.248.0 0.0.3.255
+access-list 50 permit 172.31.252.0 0.0.3.255
+dialer-list 1 protocol ip permit
+!
+!
+!
+!
+route-map ROTAS_DC permit 10
+ match ip address prefix-list ROTAS_DC
+!
+route-map LAN_TFL permit 10
+ match ip address prefix-list LAN_TFL
+!
+route-map OUT_TO_BB permit 10
+ match ip address prefix-list OUT_TO_BB
+!
+!
+snmp-server group GRP_LOTERICOS v2c write lotericos 
+snmp-server group GRP_LOTERICOS v3 auth write lotericos 
+snmp-server group GRP_LOTERICOS v3 priv write lotericos 
+snmp-server view lotericos iso included
+snmp-server community lotericos RW 50
+snmp-server trap-source Loopback10
+snmp-server source-interface informs Loopback10
+snmp-server manager
+tacacs server fac-ctc
+ address ipv4 172.31.248.45
+ key Consorcio123@
+tacacs server fac-dtc
+ address ipv4 172.31.252.45
+ key Consorcio123@
+!
+!
+!
+control-plane
+!
+!
+banner login ^CCC
+RTCS**********************************************************************************
+*                                                                                    *
+*                               #########################                            *
+*                               #########################                            *
+*                               ####                                                 *
+*                               ####                                                 *
+*                               ####                                                 *
+*                                                    ####                            *
+*                                                    ####                            *
+*                                                    ####                            *
+*                               #########################                            *
+*                               #########################                            *
+*                                                                                    *
+*                                         Alerta                                     *
+*                                                                                    *
+*                O acesso a este sistema e limitado a usuarios autorizados           *
+* Todas as informacoes e comunicacoes sobre este sistema sao monitoradas e gravadas. *
+*                 O Acesso sem autorizado esta sujeito as medidas legais.            *
+*                                                                                    *
+**************************************************************************************
+^C
+!
+line con 0
+line aux 0
+line 2
+ no activation-character
+ no exec
+ transport preferred none
+ transport input all
+ transport output pad telnet rlogin lapb-ta mop udptn v120 ssh
+ stopbits 1
+line vty 0 4
+ exec-timeout 15 0
+ transport input all
+ transport output all
+ escape-character 3
+!
+scheduler allocate 20000 1000
+ntp source Loopback1
+ntp server 172.31.252.66
+ntp server 172.31.248.66 prefer
+ntp server 172.31.252.215
+ntp server 172.31.248.215
+end
+
+21-025793-8_RT01#                                                            
+21-025793-8_RT01#
+21-025793-8_RT01#
+21-025793-8_RT01#sh run
+Building configuration...
+
+Current configuration : 8659 bytes
+!
+! Last configuration change at 16:48:33 BRZ Fri Jun 13 2025 by glauber.souza
+! NVRAM config last updated at 16:50:55 BRZ Fri Jun 13 2025 by glauber.souza
+! NVRAM config last updated at 16:50:55 BRZ Fri Jun 13 2025 by glauber.souza
+version 15.1
+service config
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname 21-025793-8_RT01
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable password PDOc8N93!XNtREFx$
+!
+aaa new-model
+!
+!
+aaa group server tacacs+ fac-ctc
+ server name fac-ctc
+ ip tacacs source-interface Loopback1
+!
+aaa group server tacacs+ fac-dtc
+ server name fac-dtc
+ ip tacacs source-interface Loopback1
+!
+aaa authentication login default group fac-ctc group fac-dtc local
+aaa authentication ppp default local
+aaa authorization config-commands
+aaa authorization exec default group fac-ctc group fac-dtc local 
+!
+!
+!
+!
+!
+aaa session-id common
+!
+memory-size iomem 25
+clock timezone BRZ -3 0
+!
+no ipv6 cef
+ip source-route
+ip cef
+!         
+!
+!
+!
+!
+no ip domain lookup
+ip domain name sencinet.com
+!
+multilink bundle-name authenticated
+!
+crypto pki token default removal timeout 0
+!
+!
+license udi pid CISCO1921/K9 sn FTX1619Y00G
+license boot module c1900 technology-package securityk9
+!
+!
+username sysop privilege 15 password 0 PDOc8N93!XNtREFx$
+!
+redundancy
+!
+!
+!
+!
+ip tftp source-interface Loopback10
+!
+track 1 ip sla 1 reachability
+! 
+crypto isakmp invalid-spi-recovery
+!
+!
+!
+!
+!
+!
+interface Loopback1
+ description Loop  Primaria
+ ip address 10.51.86.69 255.255.255.255
+!
+interface Loopback2
+ description gerenciamento CEF circuito VIVO (principal OI)
+ ip address 10.51.9.76 255.255.255.255
+!
+interface Loopback10
+ description Loop Secundaria
+ ip address 10.50.181.24 255.255.255.255
+!
+interface Tunnel0
+ bandwidth 512
+ ip address 15.50.181.24 255.248.0.0
+ no ip redirects
+ ip nhrp map multicast 10.98.0.80
+ ip nhrp map 15.50.255.80 10.98.0.80
+ ip nhrp network-id 1
+ ip nhrp holdtime 90
+ ip nhrp nhs 15.50.255.80
+ delay 1000
+ tunnel source GigabitEthernet0/1
+ tunnel mode gre multipoint
+!
+interface Embedded-Service-Engine0/0
+ no ip address
+ shutdown
+!
+interface GigabitEthernet0/0
+ ip address 10.51.22.129 255.255.255.252 secondary
+ ip address 99.245.60.129 255.255.255.240
+ ip helper-address 172.31.252.215
+ ip helper-address 172.31.248.215
+ ip directed-broadcast
+ duplex auto
+ speed auto
+ no keepalive
+!
+interface GigabitEthernet0/0.200
+ description Link VIVO
+ encapsulation dot1Q 200
+ ip address 10.202.4.118 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description Conectado ao device Elsys LTE
+ ip address 192.168.10.100 255.255.255.0
+ duplex auto
+ speed auto
+ no keepalive
+!
+router bgp 64765
+ bgp router-id 10.50.181.24
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ timers bgp 10 30
+ neighbor 10.202.4.117 remote-as 10429
+ neighbor 15.50.255.80 remote-as 65055
+ !
+ address-family ipv4
+  network 10.50.181.24 mask 255.255.255.252
+  network 10.51.22.128 mask 255.255.255.252
+  network 99.245.60.128 mask 255.255.255.240
+  redistribute connected route-map LAN_TFL
+  neighbor 10.202.4.117 activate
+  neighbor 10.202.4.117 route-map ROTAS_DC in
+  neighbor 10.202.4.117 route-map LAN_TFL out
+  neighbor 15.50.255.80 activate
+  neighbor 15.50.255.80 soft-reconfiguration inbound
+  neighbor 15.50.255.80 route-map OUT_TO_BB out
+ exit-address-family
+!
+ip forward-protocol nd
+!
+no ip http server
+no ip http secure-server
+!
+ip route 0.0.0.0 0.0.0.0 192.168.10.254 200
+ip route 10.98.0.80 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.81 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.82 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.83 255.255.255.255 192.168.10.254 200
+ip route 10.98.0.84 255.255.255.255 192.168.10.254 200
+ip tacacs source-interface Loopback1
+!
+!
+ip prefix-list LAN_TFL seq 10 permit 99.244.0.0/14 le 28
+ip prefix-list LAN_TFL seq 20 permit 10.51.0.0/16 le 32
+ip prefix-list LAN_TFL seq 21 permit 10.51.9.76/32
+!
+ip prefix-list OUT_TO_BB seq 10 permit 10.50.181.24/32
+ip prefix-list OUT_TO_BB seq 20 permit 99.245.60.128/28
+ip prefix-list OUT_TO_BB seq 30 permit 10.51.22.128/30
+!
+ip prefix-list ROTAS_DC seq 10 permit 172.16.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 20 permit 172.17.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 30 permit 172.18.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 40 permit 172.24.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 50 permit 172.27.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 60 permit 172.31.0.0/16 le 32
+ip prefix-list ROTAS_DC seq 70 permit 200.218.181.0/24 le 32
+ip prefix-list ROTAS_DC seq 80 permit 10.51.127.255/32
+ip prefix-list ROTAS_DC seq 90 permit 10.51.98.94/32
+!
+ip prefix-list STATIC_TO_BGP seq 10 permit 172.16.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 20 permit 172.17.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 30 permit 172.18.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 40 permit 172.24.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 50 permit 172.27.0.0/16 le 32
+ip prefix-list STATIC_TO_BGP seq 60 permit 172.31.0.0/16 le 32
+ip sla 1
+ icmp-echo 10.19.0.1 source-interface Loopback10
+ frequency 5
+ip sla schedule 1 life forever start-time now
+ip sla 2
+ icmp-echo 10.19.0.1 source-ip 99.245.60.129
+ frequency 5
+ip sla schedule 2 life forever start-time now
+logging trap notifications
+logging origin-id hostname
+logging source-interface Loopback10
+logging host 172.31.249.36 transport udp port 5518
+logging host 172.31.253.36 transport udp port 5518
+access-list 1 permit any
+access-list 50 permit 172.31.249.0 0.0.0.255
+access-list 50 permit 172.31.253.0 0.0.0.255
+access-list 50 permit 200.218.181.0 0.0.0.255
+access-list 50 deny   any log
+access-list 50 permit 172.31.248.0 0.0.3.255
+access-list 50 permit 172.31.252.0 0.0.3.255
+dialer-list 1 protocol ip permit
+!
+!
+!
+!
+route-map ROTAS_DC permit 10
+ match ip address prefix-list ROTAS_DC
+!
+route-map LAN_TFL permit 10
+ match ip address prefix-list LAN_TFL
+!
+route-map OUT_TO_BB permit 10
+ match ip address prefix-list OUT_TO_BB
+!
+!
+snmp-server group GRP_LOTERICOS v2c write lotericos 
+snmp-server group GRP_LOTERICOS v3 auth write lotericos 
+snmp-server group GRP_LOTERICOS v3 priv write lotericos 
+snmp-server view lotericos iso included
+snmp-server community lotericos RW 50
+snmp-server trap-source Loopback10
+snmp-server source-interface informs Loopback10
+snmp-server manager
+tacacs server fac-ctc
+ address ipv4 172.31.248.45
+ key Consorcio123@
+tacacs server fac-dtc
+ address ipv4 172.31.252.45
+ key Consorcio123@
+!
+!
+!
+control-plane
+!
+!
+banner login ^CCC
+RTCS**********************************************************************************
+*                                                                                    *
+*                               #########################                            *
+*                               #########################                            *
+*                               ####                                                 *
+*                               ####                                                 *
+*                               ####                                                 *
+*                                                    ####                            *
+*                                                    ####                            *
+*                                                    ####                            *
+*                               #########################                            *
+*                               #########################                            *
+*                                                                                    *
+*                                         Alerta                                     *
+*                                                                                    *
+*                O acesso a este sistema e limitado a usuarios autorizados           *
+* Todas as informacoes e comunicacoes sobre este sistema sao monitoradas e gravadas. *
+*                 O Acesso sem autorizado esta sujeito as medidas legais.            *
+*                                                                                    *
+**************************************************************************************
+^C
+!
+line con 0
+line aux 0
+line 2
+ no activation-character
+ no exec
+ transport preferred none
+ transport input all
+ transport output pad telnet rlogin lapb-ta mop udptn v120 ssh
+ stopbits 1
+line vty 0 4
+ exec-timeout 15 0
+ transport input all
+ transport output all
+ escape-character 3
+!
+scheduler allocate 20000 1000
+ntp source Loopback1
+ntp server 172.31.252.66
+ntp server 172.31.248.66 prefer
+ntp server 172.31.252.215
+ntp server 172.31.248.215
+end
+
+21-025793-8_RT01

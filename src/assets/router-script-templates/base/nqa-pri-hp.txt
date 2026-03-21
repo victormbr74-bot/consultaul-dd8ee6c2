@@ -1,0 +1,41 @@
+undo nqa entry icmp loop1
+nqa entry icmp loop1
+ type icmp-echo
+  data-size 20
+  destination ip 10.51.127.255
+  frequency 30000
+  source ip 10.51.5.29
+#
+undo nqa entry icmp loop10
+nqa entry icmp loop10
+ type icmp-echo
+  data-size 20
+  destination ip 10.98.0.1
+  frequency 30000
+  source ip 10.50.156.58
+#
+undo nqa entry latencia icmp
+nqa entry latencia icmp
+ type icmp-echo
+  data-size 32
+  description Flexvision
+  destination ip 10.51.127.255
+  frequency 300000
+  probe count 15
+  source ip 10.51.5.29
+#
+undo nqa entry latencia icmq
+nqa entry latencia icmq
+ type icmp-echo
+  data-size 32
+  description Flexvision
+  destination ip 10.98.0.1
+  frequency 300000
+  probe count 15
+  source ip 10.50.156.58
+#
+nqa schedule icmp loopback10 start-time now lifetime forever
+nqa schedule icmp loop1 start-time now lifetime forever
+nqa schedule latencia icmp start-time now lifetime forever
+nqa schedule latencia icmq start-time now lifetime forever
+

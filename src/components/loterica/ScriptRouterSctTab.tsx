@@ -240,6 +240,11 @@ const createEmptyCustomTemplateForm = (
   isActive: true,
 });
 
+type ImportedTemplateDraft = Omit<CustomTemplateFormState, "id" | "content" | "isActive"> & {
+  content: string;
+  sourceFileName: string;
+};
+
 const toUpperNoAccent = (value: unknown) => {
   return normalizeText(value)
     .normalize("NFD")
@@ -261,6 +266,83 @@ const readTextFile = (file: File) =>
     reader.onerror = () => reject(reader.error || new Error("Falha ao ler o arquivo do modelo."));
     reader.readAsText(file);
   });
+
+const detectModelFromTemplateFileName = (value: string, fallback: RouterModel): RouterModel => {
+  const signal = toUpperNoAccent(value);
+
+  if (signal.includes("CISCO") || signal.includes("1900") || signal.includes("1921")) return "cisco1900";
+  if (signal.includes("HUAWEI") || signal.includes("AR121")) return "huawei";
+  if (signal.includes("20-11") || signal.includes("2011")) return "hp20-11";
+  if (signal.includes("1002-4") || signal.includes("10024") || signal.includes("1002")) return "hp1002-4";
+  if (signal.includes("931")) return "hpmsr931";
+  if (signal.includes("920")) return "hpmsr920";
+  if (signal.includes("900") || signal.includes("HPMSR") || signal.includes("HPE MSR") || signal.includes("MSR 900")) return "hpmsr900";
+
+  return fallback;
+};
+
+const inferImportedTemplateDraft = (
+  fileName: string,
+  content: string,
+  fallback: Pick<CustomTemplateFormState, "routerRole" | "model" | "technology" | "owner" | "switchTopology" | "scriptVariant">,
+): ImportedTemplateDraft => {
+  const name = normalizeText(fileName).replace(/\.[^.]+$/u, "");
+  const signal = toUpperNoAccent(name);
+  const fallbackModel = fallback.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "hpmsr900" : fallback.model;
+  const fallbackTechnology = fallback.technology === ROUTER_SCRIPT_TEMPLATE_ANY ? "vsat" : fallback.technology;
+  const fallbackOwner = fallback.owner === ROUTER_SCRIPT_TEMPLATE_ANY ? "sencinet" : fallback.owner;
+  const fallbackSwitchTopology = fallback.switchTopology === ROUTER_SCRIPT_TEMPLATE_ANY ? "sem-switch" : fallback.switchTopology;
+  const model = detectModelFromTemplateFileName(name, fallbackModel);
+  const explicitTechnology = VSAT_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))
+    ? "vsat"
+    : FOUR_G_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))
+      ? "4g"
+      : null;
+  const explicitRole = /\bPRI\b/.test(signal) || signal.includes("PRINCIPAL")
+    ? "principal"
+    : signal.includes("BKP") || signal.includes("BACKUP")
+      ? "backup"
+      : null;
+
+  const routerRole =
+    explicitRole ||
+    (explicitTechnology === "vsat" || explicitTechnology === "4g"
+      ? "backup"
+      : explicitTechnology === null && /\bPRI\b/.test(signal)
+        ? "principal"
+        : fallback.routerRole);
+  const technology =
+    explicitTechnology ||
+    (routerRole === "principal" ? "fibra" : fallbackTechnology);
+  const owner = /\bOWNER OI\b/.test(signal) || /\bOI\b/.test(signal)
+    ? "oi"
+    : signal.includes("SCT") || signal.includes("SENCINET")
+      ? "sencinet"
+      : fallbackOwner;
+  const switchTopology = signal.includes("C/SW") || signal.includes("COM SWITCH") || signal.includes("COMSWITCH")
+    ? "com-switch"
+    : signal.includes("S/SW") || signal.includes("SEM SWITCH") || signal.includes("SEMSWITCH")
+      ? "sem-switch"
+      : fallbackSwitchTopology;
+  const scriptVariant = /\bBGP\b/.test(signal)
+    ? "bgp"
+    : /\bNQA\b/.test(signal)
+      ? "nqa"
+      : "completo";
+
+  return {
+    name,
+    routerRole,
+    model,
+    technology,
+    owner,
+    switchTopology,
+    scriptVariant,
+    content,
+    notes: `Importado de ${fileName}`,
+    sourceFileName: fileName,
+  };
+};
 
 const formatDateTimePtBr = (value: string | null) => {
   if (!value) return "-";
@@ -793,7 +875,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   }, [model, owner, routerRole, scriptVariant, switchTopology, technology]);
 
   const fetchCustomTemplates = useCallback(async () => {
-    if (!isAdmin) {
+    if (!user) {
       setCustomTemplates([]);
       setCustomTemplatesError("");
       return;
@@ -831,31 +913,114 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     } finally {
       setCustomTemplatesLoading(false);
     }
-  }, [isAdmin]);
+  }, [user]);
 
   useEffect(() => {
     void fetchCustomTemplates();
   }, [fetchCustomTemplates]);
 
   const handleTemplateFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
 
     try {
-      const text = await readTextFile(file);
-      setCustomTemplateForm((current) => ({
-        ...current,
-        name: current.name || file.name.replace(/\.[^.]+$/u, ""),
-        content: text,
-      }));
-      setCustomTemplateNotice(`Arquivo '${file.name}' carregado no editor.`);
+      setCustomTemplatesError("");
+
+      const loadedFiles = await Promise.all(
+        files.map(async (file) => {
+          const text = await readTextFile(file);
+          return inferImportedTemplateDraft(file.name, text, customTemplateForm);
+        }),
+      );
+
+      if (loadedFiles.length === 1) {
+        const imported = loadedFiles[0];
+        setCustomTemplateForm((current) => ({
+          ...current,
+          name: imported.name,
+          routerRole: imported.routerRole,
+          model: imported.model,
+          technology: imported.technology,
+          owner: imported.owner,
+          switchTopology: imported.switchTopology,
+          scriptVariant: imported.scriptVariant,
+          content: imported.content,
+          notes: imported.notes,
+        }));
+        setCustomTemplateNotice(`Arquivo '${imported.sourceFileName}' carregado no editor com campos identificados automaticamente.`);
+        return;
+      }
+
+      if (!isAdmin) {
+        throw new Error("A importacao em lote de modelos esta disponivel apenas para administradores.");
+      }
+
+      setCustomTemplateSaving(true);
+      setCustomTemplateNotice("");
+
+      const findExistingTemplate = (draft: ImportedTemplateDraft) =>
+        customTemplates.find((template) =>
+          toUpperNoAccent(template.name) === toUpperNoAccent(draft.name) ||
+          (
+            template.router_role === draft.routerRole &&
+            template.model === draft.model &&
+            template.technology === draft.technology &&
+            template.owner === draft.owner &&
+            template.switch_topology === draft.switchTopology &&
+            template.script_variant === draft.scriptVariant
+          )
+        );
+
+      for (const imported of loadedFiles) {
+        const payload = {
+          name: imported.name,
+          router_role: imported.routerRole,
+          model: imported.model,
+          technology: imported.technology,
+          owner: imported.owner,
+          switch_topology: imported.switchTopology,
+          script_variant: imported.scriptVariant,
+          content: imported.content,
+          notes: imported.notes,
+          is_active: true,
+          updated_by: user?.id || null,
+        };
+
+        const existing = findExistingTemplate(imported);
+        if (existing) {
+          const { error: updateError } = await (supabase as any)
+            .from("router_script_templates")
+            .update(payload)
+            .eq("id", existing.id);
+
+          if (updateError) {
+            throw new Error(updateError.message || `Falha ao atualizar o modelo '${imported.name}'.`);
+          }
+        } else {
+          const { error: insertError } = await (supabase as any)
+            .from("router_script_templates")
+            .insert({
+              ...payload,
+              created_by: user?.id || null,
+            });
+
+          if (insertError) {
+            throw new Error(insertError.message || `Falha ao cadastrar o modelo '${imported.name}'.`);
+          }
+        }
+      }
+
+      await fetchCustomTemplates();
+      resetCustomTemplateForm();
+      setCustomTemplateNotice(`${loadedFiles.length} arquivo(s) importado(s) com identificacao automatica dos campos.`);
     } catch (fileError) {
       console.error("Falha ao ler modelo customizado", fileError);
       setCustomTemplatesError(String((fileError as Error)?.message || fileError || "Falha ao ler o arquivo."));
     } finally {
+      setCustomTemplateSaving(false);
       event.target.value = "";
     }
-  }, []);
+  }, [customTemplateForm, customTemplates, fetchCustomTemplates, isAdmin, resetCustomTemplateForm, user?.id]);
 
   const handleEditCustomTemplate = useCallback((template: RouterScriptCustomTemplateRow) => {
     setCustomTemplateForm({
@@ -1671,6 +1836,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                   ref={templateFileInputRef}
                   type="file"
                   accept={CUSTOM_TEMPLATE_ACCEPT}
+                  multiple
                   className="hidden"
                   onChange={handleTemplateFileChange}
                 />
@@ -1681,7 +1847,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                       {customTemplateForm.id ? "Editar modelo" : "Novo modelo"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Modelos parciais aceitam o mesmo mecanismo de placeholders dos completos.
+                      Modelos parciais aceitam o mesmo mecanismo de placeholders dos completos. Um arquivo abre no editor; varios arquivos importam em lote.
                     </p>
                   </div>
                   <Button

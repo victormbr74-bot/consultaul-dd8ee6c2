@@ -162,7 +162,7 @@ const MODEL_OPTIONS: Array<{ value: RouterModel; label: string }> = [
 ];
 
 const ROUTER_ROLE_OPTIONS: Array<{ value: RouterRole; label: string }> = [
-  { value: "principal", label: "Principal" },
+  { value: "principal", label: "Principal / PRI" },
   { value: "backup", label: "Backup" },
 ];
 
@@ -432,13 +432,36 @@ const detectOwner = (row: LotericaLookupRow): OwnerType => {
   return "sencinet";
 };
 
-const detectTechnology = (row: LotericaLookupRow): LinkTechnology => {
-  const signal = toUpperNoAccent([
+const BACKUP_SIGNAL_KEYWORDS = ["VSAT", "4G", "SIM CARD", "VIVO", "TIM", "ARQIA", "CLARO", "BRISANET"] as const;
+
+const buildRouterSignal = (row: LotericaLookupRow) => {
+  const rawValues =
+    row.raw_data && typeof row.raw_data === "object"
+      ? Object.values(row.raw_data as Record<string, unknown>).map((value) => normalizeText(value))
+      : [];
+
+  return toUpperNoAccent([
     getRawValueByAliases(row, ["TECNOLOGIA"]),
     getRawValueByAliases(row, ["VSAT"]),
     getRawValueByAliases(row, ["SIM CARD 4G"]),
+    getRawValueByAliases(row, ["OPERADORA 4G", "OPERADORA"]),
     row.operadora || "",
+    ...rawValues,
   ].join(" | "));
+};
+
+const hasPriMarker = (row: LotericaLookupRow) => /\bPRI\b/.test(buildRouterSignal(row));
+
+const detectRouterRole = (row: LotericaLookupRow): RouterRole => {
+  const signal = buildRouterSignal(row);
+
+  if (hasPriMarker(row)) return "principal";
+  if (BACKUP_SIGNAL_KEYWORDS.some((keyword) => signal.includes(keyword))) return "backup";
+  return "principal";
+};
+
+const detectTechnology = (row: LotericaLookupRow, routerRole: RouterRole = detectRouterRole(row)): LinkTechnology => {
+  const signal = buildRouterSignal(row);
 
   if (signal.includes("VSAT")) return "vsat";
   if (
@@ -450,6 +473,8 @@ const detectTechnology = (row: LotericaLookupRow): LinkTechnology => {
   ) {
     return "4g";
   }
+
+  if (routerRole === "principal") return "fibra";
 
   const model = detectModel(row);
   if (model === "huawei" || model === "hp20-11" || model === "hpmsr920") return "4g";
@@ -486,9 +511,6 @@ const chooseTemplate = (
 
   if (routerRole === "principal") {
     templateId = owner === "oi" ? "cisco1900-principal-oi" : "cisco1900-principal-sencinet";
-    if (technology !== "fibra") {
-      warnings.push("Roteador principal usa tecnologia Fibra. A opcao foi ajustada para o template principal.");
-    }
     return { templateId, warnings };
   }
 
@@ -1004,20 +1026,22 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             : {},
       } as LotericaLookupRow;
 
+      const detectedRole = detectRouterRole(normalizedRow);
+      const detectedTechnology = detectTechnology(normalizedRow, detectedRole);
+
       setLoterica(normalizedRow);
       setCodUlInput(normalizeText(normalizedRow.cod_ul));
-
+      setRouterRole(detectedRole);
       setOwner(detectOwner(normalizedRow));
       setSwitchTopology(detectSwitchTopology(normalizedRow));
-      if (routerRole === "principal") {
+      if (detectedRole === "principal") {
         setModel("cisco1900");
-        setTechnology("fibra");
-        setOperadora4g("nao-se-aplica");
+        setTechnology(detectedTechnology);
       } else {
         setModel(detectBackupModel(normalizedRow));
-        setTechnology(detectTechnology(normalizedRow));
-        setOperadora4g(detectOperadora4g(normalizedRow));
+        setTechnology(detectedTechnology);
       }
+      setOperadora4g(detectedTechnology === "4g" ? detectOperadora4g(normalizedRow) : "nao-se-aplica");
 
       return normalizedRow;
     } catch (lookupError) {
@@ -1032,26 +1056,30 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     } finally {
       setLoadingLookup(false);
     }
-  }, [codUlInput, routerRole]);
+  }, [codUlInput]);
 
   useEffect(() => {
     if (routerRole === "principal") {
       setModel("cisco1900");
-      setTechnology("fibra");
-      setOperadora4g("nao-se-aplica");
+      if (!loterica) return;
+
+      const detectedTechnology = detectTechnology(loterica, "principal");
+      setTechnology(detectedTechnology);
+      setOperadora4g(detectedTechnology === "4g" ? detectOperadora4g(loterica) : "nao-se-aplica");
       return;
     }
 
     if (!loterica) {
-      if (model === "cisco1900") setModel("hpmsr900");
-      if (technology === "fibra") setTechnology("vsat");
+      setModel((current) => (current === "cisco1900" ? "hpmsr900" : current));
+      setTechnology((current) => (current === "fibra" ? "vsat" : current));
       return;
     }
 
+    const detectedTechnology = detectTechnology(loterica, "backup");
     setModel(detectBackupModel(loterica));
-    setTechnology(detectTechnology(loterica));
-    setOperadora4g(detectOperadora4g(loterica));
-  }, [loterica, model, routerRole, technology]);
+    setTechnology(detectedTechnology);
+    setOperadora4g(detectedTechnology === "4g" ? detectOperadora4g(loterica) : "nao-se-aplica");
+  }, [loterica, routerRole]);
 
   useEffect(() => {
     const initial = normalizeText(initialCodUl);
@@ -1267,9 +1295,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
 
   const availableTechOptions = useMemo(
     () =>
-      TECH_OPTIONS.filter((item) =>
-        routerRole === "principal" ? item.value === "fibra" : item.value !== "fibra",
-      ),
+      TECH_OPTIONS.filter((item) => (routerRole === "principal" ? true : item.value !== "fibra")),
     [routerRole],
   );
   const matchingCustomTemplate = useMemo(
@@ -1398,7 +1424,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
             <Select
               value={operadora4g}
               onValueChange={(value) => setOperadora4g(value as Operadora4g)}
-              disabled={routerRole === "principal" || technology !== "4g"}
+              disabled={technology !== "4g"}
             >
               <SelectTrigger>
                 <SelectValue />

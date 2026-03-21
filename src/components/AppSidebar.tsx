@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
-import { Store, Search, FileText, FileCheck, Terminal, Wifi, LogOut, User, Users, Download, Upload, KeyRound, Palette, Database, ListChecks, Activity, PlusCircle } from "lucide-react";
+import {
+  Store,
+  Search,
+  FileText,
+  FileCheck,
+  Terminal,
+  Wifi,
+  LogOut,
+  User,
+  Users,
+  Download,
+  Upload,
+  KeyRound,
+  Palette,
+  Database,
+  ListChecks,
+  Activity,
+  PlusCircle,
+} from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,13 +57,20 @@ export function AppSidebar() {
     setLotericaTab,
     consultaSearch,
     setConsultaSearch,
+    showLotericaTabs,
   } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
   const isDashboardRoute = location.pathname === "/";
-  const shouldShowLotericaTabs = true;
+  const isLotericaRoute = location.pathname.startsWith("/loterica/");
+  const isDashboardToolView = location.pathname === "/" && (lotericaTab === "pingao" || lotericaTab === "script-router-sct");
+  const isConsultaUlActive =
+    (location.pathname === "/" && !isDashboardToolView) ||
+    (isLotericaRoute && lotericaTab === "consulta");
+  const isScriptRouterActive =
+    lotericaTab === "script-router-sct" && (location.pathname === "/" || isLotericaRoute);
   const hasPendingChanges = pendingChangeCount > 0;
-  const codUlSegment = location.pathname.startsWith("/loterica/")
+  const codUlSegment = isLotericaRoute
     ? location.pathname.replace("/loterica/", "").split("/")[0] || ""
     : "";
   const codUlFromDetailRoute = (() => {
@@ -59,11 +84,23 @@ export function AppSidebar() {
   const ping99Path = ping99SeedTerm ? `/ping99?q=${encodeURIComponent(ping99SeedTerm)}` : "/ping99";
 
   const lotericaTabs = [
-    { id: "consulta", label: "Consulta", icon: Search },
-    { id: "mascara", label: "Máscara", icon: FileText },
+    { id: "mascara", label: "Mascara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
-    ...(isAdmin ? [{ id: "script-router-sct", label: "Script Router SCT", icon: Terminal }] : []),
   ];
+
+  const openConsultaUl = useCallback(() => {
+    setLotericaTab("consulta");
+    if (!isLotericaRoute) {
+      navigate("/");
+    }
+  }, [isLotericaRoute, navigate, setLotericaTab]);
+
+  const openLotericaTab = useCallback((tabId: string) => {
+    setLotericaTab(tabId);
+    if (!isLotericaRoute) {
+      navigate("/");
+    }
+  }, [isLotericaRoute, navigate, setLotericaTab]);
 
   const fetchPendingChangeCount = useCallback(async () => {
     if (!isAdmin) {
@@ -130,7 +167,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          {/* TODO: Remover bloco worldCupFlag apos a Copa do Mundo 2026 */}
+            {/* TODO: Remover bloco worldCupFlag apos a Copa do Mundo 2026 */}
             {worldCupFlagImg ? (
               <img src={worldCupFlagImg} alt="Bandeira" className="w-6 h-4 object-cover rounded-sm" />
             ) : (
@@ -140,7 +177,7 @@ export function AppSidebar() {
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-bold text-sm text-sidebar-foreground">Consulta Lotericas</span>
             <span className="order-last text-[9px] text-sidebar-foreground/40">Versao {appVersionLabel}</span>
-            <span className="text-[10px] text-sidebar-foreground/50">{"Gestão de unidades"}</span>
+            <span className="text-[10px] text-sidebar-foreground/50">Gestao de unidades</span>
           </div>
         </div>
       </SidebarHeader>
@@ -151,7 +188,7 @@ export function AppSidebar() {
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={"Buscar por codigo, nome, CCTO ou cidade..."}
+                placeholder="Buscar por codigo, nome, CCTO ou cidade..."
                 className="pl-9 bg-sidebar border-sidebar-border"
                 value={consultaSearch}
                 onChange={(e) => setConsultaSearch(e.target.value)}
@@ -165,18 +202,21 @@ export function AppSidebar() {
             </div>
           </div>
         )}
+
         <SidebarGroup>
-          <SidebarGroupLabel>{"Navegação"}</SidebarGroupLabel>
+          <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                    <Search className="mr-2 h-4 w-4" />
-                    <span>Consulta UL</span>
-                  </NavLink>
+                <SidebarMenuButton
+                  onClick={openConsultaUl}
+                  className={isConsultaUlActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  <span>Consulta UL</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               {isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
@@ -187,6 +227,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
@@ -195,6 +236,7 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/validacao" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
@@ -203,6 +245,7 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to={ping99Path} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
@@ -211,6 +254,7 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/pingao" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
@@ -219,14 +263,16 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/pingao-nat" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Activity className="mr-2 h-4 w-4" />
-                    <span>Pingão NAT</span>
+                    <span>Pingao NAT</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/comparar-texto" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
@@ -235,35 +281,33 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+              {showLotericaTabs && lotericaTabs.map((tab) => (
+                <SidebarMenuItem key={tab.id}>
+                  <SidebarMenuButton
+                    onClick={() => openLotericaTab(tab.id)}
+                    className={isLotericaRoute && lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                  >
+                    <tab.icon className="mr-2 h-4 w-4" />
+                    <span>{tab.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => openLotericaTab("script-router-sct")}
+                    className={isScriptRouterActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                  >
+                    <Terminal className="mr-2 h-4 w-4" />
+                    <span>Script Router SCT</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {shouldShowLotericaTabs && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{"Lotérica"}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {lotericaTabs.map((tab) => (
-                  <SidebarMenuItem key={tab.id}>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        setLotericaTab(tab.id);
-                        if (!location.pathname.startsWith("/loterica/")) {
-                          navigate("/");
-                        }
-                      }}
-                      className={lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
-                    >
-                      <tab.icon className="mr-2 h-4 w-4" />
-                      <span>{tab.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Dados</SidebarGroupLabel>
@@ -285,17 +329,16 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>{"Administração"}</SidebarGroupLabel>
+            <SidebarGroupLabel>Administracao</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin/dados" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Database className="mr-2 h-4 w-4" />
-                      <span>{"Gerenciar Dados"}</span>
+                      <span>Gerenciar Dados</span>
                       {hasPendingChanges && (
                         <span className="ml-auto inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
                           {pendingChangeCount > 99 ? "99+" : pendingChangeCount}
@@ -308,7 +351,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin/usuarios" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Users className="mr-2 h-4 w-4" />
-                      <span>{"Gerenciar Usuários"}</span>
+                      <span>Gerenciar Usuarios</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -316,7 +359,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin/import-nat" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <Upload className="mr-2 h-4 w-4" />
-                      <span>{"Importar IPs NAT"}</span>
+                      <span>Importar IPs NAT</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -333,7 +376,7 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild>
                   <NavLink to="/temas" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Palette className="mr-2 h-4 w-4" />
-                    <span>Aparência</span>
+                    <span>Aparencia</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -357,7 +400,7 @@ export function AppSidebar() {
           </div>
           <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name}</p>
-            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usuário"}</p>
+            <p className="text-[10px] text-sidebar-foreground/50">{profile?.user_code || "Usuario"}</p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={signOut} title="Sair">
             <LogOut className="w-4 h-4" />
@@ -367,4 +410,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyCustomTemplatePlaceholders,
+  normalizeRouterModelValue,
   resolveCustomRouterScriptTemplate,
   type RouterScriptCustomTemplateRow,
   type RouterScriptPlaceholderContext,
@@ -127,5 +128,21 @@ describe("applyCustomTemplatePlaceholders", () => {
   it("clears unknown placeholders instead of leaving raw tokens", () => {
     const output = applyCustomTemplatePlaceholders("x {{TOKEN_INEXISTENTE}} y", placeholderContext);
     expect(output).toBe("x  y");
+  });
+});
+
+describe("normalizeRouterModelValue", () => {
+  it("maps HP aliases to the canonical HPMSR models", () => {
+    expect(normalizeRouterModelValue("HPMSR900")).toBe("hpmsr900");
+    expect(normalizeRouterModelValue("HP 900")).toBe("hpmsr900");
+    expect(normalizeRouterModelValue("HPMSR 920")).toBe("hpmsr920");
+    expect(normalizeRouterModelValue("HP 931")).toBe("hpmsr931");
+  });
+
+  it("keeps the existing non-HP models recognized", () => {
+    expect(normalizeRouterModelValue("HP 20-11")).toBe("hp20-11");
+    expect(normalizeRouterModelValue("HP 1002-4")).toBe("hp1002-4");
+    expect(normalizeRouterModelValue("Cisco 1921")).toBe("cisco1900");
+    expect(normalizeRouterModelValue("Huawei")).toBe("huawei");
   });
 });

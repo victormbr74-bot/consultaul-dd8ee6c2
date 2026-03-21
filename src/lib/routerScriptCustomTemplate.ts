@@ -8,6 +8,39 @@ export type SwitchTopology = "com-switch" | "sem-switch";
 export type Operadora4g = "vivo" | "tim" | "arqia" | "nao-se-aplica";
 export type TemplateScopeValue<T extends string> = T | "any";
 
+export const ROUTER_MODEL_LABELS: Record<RouterModel, string> = {
+  cisco1900: "Cisco 1900",
+  huawei: "Huawei",
+  "hp20-11": "HP20-11 / HP 2011",
+  "hp1002-4": "HP1002-4 / HP 1002",
+  hpmsr900: "HPMSR900 / HP 900",
+  hpmsr931: "HPMSR931 / HP 931",
+  hpmsr920: "HPMSR920 / HP 920",
+};
+
+const normalizeRouterModelToken = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+export const normalizeRouterModelValue = (value: unknown): RouterModel => {
+  const token = normalizeRouterModelToken(value);
+
+  if (!token) return "hpmsr900";
+  if (token.includes("CISCO") || token.includes("1900") || token.includes("1921")) return "cisco1900";
+  if (token.includes("HUAWEI")) return "huawei";
+  if (token.includes("2011")) return "hp20-11";
+  if (token.includes("10024") || token.includes("1002")) return "hp1002-4";
+  if (token.includes("931")) return "hpmsr931";
+  if (token.includes("920")) return "hpmsr920";
+  if (token.includes("900")) return "hpmsr900";
+  if (token === "HPMSR" || token === "HP") return "hpmsr900";
+
+  return "hpmsr900";
+};
+
 export interface RouterScriptCustomTemplateRow {
   id: string;
   name: string;

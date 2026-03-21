@@ -7,7 +7,9 @@ import { extractRouterScriptVariant, ROUTER_SCRIPT_VARIANT_LABELS, type RouterSc
 import {
   ROUTER_SCRIPT_PLACEHOLDER_HINTS,
   ROUTER_SCRIPT_TEMPLATE_ANY,
+  ROUTER_MODEL_LABELS,
   applyCustomTemplatePlaceholders,
+  normalizeRouterModelValue,
   resolveCustomRouterScriptTemplate,
   type LinkTechnology,
   type Operadora4g,
@@ -152,13 +154,13 @@ const TEMPLATE_META: Record<TemplateId, { label: string; filePath: string }> = {
 const templateCache = new Map<TemplateId, string>();
 
 const MODEL_OPTIONS: Array<{ value: RouterModel; label: string }> = [
-  { value: "cisco1900", label: "Cisco 1900" },
-  { value: "huawei", label: "HUAWEI" },
-  { value: "hp20-11", label: "HP20-11" },
-  { value: "hp1002-4", label: "HP 1002-4" },
-  { value: "hpmsr900", label: "HPMSR900" },
-  { value: "hpmsr931", label: "HPMSR931" },
-  { value: "hpmsr920", label: "HPMSR920" },
+  { value: "cisco1900", label: ROUTER_MODEL_LABELS.cisco1900 },
+  { value: "huawei", label: ROUTER_MODEL_LABELS.huawei },
+  { value: "hp20-11", label: ROUTER_MODEL_LABELS["hp20-11"] },
+  { value: "hp1002-4", label: ROUTER_MODEL_LABELS["hp1002-4"] },
+  { value: "hpmsr900", label: ROUTER_MODEL_LABELS.hpmsr900 },
+  { value: "hpmsr931", label: ROUTER_MODEL_LABELS.hpmsr931 },
+  { value: "hpmsr920", label: ROUTER_MODEL_LABELS.hpmsr920 },
 ];
 
 const ROUTER_ROLE_OPTIONS: Array<{ value: RouterRole; label: string }> = [
@@ -409,15 +411,7 @@ const deriveTunnelIpFromPrimaryLoopback = (loopback: string) => {
 };
 
 const detectModel = (row: LotericaLookupRow): RouterModel => {
-  const source = toUpperNoAccent(getRawValueByAliases(row, ["MODELO ROTEADOR"]));
-  if (source.includes("CISCO") || source.includes("1900") || source.includes("1921")) return "cisco1900";
-  if (source.includes("HUAWEI")) return "huawei";
-  if (source.includes("20-11") || source.includes("2011")) return "hp20-11";
-  if (source.includes("1002")) return "hp1002-4";
-  if (source.includes("931")) return "hpmsr931";
-  if (source.includes("920")) return "hpmsr920";
-  if (source.includes("900")) return "hpmsr900";
-  return "hpmsr900";
+  return normalizeRouterModelValue(getRawValueByAliases(row, ["MODELO ROTEADOR"]));
 };
 
 const detectBackupModel = (row: LotericaLookupRow): Exclude<RouterModel, "cisco1900"> => {
@@ -592,7 +586,10 @@ const normalizeCustomTemplateRow = (value: Record<string, unknown>): RouterScrip
   id: normalizeText(value.id),
   name: normalizeText(value.name),
   router_role: normalizeText(value.router_role) as RouterRole,
-  model: normalizeText(value.model) as TemplateScopeValue<RouterModel>,
+  model:
+    normalizeText(value.model) === ROUTER_SCRIPT_TEMPLATE_ANY
+      ? ROUTER_SCRIPT_TEMPLATE_ANY
+      : normalizeRouterModelValue(value.model),
   technology: normalizeText(value.technology) as TemplateScopeValue<LinkTechnology>,
   owner: normalizeText(value.owner) as TemplateScopeValue<OwnerType>,
   switch_topology: normalizeText(value.switch_topology) as TemplateScopeValue<SwitchTopology>,
@@ -1633,7 +1630,9 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="outline">{template.router_role}</Badge>
                         <Badge variant="outline">{template.script_variant}</Badge>
-                        <Badge variant="outline">{template.model}</Badge>
+                        <Badge variant="outline">
+                          {template.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "Qualquer" : ROUTER_MODEL_LABELS[template.model]}
+                        </Badge>
                         <Badge variant="outline">{template.technology}</Badge>
                         <Badge variant="outline">{template.owner}</Badge>
                         <Badge variant="outline">{template.switch_topology}</Badge>

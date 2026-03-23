@@ -20,6 +20,7 @@ import {
   ROUTER_MODEL_LABELS,
   applyCustomTemplatePlaceholders,
   normalizeRouterModelValue,
+  parseRouterModelValue,
   resolveCustomRouterScriptTemplate,
   type LinkTechnology,
   type Operadora4g,
@@ -324,17 +325,7 @@ const readTextFile = (file: File) =>
   });
 
 const detectModelFromTemplateFileName = (value: string, fallback: RouterModel): RouterModel => {
-  const signal = toUpperNoAccent(value);
-
-  if (signal.includes("CISCO") || signal.includes("1900") || signal.includes("1921")) return "cisco1900";
-  if (signal.includes("HUAWEI") || signal.includes("AR121")) return "huawei";
-  if (signal.includes("20-11") || signal.includes("2011")) return "hp20-11";
-  if (signal.includes("1002-4") || signal.includes("10024") || signal.includes("1002")) return "hp1002-4";
-  if (signal.includes("931")) return "hpmsr931";
-  if (signal.includes("920")) return "hpmsr920";
-  if (signal.includes("900") || signal.includes("HPMSR") || signal.includes("HPE MSR") || signal.includes("MSR 900")) return "hpmsr900";
-
-  return fallback;
+  return parseRouterModelValue(value) || fallback;
 };
 
 const inferImportedTemplateDraft = (
@@ -930,6 +921,8 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
   const [customTemplatesError, setCustomTemplatesError] = useState("");
   const [customTemplateSaving, setCustomTemplateSaving] = useState(false);
   const [customTemplateNotice, setCustomTemplateNotice] = useState("");
+  const [showPlaceholderHints, setShowPlaceholderHints] = useState(false);
+  const [showInactiveCustomTemplates, setShowInactiveCustomTemplates] = useState(false);
   const [customTemplateForm, setCustomTemplateForm] = useState<CustomTemplateFormState>(() =>
     createEmptyCustomTemplateForm("backup", "hpmsr900", "vsat", "sencinet", "nao-se-aplica", "sem-switch", "completo"),
   );
@@ -960,6 +953,14 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
         customTemplateForm.scriptVariant,
       ]),
     [customTemplateForm.scriptVariant, customTemplates],
+  );
+  const activeCustomTemplateCount = useMemo(
+    () => customTemplates.filter((template) => template.is_active).length,
+    [customTemplates],
+  );
+  const visibleCustomTemplates = useMemo(
+    () => (showInactiveCustomTemplates ? customTemplates : customTemplates.filter((template) => template.is_active)),
+    [customTemplates, showInactiveCustomTemplates],
   );
 
   useEffect(() => {
@@ -1149,37 +1150,50 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
     setCustomTemplateNotice(`Editando o modelo '${template.name}'.`);
   }, []);
 
-  const handleDeleteCustomTemplate = useCallback(async (template: RouterScriptCustomTemplateRow) => {
+  const handleToggleCustomTemplateActive = useCallback(async (template: RouterScriptCustomTemplateRow, nextIsActive: boolean) => {
     if (!isAdmin) return;
-    if (!window.confirm(`Excluir o modelo '${template.name}'?`)) return;
+
+    const confirmationMessage = nextIsActive
+      ? `Reativar o modelo '${template.name}'?`
+      : `Remover o modelo '${template.name}' da lista ativa? Ele permanecera salvo na base como inativo.`;
+    if (!window.confirm(confirmationMessage)) return;
 
     setCustomTemplateSaving(true);
     setCustomTemplateNotice("");
     setCustomTemplatesError("");
 
     try {
-      const { error: deleteError } = await (supabase as any)
+      const { error: updateError } = await (supabase as any)
         .from("router_script_templates")
-        .delete()
+        .update({
+          is_active: nextIsActive,
+          updated_by: user?.id || null,
+        })
         .eq("id", template.id);
 
-      if (deleteError) {
-        throw new Error(deleteError.message || "Falha ao excluir o modelo.");
+      if (updateError) {
+        throw new Error(updateError.message || "Falha ao atualizar o status do modelo.");
       }
 
       if (customTemplateForm.id === template.id) {
-        resetCustomTemplateForm();
+        setCustomTemplateForm((current) => ({ ...current, isActive: nextIsActive }));
       }
 
-      setCustomTemplateNotice(`Modelo '${template.name}' excluido.`);
+      setCustomTemplateNotice(
+        nextIsActive
+          ? `Modelo '${template.name}' reativado.`
+          : `Modelo '${template.name}' removido da lista ativa e mantido na base como inativo.`,
+      );
       await fetchCustomTemplates();
-    } catch (deleteError) {
-      console.error("Falha ao excluir modelo customizado", deleteError);
-      setCustomTemplatesError(String((deleteError as Error)?.message || deleteError || "Falha ao excluir o modelo."));
+    } catch (updateError) {
+      console.error("Falha ao atualizar status do modelo customizado", updateError);
+      setCustomTemplatesError(
+        String((updateError as Error)?.message || updateError || "Falha ao atualizar o status do modelo."),
+      );
     } finally {
       setCustomTemplateSaving(false);
     }
-  }, [customTemplateForm.id, fetchCustomTemplates, isAdmin, resetCustomTemplateForm]);
+  }, [customTemplateForm.id, fetchCustomTemplates, isAdmin, user?.id]);
 
   const handleSaveCustomTemplate = useCallback(async () => {
     if (!isAdmin) return;
@@ -1917,71 +1931,7 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
               </div>
             )}
 
-            <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium">Modelos salvos</p>
-                  <p className="text-xs text-muted-foreground">
-                    {customTemplatesLoading ? "Carregando..." : `${customTemplates.length} modelo(s) carregado(s)`}
-                  </p>
-                </div>
-
-                <div className="space-y-2 max-h-[720px] overflow-y-auto pr-1">
-                  {!customTemplatesLoading && customTemplates.length === 0 && (
-                    <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                      Nenhum modelo customizado cadastrado.
-                    </div>
-                  )}
-
-                  {customTemplates.map((template) => (
-                    <div key={template.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{template.name}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            Atualizado em {formatDateTimePtBr(template.updated_at || template.created_at)}
-                          </p>
-                        </div>
-                        <Badge variant={template.is_active ? "secondary" : "outline"}>
-                          {template.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="outline">{template.router_role}</Badge>
-                        <Badge variant="outline">{getRouterScriptVariantLabel(template.script_variant)}</Badge>
-                        <Badge variant="outline">
-                          {template.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "Qualquer" : ROUTER_MODEL_LABELS[template.model]}
-                        </Badge>
-                        <Badge variant="outline">{template.technology}</Badge>
-                        <Badge variant="outline">{template.owner}</Badge>
-                        <Badge variant="outline">{template.operadora_4g}</Badge>
-                        <Badge variant="outline">{template.switch_topology}</Badge>
-                      </div>
-
-                      {template.notes && <p className="text-xs text-muted-foreground whitespace-pre-line">{template.notes}</p>}
-
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleEditCustomTemplate(template)}>
-                          <Pencil className="w-4 h-4 mr-1" />
-                          Editar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void handleDeleteCustomTemplate(template)}
-                          disabled={customTemplateSaving}
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Excluir
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
+            <div className="space-y-5">
               <div className="space-y-4">
                 <input
                   ref={templateFileInputRef}
@@ -2257,16 +2207,38 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                   />
                 </div>
 
-                <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
-                  <p className="text-sm font-medium">Placeholders disponiveis</p>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {ROUTER_SCRIPT_PLACEHOLDER_HINTS.map((item) => (
-                      <div key={item.token} className="text-xs">
-                        <p className="font-mono text-foreground">{item.token}</p>
-                        <p className="text-muted-foreground">{item.description}</p>
-                      </div>
-                    ))}
+                <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium">Placeholders disponiveis</p>
+                      <p className="text-xs text-muted-foreground">
+                        Deixe recolhido e abra apenas quando precisar consultar os tokens.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPlaceholderHints((current) => !current)}
+                    >
+                      {showPlaceholderHints ? "Ocultar" : "Visualizar"}
+                    </Button>
                   </div>
+
+                  {showPlaceholderHints ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {ROUTER_SCRIPT_PLACEHOLDER_HINTS.map((item) => (
+                        <div key={item.token} className="text-xs">
+                          <p className="font-mono text-foreground">{item.token}</p>
+                          <p className="text-muted-foreground">{item.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Clique em Visualizar para listar os placeholders disponiveis.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -2280,6 +2252,89 @@ const ScriptRouterSctTab = ({ initialCodUl = "" }: ScriptRouterSctTabProps) => {
                   <Button type="button" variant="outline" onClick={resetCustomTemplateForm} disabled={customTemplateSaving}>
                     Limpar
                   </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-sm font-medium">Modelos salvos</p>
+                    <p className="text-xs text-muted-foreground">
+                      {customTemplatesLoading
+                        ? "Carregando..."
+                        : `${activeCustomTemplateCount} ativo(s) de ${customTemplates.length} modelo(s) carregado(s)`}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowInactiveCustomTemplates((current) => !current)}
+                    disabled={customTemplatesLoading || customTemplates.length === 0}
+                  >
+                    {showInactiveCustomTemplates ? "Ocultar inativos" : "Mostrar inativos"}
+                  </Button>
+                </div>
+
+                <div className="space-y-2 max-h-[720px] overflow-y-auto pr-1">
+                  {!customTemplatesLoading && customTemplates.length === 0 && (
+                    <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                      Nenhum modelo customizado cadastrado.
+                    </div>
+                  )}
+
+                  {!customTemplatesLoading && customTemplates.length > 0 && visibleCustomTemplates.length === 0 && (
+                    <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                      Nenhum modelo ativo visivel. Use "Mostrar inativos" para revisar os modelos removidos da lista ativa.
+                    </div>
+                  )}
+
+                  {visibleCustomTemplates.map((template) => (
+                    <div key={template.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{template.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Atualizado em {formatDateTimePtBr(template.updated_at || template.created_at)}
+                          </p>
+                        </div>
+                        <Badge variant={template.is_active ? "secondary" : "outline"}>
+                          {template.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline">{template.router_role}</Badge>
+                        <Badge variant="outline">{getRouterScriptVariantLabel(template.script_variant)}</Badge>
+                        <Badge variant="outline">
+                          {template.model === ROUTER_SCRIPT_TEMPLATE_ANY ? "Qualquer" : ROUTER_MODEL_LABELS[template.model]}
+                        </Badge>
+                        <Badge variant="outline">{template.technology}</Badge>
+                        <Badge variant="outline">{template.owner}</Badge>
+                        <Badge variant="outline">{template.operadora_4g}</Badge>
+                        <Badge variant="outline">{template.switch_topology}</Badge>
+                      </div>
+
+                      {template.notes && <p className="text-xs text-muted-foreground whitespace-pre-line">{template.notes}</p>}
+
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleEditCustomTemplate(template)}>
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleToggleCustomTemplateActive(template, !template.is_active)}
+                          disabled={customTemplateSaving}
+                        >
+                          {template.is_active ? <Trash2 className="w-4 h-4 mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                          {template.is_active ? "Remover" : "Reativar"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

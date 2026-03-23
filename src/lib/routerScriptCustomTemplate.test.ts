@@ -190,9 +190,16 @@ describe("applyCustomTemplatePlaceholders", () => {
 describe("normalizeRouterModelValue", () => {
   it("maps HP aliases to the canonical HPMSR models", () => {
     expect(normalizeRouterModelValue("HPMSR900")).toBe("hpmsr900");
+    expect(normalizeRouterModelValue("HPMSR 900")).toBe("hpmsr900");
     expect(normalizeRouterModelValue("HP 900")).toBe("hpmsr900");
+    expect(normalizeRouterModelValue("HP900")).toBe("hpmsr900");
     expect(normalizeRouterModelValue("HPMSR 920")).toBe("hpmsr920");
+    expect(normalizeRouterModelValue("MSR920")).toBe("hpmsr920");
+    expect(normalizeRouterModelValue("MSR 920")).toBe("hpmsr920");
     expect(normalizeRouterModelValue("HP 931")).toBe("hpmsr931");
+    expect(normalizeRouterModelValue("HP931")).toBe("hpmsr931");
+    expect(normalizeRouterModelValue("MSR931")).toBe("hpmsr931");
+    expect(normalizeRouterModelValue("MSR 931")).toBe("hpmsr931");
   });
 
   it("keeps the existing non-HP models recognized", () => {

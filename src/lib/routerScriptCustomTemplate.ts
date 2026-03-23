@@ -18,9 +18,9 @@ export const ROUTER_MODEL_LABELS: Record<RouterModel, string> = {
   huawei: "Huawei",
   "hp20-11": "HP20-11 / HP 2011",
   "hp1002-4": "HP1002-4 / HP 1002",
-  hpmsr900: "HPMSR900 / HP 900",
-  hpmsr931: "HPMSR931 / HP 931",
-  hpmsr920: "HPMSR920 / HP 920",
+  hpmsr900: "HPMSR900 / MSR 900 / HP 900",
+  hpmsr931: "HPMSR931 / MSR 931 / HP 931",
+  hpmsr920: "HPMSR920 / MSR 920 / HP 920",
 };
 
 const normalizeRouterModelToken = (value: unknown) =>
@@ -30,21 +30,41 @@ const normalizeRouterModelToken = (value: unknown) =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 
-export const normalizeRouterModelValue = (value: unknown): RouterModel => {
+const parseHpmsrAliasToken = (token: string): RouterModel | null => {
+  const exactAliasMatch = token.match(/(?:HPMSR|HPEMSR|HPE|MSR|HP)(900|920|931)/);
+  if (exactAliasMatch) {
+    if (exactAliasMatch[1] === "931") return "hpmsr931";
+    if (exactAliasMatch[1] === "920") return "hpmsr920";
+    return "hpmsr900";
+  }
+
+  if (token === "HPMSR" || token === "HP" || token === "MSR" || token === "HPEMSR" || token === "HPE") {
+    return "hpmsr900";
+  }
+
+  return null;
+};
+
+export const parseRouterModelValue = (value: unknown): RouterModel | null => {
   const token = normalizeRouterModelToken(value);
 
-  if (!token) return "hpmsr900";
+  if (!token) return null;
   if (token.includes("CISCO") || token.includes("1900") || token.includes("1921")) return "cisco1900";
   if (token.includes("HUAWEI") || token.includes("AR121")) return "huawei";
   if (token.includes("2011")) return "hp20-11";
   if (token.includes("10024") || token.includes("1002")) return "hp1002-4";
+
+  const hpmsrAlias = parseHpmsrAliasToken(token);
+  if (hpmsrAlias) return hpmsrAlias;
+
   if (token.includes("931")) return "hpmsr931";
   if (token.includes("920")) return "hpmsr920";
   if (token.includes("900")) return "hpmsr900";
-  if (token === "HPMSR" || token === "HP" || token === "MSR" || token === "HPEMSR" || token === "HPE") return "hpmsr900";
 
-  return "hpmsr900";
+  return null;
 };
+
+export const normalizeRouterModelValue = (value: unknown): RouterModel => parseRouterModelValue(value) || "hpmsr900";
 
 export interface RouterScriptCustomTemplateRow {
   id: string;

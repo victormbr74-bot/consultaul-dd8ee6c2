@@ -147,6 +147,40 @@ const buildLotericaNoticesMissingTableMessage = () =>
 
 const getSupabaseErrorMessage = (error: { message?: string } | null | undefined) => String(error?.message || "");
 
+const formatHistoryValue = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "string") return value;
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const buildHistorySummaryText = (entry: any) => {
+  const beforeData = entry?.before_data && typeof entry.before_data === "object" ? entry.before_data : {};
+  const afterData = entry?.after_data && typeof entry.after_data === "object" ? entry.after_data : {};
+  const changedKeys = Object.keys(afterData).filter(
+    (key) =>
+      key !== "raw_data" &&
+      key !== "updated_at" &&
+      key !== "updated_by" &&
+      JSON.stringify(beforeData[key]) !== JSON.stringify(afterData[key]),
+  );
+
+  if (changedKeys.length === 0) {
+    return "Nenhuma diferença detalhada registrada.";
+  }
+
+  return changedKeys
+    .map(
+      (key) =>
+        `${key}\nAnterior: ${formatHistoryValue(beforeData[key])}\nNovo: ${formatHistoryValue(afterData[key])}`,
+    )
+    .join("\n\n");
+};
+
 const LotericaDetail = () => {
   const { codUl } = useParams();
   const navigate = useNavigate();
@@ -754,10 +788,10 @@ const LotericaDetail = () => {
                 {lotericas.length}/{requestedCodes.length} lotericas carregadas
               </span>
             ) : (
-              <>
-                <span className="font-mono text-sm font-medium text-foreground">{activeCode || "-"}</span>
-                <span className="text-sm text-muted-foreground hidden sm:inline"> - {activeForm?.nome_loterica || "-"}</span>
-              </>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm font-medium text-foreground">{activeForm?.nome_loterica || "-"}</span>
+                <span className="font-mono text-xs text-muted-foreground">{activeCode || "-"}</span>
+              </div>
             )}
           </div>
 
@@ -861,32 +895,20 @@ const LotericaDetail = () => {
                   ) : (
                     <div className="space-y-3">
                       {history.map((h) => (
-                        <div key={h.id} className="border rounded-lg p-3 text-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{(h as any).profiles?.name || "Desconhecido"}</span>
-                            <span className="text-xs text-muted-foreground">{new Date(h.changed_at).toLocaleString("pt-BR")}</span>
+                        <div key={h.id} className="border rounded-lg p-3 text-sm space-y-2">
+                          <div className="space-y-0.5">
+                            <p className="font-medium text-foreground">{activeForm?.nome_loterica || "Lotérica"}</p>
+                            <p className="font-mono text-[11px] text-muted-foreground">{activeCode || "-"}</p>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {h.before_data && h.after_data && (
-                              <div className="space-y-1">
-                                {Object.keys(h.after_data)
-                                  .filter(
-                                    (k) =>
-                                      k !== "raw_data" &&
-                                      k !== "updated_at" &&
-                                      k !== "updated_by" &&
-                                      JSON.stringify(h.before_data[k]) !== JSON.stringify(h.after_data[k]),
-                                  )
-                                  .map((k) => (
-                                    <div key={k}>
-                                      <span className="font-medium text-foreground">{k}:</span>{" "}
-                                      <span className="text-destructive line-through">{String(h.before_data[k] ?? "")}</span>{" -> "}
-                                      <span className="text-green-600">{String(h.after_data[k] ?? "")}</span>
-                                    </div>
-                                  ))}
-                              </div>
-                            )}
+                          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <span>{(h as any).profiles?.name || "Desconhecido"}</span>
+                            <span>{new Date(h.changed_at).toLocaleString("pt-BR")}</span>
                           </div>
+                          <Textarea
+                            readOnly
+                            value={buildHistorySummaryText(h)}
+                            className="min-h-[88px] resize-none bg-muted/30 text-xs leading-5"
+                          />
                         </div>
                       ))}
                     </div>

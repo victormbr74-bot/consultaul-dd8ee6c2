@@ -181,6 +181,24 @@ const buildHistorySummaryText = (entry: any) => {
     .join("\n\n");
 };
 
+const formatNoticeTimelineDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("pt-BR");
+};
+
+const buildNoticeTimelineText = (notice: LotericaNoticeView) => {
+  const authorParts = [notice.creator_code, notice.creator_name].filter(Boolean);
+  const authorLabel = authorParts.length > 0 ? authorParts.join(" - ") : "Usu\u00E1rio";
+  return `[${formatNoticeTimelineDate(notice.created_at)}] ${authorLabel}\n${notice.observacao}`;
+};
+
+const buildNoticeEditorBaseText = (items: LotericaNoticeView[]) =>
+  [...items]
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map((notice) => buildNoticeTimelineText(notice))
+    .join("\n\n");
+
 const LotericaDetail = () => {
   const { codUl } = useParams();
   const navigate = useNavigate();
@@ -201,10 +219,9 @@ const LotericaDetail = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [notices, setNotices] = useState<LotericaNoticeView[]>([]);
   const [noticesLoading, setNoticesLoading] = useState(false);
-  const [noticeDraft, setNoticeDraft] = useState("");
+  const [noticeEditorValue, setNoticeEditorValue] = useState("");
   const [selectedNoticeCode, setSelectedNoticeCode] = useState("");
   const [savingNotice, setSavingNotice] = useState(false);
-  const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
   const [noticesError, setNoticesError] = useState<string | null>(null);
   const [noticeSuccessMessage, setNoticeSuccessMessage] = useState<string | null>(null);
   const {
@@ -235,6 +252,11 @@ const LotericaDetail = () => {
 
     return next;
   }, [formsByCode, lotericas]);
+  const currentCodeNotices = useMemo(
+    () => notices.filter((notice) => String(notice.cod_ul || "").trim() === noticeTargetCode),
+    [noticeTargetCode, notices],
+  );
+  const noticeBaseText = useMemo(() => buildNoticeEditorBaseText(currentCodeNotices), [currentCodeNotices]);
 
   useLayoutEffect(() => {
     setShowLotericaTabs(true);
@@ -252,10 +274,14 @@ const LotericaDetail = () => {
   }, [requestedCodes]);
 
   useEffect(() => {
-    setNoticeDraft("");
+    setNoticeEditorValue("");
     setNoticeSuccessMessage(null);
     setNoticesError(null);
   }, [codUl]);
+
+  useEffect(() => {
+    setNoticeEditorValue(noticeBaseText);
+  }, [noticeBaseText, noticeTargetCode]);
 
   useEffect(() => {
     if (isBulkMode && lotericaTab !== "consulta" && lotericaTab !== "avisos") {
@@ -471,15 +497,24 @@ const LotericaDetail = () => {
 
   const handleSaveNotice = useCallback(async () => {
     const targetCode = String(noticeTargetCode || "").trim();
-    const observacao = noticeDraft.trim();
+    const baseText = noticeBaseText;
+    const editorValue = noticeEditorValue;
+    let observacao = "";
 
     if (!targetCode) {
       setNoticesError("Nenhuma UL carregada para registrar o aviso.");
       return;
     }
 
+    if (baseText && !editorValue.startsWith(baseText)) {
+      setNoticesError("Mantenha o texto existente e adicione a nova informação no final da caixa.");
+      return;
+    }
+
+    observacao = baseText ? editorValue.slice(baseText.length).trim() : editorValue.trim();
+
     if (!observacao) {
-      setNoticesError("Digite uma observacao antes de salvar o aviso.");
+      setNoticesError("Adicione a nova informação no final da caixa de texto antes de salvar.");
       return;
     }
 
@@ -527,7 +562,6 @@ const LotericaDetail = () => {
         },
         ...prev.filter((item) => item.id !== savedNotice.id),
       ]);
-      setNoticeDraft("");
       setNoticeSuccessMessage(`Aviso salvo para a UL ${targetCode}.`);
     } catch (error) {
       console.error("Falha inesperada ao salvar aviso da loterica", error);
@@ -535,45 +569,7 @@ const LotericaDetail = () => {
     } finally {
       setSavingNotice(false);
     }
-  }, [noticeDraft, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
-
-  const handleDeleteNotice = useCallback(
-    async (notice: LotericaNoticeView) => {
-      if (!window.confirm(`Excluir o aviso da UL ${notice.cod_ul}?`)) return;
-
-      setDeletingNoticeId(notice.id);
-      setNoticesError(null);
-      setNoticeSuccessMessage(null);
-
-      try {
-        const { error } = await supabase.from("loterica_notices").delete().eq("id", notice.id);
-
-        if (error) {
-          const message = getSupabaseErrorMessage(error);
-          if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
-            setNoticesError(buildLotericaNoticesMissingTableMessage());
-            return;
-          }
-
-          if (message.toLowerCase().includes("row-level security")) {
-            setNoticesError("Sem permissao para excluir este aviso.");
-            return;
-          }
-
-          throw new Error(message || "Erro ao excluir aviso da loterica.");
-        }
-
-        setNotices((prev) => prev.filter((item) => item.id !== notice.id));
-        setNoticeSuccessMessage(`Aviso removido da UL ${notice.cod_ul}.`);
-      } catch (error) {
-        console.error("Falha inesperada ao excluir aviso da loterica", error);
-        setNoticesError(error instanceof Error ? error.message : "Falha ao excluir aviso da loterica.");
-      } finally {
-        setDeletingNoticeId(null);
-      }
-    },
-    [],
-  );
+  }, [noticeBaseText, noticeEditorValue, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -747,23 +743,18 @@ const LotericaDetail = () => {
       <LotericaNoticesCard
         codes={loadedCodes}
         namesByCode={lotericaNamesByCode}
-        notices={notices}
         selectedCode={noticeTargetCode}
         onSelectedCodeChange={setSelectedNoticeCode}
-        draft={noticeDraft}
-        onDraftChange={setNoticeDraft}
+        textValue={noticeEditorValue}
+        onTextValueChange={setNoticeEditorValue}
         onSubmit={() => {
           void handleSaveNotice();
         }}
-        onDelete={(notice) => {
-          void handleDeleteNotice(notice);
-        }}
         loading={noticesLoading}
         saving={savingNotice}
-        deletingNoticeId={deletingNoticeId}
         error={noticesError}
         successMessage={noticeSuccessMessage}
-        isAdmin={isAdmin}
+        noticeCount={currentCodeNotices.length}
       />
     </section>
   ) : null;
@@ -771,6 +762,16 @@ const LotericaDetail = () => {
     <Card>
       <CardContent className="pt-4">
         <p className="text-sm text-muted-foreground">Os avisos compartilhados da lotérica estão exibidos acima do campo de pesquisa.</p>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  const noticesTabHint = hasLoadedRows && lotericaTab === "avisos" ? (
+    <Card>
+      <CardContent className="pt-4">
+        <p className="text-sm text-muted-foreground">
+          {"Os avisos compartilhados da lot\u00E9rica est\u00E3o exibidos acima do campo de pesquisa."}
+        </p>
       </CardContent>
     </Card>
   ) : null;
@@ -844,7 +845,7 @@ const LotericaDetail = () => {
             Nenhuma loterica encontrada para os codigos informados.
           </div>
         ) : lotericaTab === "avisos" ? (
-          noticesPanel
+          noticesTabHint
         ) : isBulkMode ? (
           <div className="space-y-8">
             {lotericas.map((row) => {

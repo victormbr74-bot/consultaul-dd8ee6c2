@@ -16,6 +16,8 @@ import Ping99Tab from "@/components/loterica/Ping99Tab";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
+import LotericaNoticesCard, { type LotericaNoticeView } from "@/components/loterica/LotericaNoticesCard";
+import type { Tables } from "@/integrations/supabase/types";
 
 const EDITABLE_KEYS = [
   "nome_loterica",
@@ -52,6 +54,10 @@ const RAW_EDITABLE_KEYS: string[][] = [
   ["MIGRACAO", "MIGRA\u00C7\u00C3O"],
   ["HOMOLOGADO"],
 ];
+
+const LOTERICA_NOTICES_MIGRATION = "20260324084033_loterica_notices.sql";
+
+type LotericaNoticeRow = Tables<"loterica_notices">;
 
 const safeDecode = (value: string) => {
   try {
@@ -135,10 +141,16 @@ const buildChangePayload = (beforeRecord: any, afterRecord: any) => {
   return { changes, beforeChanges };
 };
 
+const buildLotericaNoticesMissingTableMessage = () =>
+  "Banco desatualizado: falta a tabela loterica_notices.\n" +
+  `Aplique a migracao Supabase '${LOTERICA_NOTICES_MIGRATION}'.`;
+
+const getSupabaseErrorMessage = (error: { message?: string } | null | undefined) => String(error?.message || "");
+
 const LotericaDetail = () => {
   const { codUl } = useParams();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { lotericaTab, setLotericaTab, setShowLotericaTabs, setOnExport, setOnImportClick } = useSidebarActions();
 
   const requestedCodes = useMemo(() => parseCodUlTerms(codUl), [codUl]);
@@ -153,11 +165,42 @@ const LotericaDetail = () => {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [notices, setNotices] = useState<LotericaNoticeView[]>([]);
+  const [noticesLoading, setNoticesLoading] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState("");
+  const [selectedNoticeCode, setSelectedNoticeCode] = useState("");
+  const [savingNotice, setSavingNotice] = useState(false);
+  const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
+  const [noticesError, setNoticesError] = useState<string | null>(null);
+  const [noticeSuccessMessage, setNoticeSuccessMessage] = useState<string | null>(null);
   const {
     enabled: lotericaUpdatesEnabled,
     loading: lotericaUpdatesLoading,
     error: lotericaUpdatesError,
   } = useLotericaUpdatesAccess();
+
+  const loadedCodes = useMemo(
+    () =>
+      lotericas
+        .map((row) => String(row?.cod_ul || "").trim())
+        .filter(Boolean),
+    [lotericas],
+  );
+  const loadedCodesKey = useMemo(() => loadedCodes.join("|"), [loadedCodes]);
+  const noticeTargetCode = isBulkMode ? selectedNoticeCode : activeCode || loadedCodes[0] || "";
+  const lotericaNamesByCode = useMemo(() => {
+    const next: Record<string, string> = {};
+
+    for (const row of lotericas) {
+      const code = String(row?.cod_ul || "").trim();
+      if (!code) continue;
+
+      const currentForm = formsByCode[code];
+      next[code] = String(currentForm?.nome_loterica || row?.nome_loterica || "").trim();
+    }
+
+    return next;
+  }, [formsByCode, lotericas]);
 
   useLayoutEffect(() => {
     setShowLotericaTabs(true);
@@ -175,10 +218,23 @@ const LotericaDetail = () => {
   }, [requestedCodes]);
 
   useEffect(() => {
+    setNoticeDraft("");
+    setNoticeSuccessMessage(null);
+    setNoticesError(null);
+  }, [codUl]);
+
+  useEffect(() => {
     if (isBulkMode && lotericaTab !== "consulta") {
       setLotericaTab("consulta");
     }
   }, [isBulkMode, lotericaTab, setLotericaTab]);
+
+  useEffect(() => {
+    setSelectedNoticeCode((current) => {
+      if (current && loadedCodes.includes(current)) return current;
+      return loadedCodes[0] || "";
+    });
+  }, [loadedCodes, loadedCodesKey]);
 
   useEffect(() => {
     const fetchLotericas = async () => {
@@ -242,6 +298,104 @@ const LotericaDetail = () => {
 
   const activeForm = activeCode ? formsByCode[activeCode] || lotericas[0] || {} : {};
 
+  const fetchNotices = useCallback(async () => {
+    if (!loadedCodes.length) {
+      setNotices([]);
+      setNoticesLoading(false);
+      setNoticesError(null);
+      return;
+    }
+
+    setNoticesLoading(true);
+    setNoticesError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from("loterica_notices")
+        .select("id,cod_ul,observacao,created_at,created_by")
+        .in("cod_ul", loadedCodes)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        const message = getSupabaseErrorMessage(error);
+        if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
+          setNotices([]);
+          setNoticesError(buildLotericaNoticesMissingTableMessage());
+          return;
+        }
+
+        throw new Error(message || "Erro ao carregar avisos da loterica.");
+      }
+
+      const baseNotices = (data || []) as LotericaNoticeRow[];
+      const creatorIds = Array.from(new Set(baseNotices.map((notice) => notice.created_by).filter(Boolean)));
+      const profileById = new Map<string, { name: string; user_code: string | null }>();
+
+      if (creatorIds.length > 0) {
+        const { data: profileRows, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id,name,user_code")
+          .in("id", creatorIds);
+
+        if (profilesError) {
+          console.error("Erro ao carregar autores dos avisos", profilesError);
+        } else {
+          (profileRows || []).forEach((item) => {
+            profileById.set(item.id, { name: item.name, user_code: item.user_code });
+          });
+        }
+      }
+
+      setNotices(
+        baseNotices.map((notice) => {
+          const creator = profileById.get(notice.created_by);
+          return {
+            ...notice,
+            creator_name: creator?.name || null,
+            creator_code: creator?.user_code ?? null,
+          };
+        }),
+      );
+    } catch (error) {
+      console.error("Falha inesperada ao carregar avisos da loterica", error);
+      setNotices([]);
+      setNoticesError(error instanceof Error ? error.message : "Erro ao carregar avisos da loterica.");
+    } finally {
+      setNoticesLoading(false);
+    }
+  }, [loadedCodes]);
+
+  useEffect(() => {
+    void fetchNotices();
+  }, [fetchNotices]);
+
+  useEffect(() => {
+    if (!loadedCodes.length) return;
+
+    const monitoredCodes = new Set(loadedCodes.map((code) => code.toUpperCase()));
+    const channel = supabase
+      .channel(`loterica-notices:${loadedCodesKey}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loterica_notices" },
+        (payload) => {
+          const nextRow = payload.new as Record<string, unknown>;
+          const previousRow = payload.old as Record<string, unknown>;
+          const changedCode = String(nextRow.cod_ul ?? previousRow.cod_ul ?? "")
+            .trim()
+            .toUpperCase();
+
+          if (!changedCode || !monitoredCodes.has(changedCode)) return;
+          void fetchNotices();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchNotices, loadedCodes, loadedCodesKey]);
+
   const fetchHistory = async () => {
     if (!activeCode) {
       alert("Informe um codigo UL para consultar o historico.");
@@ -280,6 +434,112 @@ const LotericaDetail = () => {
     setLotericaTab("consulta");
     navigate(`/loterica/${encodeURIComponent(codes.join(","))}`);
   }, [navigate, queryInput, setLotericaTab]);
+
+  const handleSaveNotice = useCallback(async () => {
+    const targetCode = String(noticeTargetCode || "").trim();
+    const observacao = noticeDraft.trim();
+
+    if (!targetCode) {
+      setNoticesError("Nenhuma UL carregada para registrar o aviso.");
+      return;
+    }
+
+    if (!observacao) {
+      setNoticesError("Digite uma observacao antes de salvar o aviso.");
+      return;
+    }
+
+    if (!user?.id) {
+      setNoticesError("Sessao invalida. Faca login novamente.");
+      return;
+    }
+
+    setSavingNotice(true);
+    setNoticesError(null);
+    setNoticeSuccessMessage(null);
+
+    try {
+      const { data, error } = await supabase
+        .from("loterica_notices")
+        .insert({
+          cod_ul: targetCode,
+          observacao,
+          created_by: user.id,
+        })
+        .select("id,cod_ul,observacao,created_at,created_by")
+        .single();
+
+      if (error) {
+        const message = getSupabaseErrorMessage(error);
+        if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
+          setNoticesError(buildLotericaNoticesMissingTableMessage());
+          return;
+        }
+
+        if (message.toLowerCase().includes("row-level security")) {
+          setNoticesError("Sem permissao para salvar avisos nesta UL.");
+          return;
+        }
+
+        throw new Error(message || "Erro ao salvar aviso da loterica.");
+      }
+
+      const savedNotice = data as LotericaNoticeRow;
+      setNotices((prev) => [
+        {
+          ...savedNotice,
+          creator_name: profile?.name || null,
+          creator_code: profile?.user_code ?? null,
+        },
+        ...prev.filter((item) => item.id !== savedNotice.id),
+      ]);
+      setNoticeDraft("");
+      setNoticeSuccessMessage(`Aviso salvo para a UL ${targetCode}.`);
+    } catch (error) {
+      console.error("Falha inesperada ao salvar aviso da loterica", error);
+      setNoticesError(error instanceof Error ? error.message : "Falha ao salvar aviso da loterica.");
+    } finally {
+      setSavingNotice(false);
+    }
+  }, [noticeDraft, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
+
+  const handleDeleteNotice = useCallback(
+    async (notice: LotericaNoticeView) => {
+      if (!window.confirm(`Excluir o aviso da UL ${notice.cod_ul}?`)) return;
+
+      setDeletingNoticeId(notice.id);
+      setNoticesError(null);
+      setNoticeSuccessMessage(null);
+
+      try {
+        const { error } = await supabase.from("loterica_notices").delete().eq("id", notice.id);
+
+        if (error) {
+          const message = getSupabaseErrorMessage(error);
+          if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
+            setNoticesError(buildLotericaNoticesMissingTableMessage());
+            return;
+          }
+
+          if (message.toLowerCase().includes("row-level security")) {
+            setNoticesError("Sem permissao para excluir este aviso.");
+            return;
+          }
+
+          throw new Error(message || "Erro ao excluir aviso da loterica.");
+        }
+
+        setNotices((prev) => prev.filter((item) => item.id !== notice.id));
+        setNoticeSuccessMessage(`Aviso removido da UL ${notice.cod_ul}.`);
+      } catch (error) {
+        console.error("Falha inesperada ao excluir aviso da loterica", error);
+        setNoticesError(error instanceof Error ? error.message : "Falha ao excluir aviso da loterica.");
+      } finally {
+        setDeletingNoticeId(null);
+      }
+    },
+    [],
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -511,6 +771,33 @@ const LotericaDetail = () => {
       )}
 
       <main className="container px-4 py-6 max-w-[1400px]">
+        {hasLoadedRows && (
+          <section className="mb-6">
+            <LotericaNoticesCard
+              codes={loadedCodes}
+              namesByCode={lotericaNamesByCode}
+              notices={notices}
+              selectedCode={noticeTargetCode}
+              onSelectedCodeChange={setSelectedNoticeCode}
+              draft={noticeDraft}
+              onDraftChange={setNoticeDraft}
+              onSubmit={() => {
+                void handleSaveNotice();
+              }}
+              onDelete={(notice) => {
+                void handleDeleteNotice(notice);
+              }}
+              loading={noticesLoading}
+              saving={savingNotice}
+              deletingNoticeId={deletingNoticeId}
+              error={noticesError}
+              successMessage={noticeSuccessMessage}
+              currentUserId={user?.id}
+              isAdmin={isAdmin}
+            />
+          </section>
+        )}
+
         {!hasLoadedRows ? (
           <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
             Nenhuma loterica encontrada para os codigos informados.

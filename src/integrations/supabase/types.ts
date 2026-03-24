@@ -561,6 +561,38 @@ export type Database = {
           },
         ]
       }
+      loterica_notices: {
+        Row: {
+          cod_ul: string
+          created_at: string
+          created_by: string
+          id: string
+          observacao: string
+        }
+        Insert: {
+          cod_ul: string
+          created_at?: string
+          created_by: string
+          id?: string
+          observacao: string
+        }
+        Update: {
+          cod_ul?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          observacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loterica_notices_cod_ul_fkey"
+            columns: ["cod_ul"]
+            isOneToOne: false
+            referencedRelation: "lotericas"
+            referencedColumns: ["cod_ul"]
+          },
+        ]
+      }
       lotericas: {
         Row: {
           ccto_oemp: string | null

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Store,
   Search,
+  MessageSquare,
   FileText,
   FileCheck,
   Terminal,
@@ -84,6 +85,7 @@ export function AppSidebar() {
   const ping99Path = ping99SeedTerm ? `/ping99?q=${encodeURIComponent(ping99SeedTerm)}` : "/ping99";
 
   const lotericaTabs = [
+    { id: "avisos", label: "Avisos", icon: MessageSquare },
     { id: "mascara", label: "Mascara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
   ];
@@ -217,6 +219,18 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {showLotericaTabs && lotericaTabs.map((tab) => (
+                <SidebarMenuItem key={tab.id}>
+                  <SidebarMenuButton
+                    onClick={() => openLotericaTab(tab.id)}
+                    className={isLotericaRoute && lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                  >
+                    <tab.icon className="mr-2 h-4 w-4" />
+                    <span>{tab.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
               {isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
@@ -281,18 +295,6 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-
-              {showLotericaTabs && lotericaTabs.map((tab) => (
-                <SidebarMenuItem key={tab.id}>
-                  <SidebarMenuButton
-                    onClick={() => openLotericaTab(tab.id)}
-                    className={isLotericaRoute && lotericaTab === tab.id ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
-                  >
-                    <tab.icon className="mr-2 h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
 
               {isAdmin && (
                 <SidebarMenuItem>

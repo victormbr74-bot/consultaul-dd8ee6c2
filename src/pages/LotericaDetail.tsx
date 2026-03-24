@@ -224,7 +224,7 @@ const LotericaDetail = () => {
   }, [codUl]);
 
   useEffect(() => {
-    if (isBulkMode && lotericaTab !== "consulta") {
+    if (isBulkMode && lotericaTab !== "consulta" && lotericaTab !== "avisos") {
       setLotericaTab("consulta");
     }
   }, [isBulkMode, lotericaTab, setLotericaTab]);
@@ -708,6 +708,32 @@ const LotericaDetail = () => {
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const hasLoadedRows = lotericas.length > 0;
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
+  const noticesSection = hasLoadedRows ? (
+    <section className="mb-6">
+      <LotericaNoticesCard
+        codes={loadedCodes}
+        namesByCode={lotericaNamesByCode}
+        notices={notices}
+        selectedCode={noticeTargetCode}
+        onSelectedCodeChange={setSelectedNoticeCode}
+        draft={noticeDraft}
+        onDraftChange={setNoticeDraft}
+        onSubmit={() => {
+          void handleSaveNotice();
+        }}
+        onDelete={(notice) => {
+          void handleDeleteNotice(notice);
+        }}
+        loading={noticesLoading}
+        saving={savingNotice}
+        deletingNoticeId={deletingNoticeId}
+        error={noticesError}
+        successMessage={noticeSuccessMessage}
+        currentUserId={user?.id}
+        isAdmin={isAdmin}
+      />
+    </section>
+  ) : null;
 
   return (
     <div className="bg-background">
@@ -771,37 +797,14 @@ const LotericaDetail = () => {
       )}
 
       <main className="container px-4 py-6 max-w-[1400px]">
-        {hasLoadedRows && (
-          <section className="mb-6">
-            <LotericaNoticesCard
-              codes={loadedCodes}
-              namesByCode={lotericaNamesByCode}
-              notices={notices}
-              selectedCode={noticeTargetCode}
-              onSelectedCodeChange={setSelectedNoticeCode}
-              draft={noticeDraft}
-              onDraftChange={setNoticeDraft}
-              onSubmit={() => {
-                void handleSaveNotice();
-              }}
-              onDelete={(notice) => {
-                void handleDeleteNotice(notice);
-              }}
-              loading={noticesLoading}
-              saving={savingNotice}
-              deletingNoticeId={deletingNoticeId}
-              error={noticesError}
-              successMessage={noticeSuccessMessage}
-              currentUserId={user?.id}
-              isAdmin={isAdmin}
-            />
-          </section>
-        )}
+        {lotericaTab === "consulta" && noticesSection}
 
         {!hasLoadedRows ? (
           <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
             Nenhuma loterica encontrada para os codigos informados.
           </div>
+        ) : isBulkMode && lotericaTab === "avisos" ? (
+          noticesSection
         ) : isBulkMode ? (
           <div className="space-y-8">
             {lotericas.map((row) => {
@@ -825,6 +828,7 @@ const LotericaDetail = () => {
           </div>
         ) : (
           <>
+            {lotericaTab === "avisos" && noticesSection}
             {lotericaTab === "consulta" && (
               <ConsultaTab
                 form={activeForm}

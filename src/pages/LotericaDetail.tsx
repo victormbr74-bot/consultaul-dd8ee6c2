@@ -222,6 +222,7 @@ const LotericaDetail = () => {
   const [noticeEditorValue, setNoticeEditorValue] = useState("");
   const [selectedNoticeCode, setSelectedNoticeCode] = useState("");
   const [savingNotice, setSavingNotice] = useState(false);
+  const [clearingNotices, setClearingNotices] = useState(false);
   const [noticesError, setNoticesError] = useState<string | null>(null);
   const [noticeSuccessMessage, setNoticeSuccessMessage] = useState<string | null>(null);
   const {
@@ -571,6 +572,61 @@ const LotericaDetail = () => {
     }
   }, [noticeBaseText, noticeEditorValue, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
 
+  const handleClearNotices = useCallback(async () => {
+    const targetCode = String(noticeTargetCode || "").trim();
+
+    if (!isAdmin) {
+      setNoticesError("Apenas o ADM pode limpar os avisos.");
+      return;
+    }
+
+    if (!targetCode) {
+      setNoticesError("Nenhuma UL carregada para limpar os avisos.");
+      return;
+    }
+
+    if (!currentCodeNotices.length) {
+      setNoticesError("Nao ha avisos para limpar nesta UL.");
+      return;
+    }
+
+    if (!window.confirm(`Limpar todos os avisos da UL ${targetCode}?`)) {
+      return;
+    }
+
+    setClearingNotices(true);
+    setNoticesError(null);
+    setNoticeSuccessMessage(null);
+
+    try {
+      const { error } = await supabase.from("loterica_notices").delete().eq("cod_ul", targetCode);
+
+      if (error) {
+        const message = getSupabaseErrorMessage(error);
+        if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
+          setNoticesError(buildLotericaNoticesMissingTableMessage());
+          return;
+        }
+
+        if (message.toLowerCase().includes("row-level security")) {
+          setNoticesError("Sem permissao para limpar os avisos desta UL.");
+          return;
+        }
+
+        throw new Error(message || "Erro ao limpar avisos da loterica.");
+      }
+
+      setNotices((prev) => prev.filter((notice) => String(notice.cod_ul || "").trim() !== targetCode));
+      setNoticeEditorValue("");
+      setNoticeSuccessMessage(`Avisos da UL ${targetCode} removidos com sucesso.`);
+    } catch (error) {
+      console.error("Falha inesperada ao limpar avisos da loterica", error);
+      setNoticesError(error instanceof Error ? error.message : "Falha ao limpar avisos da loterica.");
+    } finally {
+      setClearingNotices(false);
+    }
+  }, [currentCodeNotices.length, isAdmin, noticeTargetCode]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -750,22 +806,19 @@ const LotericaDetail = () => {
         onSubmit={() => {
           void handleSaveNotice();
         }}
+        onClear={() => {
+          void handleClearNotices();
+        }}
         loading={noticesLoading}
         saving={savingNotice}
+        clearing={clearingNotices}
         error={noticesError}
         successMessage={noticeSuccessMessage}
         noticeCount={currentCodeNotices.length}
+        isAdmin={isAdmin}
       />
     </section>
   ) : null;
-  const noticesPanel = hasLoadedRows && lotericaTab === "avisos" ? (
-    <Card>
-      <CardContent className="pt-4">
-        <p className="text-sm text-muted-foreground">Os avisos compartilhados da lotérica estão exibidos acima do campo de pesquisa.</p>
-      </CardContent>
-    </Card>
-  ) : null;
-
   const noticesTabHint = hasLoadedRows && lotericaTab === "avisos" ? (
     <Card>
       <CardContent className="pt-4">

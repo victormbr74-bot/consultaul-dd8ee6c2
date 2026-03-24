@@ -12,10 +12,12 @@ type MainField = {
   multiline?: boolean;
   rows?: number;
   wide?: boolean;
+  compactExpandable?: boolean;
+  noWrap?: boolean;
 };
 
 const FIELDS: MainField[] = [
-  { key: "nome_loterica", label: "Nome", multiline: true, rows: 2, wide: true },
+  { key: "nome_loterica", label: "Nome", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
   { key: "ccto_oi", label: "CCTO OI" },
   { label: "Circuito Meraki", rawKeys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
   { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
@@ -25,8 +27,8 @@ const FIELDS: MainField[] = [
   { key: "ip_wan", label: "IP WAN", mono: true },
   { key: "loopback_wan", label: "Loopback Principal", mono: true },
   { key: "loopback_lan", label: "Loopback Secund\u00E1rio", mono: true },
-  { key: "endereco", label: "Endere\u00E7o", multiline: true, rows: 3, wide: true },
-  { key: "contato", label: "Contato", multiline: true, rows: 2, wide: true },
+  { key: "endereco", label: "Endere\u00E7o", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
+  { key: "contato", label: "Contato", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
   { key: "status", label: "Status" },
   { key: "cidade", label: "Cidade" },
   { key: "uf", label: "UF" },
@@ -90,7 +92,11 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
                 {f.multiline ? (
                   <Textarea
                     rows={f.rows || 3}
-                    className={cn("resize-y", f.mono ? "font-mono text-xs" : "")}
+                    wrap={f.noWrap ? "off" : undefined}
+                    className={cn(
+                      f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
+                      f.mono ? "font-mono text-xs" : "",
+                    )}
                     value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
                     onChange={(e) => {
                       if (f.key) {

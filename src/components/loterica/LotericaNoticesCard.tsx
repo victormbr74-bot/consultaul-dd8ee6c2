@@ -26,11 +26,14 @@ interface LotericaNoticesCardProps {
   textValue: string;
   onTextValueChange: (value: string) => void;
   onSubmit: () => void;
+  onClear: () => void;
   loading: boolean;
   saving: boolean;
+  clearing: boolean;
   error: string | null;
   successMessage: string | null;
   noticeCount: number;
+  isAdmin: boolean;
 }
 
 const LotericaNoticesCard = ({
@@ -41,14 +44,17 @@ const LotericaNoticesCard = ({
   textValue,
   onTextValueChange,
   onSubmit,
+  onClear,
   loading,
   saving,
+  clearing,
   error,
   successMessage,
   noticeCount,
+  isAdmin,
 }: LotericaNoticesCardProps) => {
   const isMultiCode = codes.length > 1;
-  const submitDisabled = saving || !selectedCode || !textValue.trim();
+  const submitDisabled = saving || clearing || loading || !selectedCode || !textValue.trim();
   const hasNotices = noticeCount > 0;
 
   return (
@@ -103,12 +109,17 @@ const LotericaNoticesCard = ({
             value={loading ? "Carregando avisos..." : textValue}
             onChange={(event) => onTextValueChange(event.target.value)}
             placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
-            className="min-h-[148px] resize-y bg-background/90 text-sm leading-5"
+            className="min-h-[104px] resize-y bg-background/90 text-sm leading-5"
             readOnly={loading}
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {isAdmin && hasNotices && (
+            <Button type="button" variant="outline" onClick={onClear} disabled={clearing || loading || saving}>
+              {clearing ? "Apagando..." : "Apagar avisos"}
+            </Button>
+          )}
           <Button onClick={onSubmit} disabled={submitDisabled}>
             {saving ? "Salvando..." : "Salvar"}
           </Button>

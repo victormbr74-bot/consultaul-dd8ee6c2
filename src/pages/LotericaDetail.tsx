@@ -709,7 +709,7 @@ const LotericaDetail = () => {
   const hasLoadedRows = lotericas.length > 0;
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
   const noticesSection = hasLoadedRows ? (
-    <section className="mb-6">
+    <section className="space-y-3">
       <LotericaNoticesCard
         codes={loadedCodes}
         namesByCode={lotericaNamesByCode}
@@ -729,10 +729,16 @@ const LotericaDetail = () => {
         deletingNoticeId={deletingNoticeId}
         error={noticesError}
         successMessage={noticeSuccessMessage}
-        currentUserId={user?.id}
         isAdmin={isAdmin}
       />
     </section>
+  ) : null;
+  const noticesPanel = hasLoadedRows && lotericaTab === "avisos" ? (
+    <Card>
+      <CardContent className="pt-4">
+        <p className="text-sm text-muted-foreground">Os avisos compartilhados da lotérica estão exibidos acima do campo de pesquisa.</p>
+      </CardContent>
+    </Card>
   ) : null;
 
   return (
@@ -758,7 +764,7 @@ const LotericaDetail = () => {
           <div className="flex items-center gap-2">
             {!isBulkMode && hasLoadedRows && (
               <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> Hist\u00F3rico
+                <History className="w-4 h-4 mr-1" /> Histórico
               </Button>
             )}
             <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
@@ -767,6 +773,8 @@ const LotericaDetail = () => {
             </Button>
           </div>
         </div>
+
+        {noticesSection}
 
         <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
           <Textarea
@@ -797,14 +805,12 @@ const LotericaDetail = () => {
       )}
 
       <main className="container px-4 py-6 max-w-[1400px]">
-        {lotericaTab === "consulta" && noticesSection}
-
         {!hasLoadedRows ? (
           <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
             Nenhuma loterica encontrada para os codigos informados.
           </div>
-        ) : isBulkMode && lotericaTab === "avisos" ? (
-          noticesSection
+        ) : lotericaTab === "avisos" ? (
+          noticesPanel
         ) : isBulkMode ? (
           <div className="space-y-8">
             {lotericas.map((row) => {
@@ -828,7 +834,6 @@ const LotericaDetail = () => {
           </div>
         ) : (
           <>
-            {lotericaTab === "avisos" && noticesSection}
             {lotericaTab === "consulta" && (
               <ConsultaTab
                 form={activeForm}
@@ -848,11 +853,11 @@ const LotericaDetail = () => {
             {showHistory && (
               <Card className="mt-6 animate-fade-in">
                 <CardHeader>
-                  <CardTitle className="text-lg">Hist\u00F3rico de Altera\u00E7\u00F5es</CardTitle>
+                  <CardTitle className="text-lg">Histórico de Alterações</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {history.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhuma altera\u00E7\u00E3o registrada.</p>
+                    <p className="text-sm text-muted-foreground">Nenhuma alteração registrada.</p>
                   ) : (
                     <div className="space-y-3">
                       {history.map((h) => (

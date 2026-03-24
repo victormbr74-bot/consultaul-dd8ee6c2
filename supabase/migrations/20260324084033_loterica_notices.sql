@@ -31,11 +31,10 @@ CREATE POLICY "Authenticated can create loterica notices"
     AND btrim(observacao) <> ''
   );
 
-DROP POLICY IF EXISTS "Authors and admins can delete loterica notices" ON public.loterica_notices;
-CREATE POLICY "Authors and admins can delete loterica notices"
+DROP POLICY IF EXISTS "Admins can delete loterica notices" ON public.loterica_notices;
+CREATE POLICY "Admins can delete loterica notices"
   ON public.loterica_notices
   FOR DELETE TO authenticated
   USING (
-    created_by = auth.uid()
-    OR public.has_role(auth.uid(), 'admin')
+    public.has_role(auth.uid(), 'admin')
   );

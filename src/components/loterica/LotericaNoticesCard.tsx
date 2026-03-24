@@ -4,9 +4,9 @@ import { AlertTriangle, MessageSquarePlus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 export interface LotericaNoticeView {
@@ -34,7 +34,6 @@ interface LotericaNoticesCardProps {
   deletingNoticeId: string | null;
   error: string | null;
   successMessage: string | null;
-  currentUserId?: string;
   isAdmin: boolean;
 }
 
@@ -65,7 +64,6 @@ const LotericaNoticesCard = ({
   deletingNoticeId,
   error,
   successMessage,
-  currentUserId,
   isAdmin,
 }: LotericaNoticesCardProps) => {
   const hasNotices = notices.length > 0;
@@ -100,10 +98,10 @@ const LotericaNoticesCard = ({
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               {hasNotices ? <AlertTriangle className="h-5 w-5 text-warning" /> : <MessageSquarePlus className="h-5 w-5" />}
-              Avisos da loterica
+              Avisos da lotérica
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Observacoes compartilhadas que ficam visiveis para todos ao consultar a UL.
+              Observações compartilhadas que ficam visíveis para todos ao consultar a UL.
             </p>
           </div>
 
@@ -120,7 +118,7 @@ const LotericaNoticesCard = ({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className={cn("grid gap-3", isMultiCode ? "xl:grid-cols-[220px_minmax(0,1fr)_auto]" : "xl:grid-cols-[minmax(0,1fr)_auto]")}>
+        <div className={cn("grid gap-3", isMultiCode ? "lg:grid-cols-[220px_minmax(0,1fr)_auto]" : "lg:grid-cols-[minmax(0,1fr)_auto]")}>
           {isMultiCode && (
             <div className="space-y-1.5">
               <Label>UL do aviso</Label>
@@ -140,18 +138,17 @@ const LotericaNoticesCard = ({
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="loterica-aviso-textarea">Novo aviso</Label>
-            <Textarea
-              id="loterica-aviso-textarea"
+            <Label htmlFor="loterica-aviso-input">Observação</Label>
+            <Input
+              id="loterica-aviso-input"
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
-              rows={4}
               placeholder="Ex.: cliente informou problema recorrente no local, validar atendimento antes de acionar campo."
-              className="resize-y bg-background/90"
+              className="bg-background/90"
             />
           </div>
 
-          <Button className="xl:self-end" onClick={onSubmit} disabled={submitDisabled}>
+          <Button className="lg:self-end" onClick={onSubmit} disabled={submitDisabled}>
             {saving ? "Salvando..." : "Salvar aviso"}
           </Button>
         </div>
@@ -182,7 +179,7 @@ const LotericaNoticesCard = ({
 
                 <div className="space-y-2">
                   {items.map((notice) => {
-                    const canDelete = Boolean(currentUserId) && (notice.created_by === currentUserId || isAdmin);
+                    const canDelete = isAdmin;
 
                     return (
                       <div key={notice.id} className="rounded-lg border bg-background/85 p-3 shadow-sm">

@@ -26,6 +26,10 @@ interface MailtoOptions {
   to?: string;
 }
 
+interface EmailDraftUrlOptions extends MailtoOptions {
+  clipboardReady?: boolean;
+}
+
 const asText = (value: unknown) => String(value ?? "").trim();
 
 const firstFilled = (...values: unknown[]) => {
@@ -81,6 +85,12 @@ export const buildMailtoUrl = ({ body, subject, to = "" }: MailtoOptions) => {
   const query = params.length ? `?${params.join("&")}` : "";
   return `mailto:${encodeURIComponent(to)}${query}`;
 };
+
+export const buildEmailDraftUrl = ({ clipboardReady = false, ...options }: EmailDraftUrlOptions) =>
+  buildMailtoUrl({
+    ...options,
+    body: clipboardReady ? "" : options.body,
+  });
 
 export const resolveValidationUnidade = (form: ValidationFormSource) => {
   const code = asText(form.cod_ul);

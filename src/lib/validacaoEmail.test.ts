@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildEmailDraftUrl,
   buildMailtoUrl,
   buildValidationHtmlTable,
   buildValidationEmailText,
@@ -114,5 +115,17 @@ describe("validacaoEmail", () => {
     expect(url).toContain("mailto:");
     expect(url).toContain("subject=Validacao%20de%20circuito%20-%2021-000111-1");
     expect(url).toContain("body=Linha%201%0ALinha%202");
+  });
+
+  it("omits the mailto body when the rich table is prepared on the clipboard", () => {
+    const url = buildEmailDraftUrl({
+      subject: "Validacao de circuito - 21-000111-1",
+      body: "Linha 1\nLinha 2",
+      clipboardReady: true,
+    });
+
+    expect(url).toContain("mailto:");
+    expect(url).toContain("subject=Validacao%20de%20circuito%20-%2021-000111-1");
+    expect(url).not.toContain("body=");
   });
 });

@@ -20,7 +20,7 @@ import {
   type TermMatch,
 } from "@/components/loterica/lotericaLookup";
 import {
-  buildMailtoUrl,
+  buildEmailDraftUrl,
   buildValidationEmailText,
   buildValidationHtmlTable,
   resolveValidationDesignacao,
@@ -29,6 +29,7 @@ import {
   type ValidationEmailRow,
 } from "@/lib/validacaoEmail";
 import { Check, Copy, Mail, Search, Table as TableIcon } from "lucide-react";
+import { toast } from "sonner";
 
 interface ValidationState {
   acaoRealizada: string;
@@ -249,16 +250,21 @@ const Validacao = () => {
   const sendEmail = async () => {
     if (!emailRows.length) return;
 
+    let clipboardReady = false;
+
     try {
       await copyRichTextToClipboard({ html: emailHtml, text: emailText });
+      clipboardReady = true;
       setCopiedFeedback("email");
+      toast.success("Tabela copiada. Cole no corpo do email com Ctrl+V.");
     } catch (error) {
       console.error("Falha ao copiar tabela para o email", error);
     }
 
-    window.location.href = buildMailtoUrl({
+    window.location.href = buildEmailDraftUrl({
       subject: emailSubject,
       body: emailText,
+      clipboardReady,
     });
   };
 

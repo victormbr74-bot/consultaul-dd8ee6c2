@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { copyRichTextToClipboard } from "@/lib/richClipboard";
-import { buildMailtoUrl } from "@/lib/validacaoEmail";
+import { buildEmailDraftUrl } from "@/lib/validacaoEmail";
 import { Copy, Check, Mail, Plus, Table } from "lucide-react";
+import { toast } from "sonner";
 
 type Defeito = {
   value: string;
@@ -293,15 +294,19 @@ ${rows.map(([label, value], i) => {
   };
 
   const sendByEmail = async (subject: string, body: string, tableRows?: [string, string][], feedbackId?: string) => {
+    let clipboardReady = false;
+
     if (tableRows?.length && feedbackId) {
       try {
         await copyAsHtmlTable(tableRows, feedbackId);
+        clipboardReady = true;
+        toast.success("Tabela copiada. Cole no corpo do email com Ctrl+V.");
       } catch (error) {
         console.error("Falha ao copiar tabela para o email", error);
       }
     }
 
-    window.location.href = buildMailtoUrl({ subject, body });
+    window.location.href = buildEmailDraftUrl({ subject, body, clipboardReady });
   };
 
   const CopyBtn = ({

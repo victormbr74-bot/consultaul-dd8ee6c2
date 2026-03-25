@@ -60,6 +60,21 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Outlook corporativo
+
+Para abrir o rascunho do Outlook ja com a tabela HTML no corpo do email, configure uma App Registration no Microsoft Entra ID com:
+
+- Redirect URI SPA para `/outlook-auth.html`
+- Permissoes delegadas `User.Read` e `Mail.ReadWrite`
+
+Depois, defina no ambiente:
+
+```sh
+VITE_OUTLOOK_CLIENT_ID=<app-client-id>
+VITE_OUTLOOK_TENANT_ID=<tenant-id-ou-organizations>
+VITE_OUTLOOK_REDIRECT_URI=https://seu-dominio/outlook-auth.html
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

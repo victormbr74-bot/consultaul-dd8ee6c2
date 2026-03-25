@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { copyRichTextToClipboard } from "@/lib/richClipboard";
 import { buildEmailDraftUrl } from "@/lib/validacaoEmail";
+import { isOutlookDraftConfigured, openOutlookHtmlDraft } from "@/lib/outlookDraft";
 import { Copy, Check, Mail, Plus, Table } from "lucide-react";
 import { toast } from "sonner";
 
@@ -294,6 +295,21 @@ ${rows.map(([label, value], i) => {
   };
 
   const sendByEmail = async (subject: string, body: string, tableRows?: [string, string][], feedbackId?: string) => {
+    if (tableRows?.length && isOutlookDraftConfigured()) {
+      try {
+        await openOutlookHtmlDraft({
+          subject,
+          html: buildTableHtml(tableRows),
+        });
+        if (feedbackId) setCopiedFeedback(feedbackId);
+        toast.success("Rascunho criado no Outlook com a tabela no corpo do email.");
+        return;
+      } catch (error) {
+        console.error("Falha ao criar rascunho no Outlook", error);
+        toast.error("Falha ao criar rascunho no Outlook. Abrindo rascunho padrao.");
+      }
+    }
+
     let clipboardReady = false;
 
     if (tableRows?.length && feedbackId) {

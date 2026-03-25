@@ -28,6 +28,7 @@ import {
   type ValidationCircuitTarget,
   type ValidationEmailRow,
 } from "@/lib/validacaoEmail";
+import { isOutlookDraftConfigured, openOutlookHtmlDraft } from "@/lib/outlookDraft";
 import { Check, Copy, Mail, Search, Table as TableIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -249,6 +250,21 @@ const Validacao = () => {
 
   const sendEmail = async () => {
     if (!emailRows.length) return;
+
+    if (isOutlookDraftConfigured()) {
+      try {
+        await openOutlookHtmlDraft({
+          subject: emailSubject,
+          html: emailHtml,
+        });
+        setCopiedFeedback("email");
+        toast.success("Rascunho criado no Outlook com a tabela no corpo do email.");
+        return;
+      } catch (error) {
+        console.error("Falha ao criar rascunho no Outlook", error);
+        toast.error("Falha ao criar rascunho no Outlook. Abrindo rascunho padrao.");
+      }
+    }
 
     let clipboardReady = false;
 

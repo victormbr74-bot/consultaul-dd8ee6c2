@@ -272,8 +272,7 @@ const Dashboard = () => {
 
     const parsedTerms = parseCodUlTerms(term);
     if (parsedTerms.length > 1) {
-      setLotericaTab("consulta");
-      navigate(`/loterica/${encodeURIComponent(parsedTerms.join(","))}`);
+      alert("Para consultar varias ULs ao mesmo tempo, use o menu Consulta Massa.");
       return;
     }
 

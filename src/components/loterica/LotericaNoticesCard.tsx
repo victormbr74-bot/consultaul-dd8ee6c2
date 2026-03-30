@@ -56,15 +56,20 @@ const LotericaNoticesCard = ({
   const isMultiCode = codes.length > 1;
   const submitDisabled = saving || clearing || loading || !selectedCode || !textValue.trim();
   const hasNotices = noticeCount > 0;
+  const selectedName = (namesByCode[selectedCode] || "").trim();
+  const selectedLabel = selectedCode
+    ? [selectedCode, selectedName || "Sem nome"].filter(Boolean).join(" - ")
+    : "";
 
   return (
     <Card className={cn("border", hasNotices ? "border-warning/40 bg-warning/10" : "border-dashed")}>
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
               {hasNotices ? <AlertTriangle className="h-5 w-5 text-warning" /> : <MessageSquarePlus className="h-5 w-5" />}
-              {"Avisos da lot\u00E9rica"}
+              <span>{"Avisos da lot\u00E9rica"}</span>
+              {selectedLabel ? <span className="text-sm font-normal text-muted-foreground">{selectedLabel}</span> : null}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               {"Visualize o hist\u00F3rico e adicione a nova informa\u00E7\u00E3o no final da mesma caixa de texto."}

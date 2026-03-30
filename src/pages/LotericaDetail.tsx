@@ -215,8 +215,6 @@ const LotericaDetail = () => {
   const [missingCodes, setMissingCodes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [notices, setNotices] = useState<LotericaNoticeView[]>([]);
   const [noticesLoading, setNoticesLoading] = useState(false);
   const [noticeEditorValue, setNoticeEditorValue] = useState("");
@@ -300,8 +298,6 @@ const LotericaDetail = () => {
   useEffect(() => {
     const fetchLotericas = async () => {
       setLoading(true);
-      setShowHistory(false);
-      setHistory([]);
       try {
         if (!requestedCodes.length) {
           setLotericas([]);
@@ -457,38 +453,15 @@ const LotericaDetail = () => {
     };
   }, [fetchNotices, loadedCodes, loadedCodesKey]);
 
-  const fetchHistory = async () => {
-    if (!activeCode) {
-      alert("Informe um codigo UL para consultar o historico.");
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("loterica_history")
-        .select("*, profiles:changed_by(name)")
-        .eq("cod_ul", activeCode)
-        .order("changed_at", { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.error("Erro ao carregar historico", error);
-        alert("Erro ao carregar historico.");
-        return;
-      }
-
-      setHistory(data || []);
-      setShowHistory(true);
-    } catch (error) {
-      console.error("Falha inesperada ao carregar historico", error);
-      alert("Falha inesperada ao carregar historico.");
-    }
-  };
-
   const handleConsult = useCallback(() => {
     const codes = parseCodUlTerms(queryInput);
     if (!codes.length) {
       alert("Informe ao menos um codigo UL para consultar.");
+      return;
+    }
+
+    if (codes.length > 1) {
+      alert("Para consultar varias ULs ao mesmo tempo, use o menu Consulta Massa.");
       return;
     }
 
@@ -794,6 +767,9 @@ const LotericaDetail = () => {
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const hasLoadedRows = lotericas.length > 0;
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
+  const history: any[] = [];
+  const showHistory = false;
+  const fetchHistory = () => undefined;
   const noticesSection = hasLoadedRows ? (
     <section className="space-y-3">
       <LotericaNoticesCard
@@ -832,8 +808,7 @@ const LotericaDetail = () => {
   return (
     <div className="bg-background">
       <div className="container px-4 py-3 border-b space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
             </Button>
@@ -847,10 +822,8 @@ const LotericaDetail = () => {
                 <span className="font-mono text-xs text-muted-foreground">{activeCode || "-"}</span>
               </div>
             )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!isBulkMode && hasLoadedRows && (
+          <div className="hidden items-center gap-2">
+            {false && !isBulkMode && hasLoadedRows && (
               <Button variant="outline" size="sm" onClick={fetchHistory}>
                 <History className="w-4 h-4 mr-1" /> Histórico
               </Button>
@@ -864,15 +837,22 @@ const LotericaDetail = () => {
 
         {noticesSection}
 
+        <div className="flex justify-end">
+          <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
+            <Save className="w-4 h-4 mr-1" />{" "}
+            {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
+          </Button>
+        </div>
+
         <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
           <Textarea
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
-            placeholder="Informe 1 ou mais codigos UL (separados por virgula, espaco ou quebra de linha)"
+            placeholder="Informe um codigo UL"
             className="min-h-[64px] font-mono text-xs"
           />
           <Button variant="outline" onClick={handleConsult} className="lg:self-start">
-            Consultar codigos
+            Consultar codigo
           </Button>
         </div>
 

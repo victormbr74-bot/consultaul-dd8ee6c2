@@ -16,7 +16,7 @@ import {
   parseMassUpdateFile,
   type MassUpdateExistingRow,
 } from "@/lib/lotericaMassUpdate";
-import { writeFile } from "@/lib/excelCompat";
+import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -387,6 +387,11 @@ const summarizeCodes = (codes: string[], maxItems = 8) => {
   return `${codes.slice(0, maxItems).join(", ")} e mais ${codes.length - maxItems}`;
 };
 
+const buildConsultaMassaExportFilename = () => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `consulta_massa_${stamp}.xlsx`;
+};
+
 const ConsultaMassaTab = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -451,18 +456,6 @@ const ConsultaMassaTab = () => {
       );
     }
   }, []);
-
-  useLayoutEffect(() => {
-    setOnImportClick(() => () => uploadInputRef.current?.click());
-    setOnExport(() => () => {
-      void downloadTemplate();
-    });
-
-    return () => {
-      setOnImportClick(undefined);
-      setOnExport(undefined);
-    };
-  }, [downloadTemplate, setOnExport, setOnImportClick]);
 
   const rows = useMemo<ConsultaMassaRow[]>(() => {
     return matches.map((match) => {
@@ -530,6 +523,62 @@ const ConsultaMassaTab = () => {
       };
     });
   }, [matches]);
+
+  const downloadLookupResults = useCallback(async () => {
+    if (!rows.length) {
+      alert("Execute uma consulta em massa antes de exportar o resultado.");
+      return;
+    }
+
+    try {
+      const exportData = rows.map((row) => ({
+        Consulta: row.query,
+        Status: row.statusText,
+        "Codigo UL": row.codUl,
+        Nome: row.nome,
+        Endereco: row.endereco,
+        Cidade: row.cidade,
+        UF: row.uf,
+        Tecnologia: row.tecnologia,
+        Contato: row.contato,
+        "Status UL": row.statusUl,
+        "CCTO OI": row.cctoOi,
+        "Designacao Nova": row.designacaoNova,
+        "IP NAT": row.ipNat,
+        "IP WAN": row.ipWan,
+        "Loopback Principal": row.loopbackWan,
+        "IP Primario": row.ipPrimario || "-",
+        "CCTO OEMP": row.cctoOemp,
+        "Loopback Secundario": row.loopbackLan,
+        "IP Secundario": row.ipSecundario || "-",
+        Operadora: row.operadora,
+        Match: row.matchedBy,
+      }));
+
+      const workbook = jsonToWorkbook([{ name: "Consulta Massa", data: exportData }]);
+      await writeFile(workbook, buildConsultaMassaExportFilename());
+    } catch (exportError) {
+      alert(
+        `Falha ao exportar a consulta: ${String((exportError as Error)?.message || exportError || "erro desconhecido")}`,
+      );
+    }
+  }, [rows]);
+
+  useLayoutEffect(() => {
+    setOnImportClick(() => () => uploadInputRef.current?.click());
+    if (rows.length > 0) {
+      setOnExport(() => () => {
+        void downloadLookupResults();
+      });
+    } else {
+      setOnExport(undefined);
+    }
+
+    return () => {
+      setOnImportClick(undefined);
+      setOnExport(undefined);
+    };
+  }, [downloadLookupResults, rows.length, setOnExport, setOnImportClick]);
 
   const summary = useMemo(() => {
     const ok = rows.filter((row) => row.statusType === "ok").length;
@@ -768,6 +817,10 @@ const ConsultaMassaTab = () => {
           <Button onClick={() => void runLookup()} disabled={loading}>
             {loading ? "Consultando..." : "Consultar"}
           </Button>
+          <Button variant="outline" onClick={() => void downloadLookupResults()} disabled={rows.length === 0}>
+            <Download className="w-4 h-4 mr-1" />
+            Baixar consulta .xlsx
+          </Button>
           <Button
             variant="secondary"
             onClick={() => goToEditByCodes(selectedCodes)}
@@ -837,6 +890,7 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
                     <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
                     <th className="p-2 font-medium whitespace-nowrap">UF</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Contato</th>
                     <th className="p-2 font-medium whitespace-nowrap">Status UL</th>
                     <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
@@ -849,7 +903,6 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">IP Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Match</th>
                   </tr>
                 </thead>
@@ -894,6 +947,7 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[160px] whitespace-normal break-words">{row.cidade}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.uf}</td>
+                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
                         <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOi}</td>
@@ -906,7 +960,6 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
                         <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
                         <td className="p-2 whitespace-nowrap">{row.matchedBy}</td>
                       </tr>
                     );

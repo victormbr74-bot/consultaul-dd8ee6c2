@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Store,
   Search,
-  MessageSquare,
   FileText,
   FileCheck,
   Terminal,
@@ -85,7 +84,6 @@ export function AppSidebar() {
   const ping99Path = ping99SeedTerm ? `/ping99?q=${encodeURIComponent(ping99SeedTerm)}` : "/ping99";
 
   const lotericaTabs = [
-    { id: "avisos", label: "Avisos", icon: MessageSquare },
     { id: "mascara", label: "Mascara", icon: FileText },
     { id: "testes", label: "Testes", icon: Terminal },
   ];

@@ -6,9 +6,9 @@ import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { useLotericaUpdatesAccess } from "@/hooks/useLotericaUpdatesAccess";
 import { normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, History, Save } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Save } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
@@ -147,40 +147,6 @@ const buildLotericaNoticesMissingTableMessage = () =>
 
 const getSupabaseErrorMessage = (error: { message?: string } | null | undefined) => String(error?.message || "");
 
-const formatHistoryValue = (value: unknown) => {
-  if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "string") return value;
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
-const buildHistorySummaryText = (entry: any) => {
-  const beforeData = entry?.before_data && typeof entry.before_data === "object" ? entry.before_data : {};
-  const afterData = entry?.after_data && typeof entry.after_data === "object" ? entry.after_data : {};
-  const changedKeys = Object.keys(afterData).filter(
-    (key) =>
-      key !== "raw_data" &&
-      key !== "updated_at" &&
-      key !== "updated_by" &&
-      JSON.stringify(beforeData[key]) !== JSON.stringify(afterData[key]),
-  );
-
-  if (changedKeys.length === 0) {
-    return "Nenhuma diferença detalhada registrada.";
-  }
-
-  return changedKeys
-    .map(
-      (key) =>
-        `${key}\nAnterior: ${formatHistoryValue(beforeData[key])}\nNovo: ${formatHistoryValue(afterData[key])}`,
-    )
-    .join("\n\n");
-};
-
 const formatNoticeTimelineDate = (value: string) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -283,7 +249,12 @@ const LotericaDetail = () => {
   }, [noticeBaseText, noticeTargetCode]);
 
   useEffect(() => {
-    if (isBulkMode && lotericaTab !== "consulta" && lotericaTab !== "avisos") {
+    if (lotericaTab === "avisos") {
+      setLotericaTab("consulta");
+      return;
+    }
+
+    if (isBulkMode && lotericaTab !== "consulta") {
       setLotericaTab("consulta");
     }
   }, [isBulkMode, lotericaTab, setLotericaTab]);
@@ -454,19 +425,25 @@ const LotericaDetail = () => {
   }, [fetchNotices, loadedCodes, loadedCodesKey]);
 
   const handleConsult = useCallback(() => {
-    const codes = parseCodUlTerms(queryInput);
-    if (!codes.length) {
+    const rawInput = String(queryInput || "").trim();
+    if (!rawInput) {
       alert("Informe ao menos um codigo UL para consultar.");
       return;
     }
 
-    if (codes.length > 1) {
-      alert("Para consultar varias ULs ao mesmo tempo, use o menu Consulta Massa.");
+    if (/[\n,;\t]/.test(rawInput)) {
+      alert("Consulta UL aceita apenas um codigo por vez. Use o menu Consulta Massa para lote.");
+      return;
+    }
+
+    const code = normalizeCodUlTerm(rawInput);
+    if (!code) {
+      alert("Informe um codigo UL valido.");
       return;
     }
 
     setLotericaTab("consulta");
-    navigate(`/loterica/${encodeURIComponent(codes.join(","))}`);
+    navigate(`/loterica/${encodeURIComponent(code)}`);
   }, [navigate, queryInput, setLotericaTab]);
 
   const handleSaveNotice = useCallback(async () => {
@@ -767,9 +744,6 @@ const LotericaDetail = () => {
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const hasLoadedRows = lotericas.length > 0;
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
-  const history: any[] = [];
-  const showHistory = false;
-  const fetchHistory = () => undefined;
   const noticesSection = hasLoadedRows ? (
     <section className="space-y-3">
       <LotericaNoticesCard
@@ -795,15 +769,6 @@ const LotericaDetail = () => {
       />
     </section>
   ) : null;
-  const noticesTabHint = hasLoadedRows && lotericaTab === "avisos" ? (
-    <Card>
-      <CardContent className="pt-4">
-        <p className="text-sm text-muted-foreground">
-          {"Os avisos compartilhados da lot\u00E9rica est\u00E3o exibidos acima do campo de pesquisa."}
-        </p>
-      </CardContent>
-    </Card>
-  ) : null;
 
   return (
     <div className="bg-background">
@@ -822,17 +787,6 @@ const LotericaDetail = () => {
                 <span className="font-mono text-xs text-muted-foreground">{activeCode || "-"}</span>
               </div>
             )}
-          <div className="hidden items-center gap-2">
-            {false && !isBulkMode && hasLoadedRows && (
-              <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> Histórico
-              </Button>
-            )}
-            <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-              <Save className="w-4 h-4 mr-1" />{" "}
-              {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
-            </Button>
-          </div>
         </div>
 
         {noticesSection}
@@ -844,17 +798,19 @@ const LotericaDetail = () => {
           </Button>
         </div>
 
-        <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-          <Textarea
-            value={queryInput}
-            onChange={(e) => setQueryInput(e.target.value)}
-            placeholder="Informe um codigo UL"
-            className="min-h-[64px] font-mono text-xs"
-          />
-          <Button variant="outline" onClick={handleConsult} className="lg:self-start">
-            Consultar codigo
-          </Button>
-        </div>
+        {!isBulkMode && (
+          <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
+            <Input
+              value={queryInput}
+              onChange={(e) => setQueryInput(e.target.value)}
+              placeholder="Informe um codigo UL"
+              className="font-mono text-xs"
+            />
+            <Button variant="outline" onClick={handleConsult} className="lg:self-start">
+              Consultar codigo
+            </Button>
+          </div>
+        )}
 
         {missingCodes.length > 0 && <p className="text-xs text-warning">Codigos nao encontrados: {missingCodes.join(", ")}</p>}
       </div>
@@ -877,8 +833,6 @@ const LotericaDetail = () => {
           <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
             Nenhuma loterica encontrada para os codigos informados.
           </div>
-        ) : lotericaTab === "avisos" ? (
-          noticesTabHint
         ) : isBulkMode ? (
           <div className="space-y-8">
             {lotericas.map((row) => {
@@ -918,38 +872,6 @@ const LotericaDetail = () => {
             {lotericaTab === "pingao-nat" && <PingaoNatTab />}
             {lotericaTab === "script-router-sct" && <ScriptRouterSctTab initialCodUl={activeCode} />}
 
-            {showHistory && (
-              <Card className="mt-6 animate-fade-in">
-                <CardHeader>
-                  <CardTitle className="text-lg">Histórico de Alterações</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {history.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhuma alteração registrada.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {history.map((h) => (
-                        <div key={h.id} className="border rounded-lg p-3 text-sm space-y-2">
-                          <div className="space-y-0.5">
-                            <p className="font-medium text-foreground">{activeForm?.nome_loterica || "Lotérica"}</p>
-                            <p className="font-mono text-[11px] text-muted-foreground">{activeCode || "-"}</p>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                            <span>{(h as any).profiles?.name || "Desconhecido"}</span>
-                            <span>{new Date(h.changed_at).toLocaleString("pt-BR")}</span>
-                          </div>
-                          <Textarea
-                            readOnly
-                            value={buildHistorySummaryText(h)}
-                            className="min-h-[88px] resize-none bg-muted/30 text-xs leading-5"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </>
         )}
 

@@ -199,6 +199,10 @@ const FIELD_SECTIONS: FieldSection[] = [
         fallback: (row) => row.uf,
       },
       {
+        label: "Tecnologia",
+        aliases: ["TECNOLOGIA"],
+      },
+      {
         label: "Contato",
         aliases: ["CONTATO", "contato"],
         fallback: (row) => row.contato,
@@ -355,10 +359,6 @@ const FIELD_SECTIONS: FieldSection[] = [
     description: "Informacoes tecnicas adicionais da infraestrutura da UL.",
     fields: [
       {
-        label: "Tecnologia",
-        aliases: ["TECNOLOGIA"],
-      },
-      {
         label: "Modelo Roteador",
         aliases: ["MODELO ROTEADOR"],
       },
@@ -391,6 +391,31 @@ const buildConsultaMassaExportFilename = () => {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   return `consulta_massa_${stamp}.xlsx`;
 };
+
+const buildConsultaMassaExportRows = (rows: ConsultaMassaRow[]) =>
+  rows.map((row) => ({
+    Consulta: row.query,
+    Status: row.statusText,
+    "Codigo UL": row.codUl,
+    Nome: row.nome,
+    Endereco: row.endereco,
+    Cidade: row.cidade,
+    UF: row.uf,
+    Tecnologia: row.tecnologia,
+    Contato: row.contato,
+    "Status UL": row.statusUl,
+    "CCTO OI": row.cctoOi,
+    "Designacao Nova": row.designacaoNova,
+    "IP NAT": row.ipNat,
+    "IP WAN": row.ipWan,
+    "Loopback Principal": row.loopbackWan,
+    "IP Primario": row.ipPrimario || "-",
+    "CCTO OEMP": row.cctoOemp,
+    "Loopback Secundario": row.loopbackLan,
+    "IP Secundario": row.ipSecundario || "-",
+    Operadora: row.operadora,
+    Match: row.matchedBy,
+  }));
 
 const ConsultaMassaTab = () => {
   const navigate = useNavigate();
@@ -531,31 +556,7 @@ const ConsultaMassaTab = () => {
     }
 
     try {
-      const exportData = rows.map((row) => ({
-        Consulta: row.query,
-        Status: row.statusText,
-        "Codigo UL": row.codUl,
-        Nome: row.nome,
-        Endereco: row.endereco,
-        Cidade: row.cidade,
-        UF: row.uf,
-        Tecnologia: row.tecnologia,
-        Contato: row.contato,
-        "Status UL": row.statusUl,
-        "CCTO OI": row.cctoOi,
-        "Designacao Nova": row.designacaoNova,
-        "IP NAT": row.ipNat,
-        "IP WAN": row.ipWan,
-        "Loopback Principal": row.loopbackWan,
-        "IP Primario": row.ipPrimario || "-",
-        "CCTO OEMP": row.cctoOemp,
-        "Loopback Secundario": row.loopbackLan,
-        "IP Secundario": row.ipSecundario || "-",
-        Operadora: row.operadora,
-        Match: row.matchedBy,
-      }));
-
-      const workbook = jsonToWorkbook([{ name: "Consulta Massa", data: exportData }]);
+      const workbook = jsonToWorkbook([{ name: "Consulta Massa", data: buildConsultaMassaExportRows(rows) }]);
       await writeFile(workbook, buildConsultaMassaExportFilename());
     } catch (exportError) {
       alert(
@@ -819,7 +820,7 @@ const ConsultaMassaTab = () => {
           </Button>
           <Button variant="outline" onClick={() => void downloadLookupResults()} disabled={rows.length === 0}>
             <Download className="w-4 h-4 mr-1" />
-            Baixar consulta .xlsx
+            Baixar Excel da consulta
           </Button>
           <Button
             variant="secondary"

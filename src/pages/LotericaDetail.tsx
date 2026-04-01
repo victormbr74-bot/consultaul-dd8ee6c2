@@ -8,7 +8,7 @@ import { normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, History, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
@@ -796,6 +796,10 @@ const LotericaDetail = () => {
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
   const noticesSection = hasLoadedRows ? (
     <section className="space-y-3">
+      <div className="text-sm font-medium text-foreground">
+        Avisos da Lotérica — <span className="font-mono">{noticeTargetCode || "-"}</span>{" "}
+        {lotericaNamesByCode[noticeTargetCode] ? `— ${lotericaNamesByCode[noticeTargetCode]}` : ""}
+      </div>
       <LotericaNoticesCard
         codes={loadedCodes}
         namesByCode={lotericaNamesByCode}
@@ -850,11 +854,6 @@ const LotericaDetail = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {!isBulkMode && hasLoadedRows && (
-              <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> Histórico
-              </Button>
-            )}
             <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
               <Save className="w-4 h-4 mr-1" />{" "}
               {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}

@@ -16,7 +16,7 @@ import {
   parseMassUpdateFile,
   type MassUpdateExistingRow,
 } from "@/lib/lotericaMassUpdate";
-import { writeFile } from "@/lib/excelCompat";
+import { writeFile, jsonToWorkbook } from "@/lib/excelCompat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -411,6 +411,39 @@ const ConsultaMassaTab = () => {
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const uploadDisabled = uploadingUpdates || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
 
+  const exportConsultaMassaToExcel = useCallback(async (exportRows: ConsultaMassaRow[]) => {
+    try {
+      const data = exportRows.map((r) => ({
+        "Consulta": r.query,
+        "Status": r.statusText,
+        "Codigo UL": r.codUl,
+        "Nome": r.nome,
+        "Endereco": r.endereco,
+        "Cidade": r.cidade,
+        "UF": r.uf,
+        "Tecnologia": r.tecnologia,
+        "Contato": r.contato,
+        "Status UL": r.statusUl,
+        "CCTO OI": r.cctoOi,
+        "Designacao Nova": r.designacaoNova,
+        "IP NAT": r.ipNat,
+        "IP WAN": r.ipWan,
+        "Loopback Principal": r.loopbackWan,
+        "IP Primario": r.ipPrimario || "-",
+        "CCTO OEMP": r.cctoOemp,
+        "Loopback Secundario": r.loopbackLan,
+        "IP Secundario": r.ipSecundario || "-",
+        "Operadora": r.operadora,
+        "Match": r.matchedBy,
+      }));
+      const wb = jsonToWorkbook([{ name: "Consulta Massa", data }]);
+      await writeFile(wb, `consulta_massa_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      alert(`Falha ao exportar: ${(err as Error)?.message || err}`);
+    }
+  }, []);
+
+
   const runLookupForTerms = useCallback(async (terms: string[]) => {
     if (!terms.length) {
       setError("Informe ao menos um codigo UL ou circuito.");
@@ -783,6 +816,15 @@ const ConsultaMassaTab = () => {
           >
             Editar encontradas ({editableCodes.length})
           </Button>
+          {rows.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => void exportConsultaMassaToExcel(rows)}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Baixar Excel
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -837,6 +879,7 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
                     <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
                     <th className="p-2 font-medium whitespace-nowrap">UF</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Contato</th>
                     <th className="p-2 font-medium whitespace-nowrap">Status UL</th>
                     <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
@@ -849,7 +892,6 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">IP Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Match</th>
                   </tr>
                 </thead>
@@ -894,6 +936,7 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[160px] whitespace-normal break-words">{row.cidade}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.uf}</td>
+                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
                         <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOi}</td>
@@ -906,7 +949,6 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
                         <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
                         <td className="p-2 whitespace-nowrap">{row.matchedBy}</td>
                       </tr>
                     );

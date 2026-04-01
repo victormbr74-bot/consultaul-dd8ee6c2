@@ -8,7 +8,7 @@ import { normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, History, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";

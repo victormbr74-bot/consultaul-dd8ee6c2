@@ -783,6 +783,15 @@ const ConsultaMassaTab = () => {
           >
             Editar encontradas ({editableCodes.length})
           </Button>
+          {rows.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => void exportConsultaMassaToExcel(rows)}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Baixar Excel
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => {

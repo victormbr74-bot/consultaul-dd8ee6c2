@@ -16,7 +16,7 @@ import {
   parseMassUpdateFile,
   type MassUpdateExistingRow,
 } from "@/lib/lotericaMassUpdate";
-import { writeFile } from "@/lib/excelCompat";
+import { writeFile, jsonToWorkbook } from "@/lib/excelCompat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";

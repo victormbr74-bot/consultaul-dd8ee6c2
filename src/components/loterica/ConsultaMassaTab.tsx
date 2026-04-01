@@ -936,7 +936,11 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[160px] whitespace-normal break-words">{row.cidade}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.uf}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          <Badge variant="outline" className={cn("text-[11px] font-semibold", techBadgeClass(row.tecnologia))}>
+                            {row.tecnologia}
+                          </Badge>
+                        </td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
                         <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOi}</td>

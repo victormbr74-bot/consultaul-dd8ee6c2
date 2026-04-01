@@ -1067,7 +1067,7 @@ const ConsultaMassaTab = () => {
                   <Badge variant="outline" className="border-white/70 text-white bg-white/10">
                     Status: {normalizeText(selectedRow.status) || "-"}
                   </Badge>
-                  <Badge variant="outline" className="border-white/70 text-white bg-white/10">
+                  <Badge variant="outline" className={cn("font-semibold", techBadgeClass(selectedTecnologia))}>
                     Tecnologia: {selectedTecnologia}
                   </Badge>
                 </div>

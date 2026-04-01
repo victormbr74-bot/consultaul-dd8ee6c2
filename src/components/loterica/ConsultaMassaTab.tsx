@@ -837,6 +837,7 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
                     <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
                     <th className="p-2 font-medium whitespace-nowrap">UF</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Contato</th>
                     <th className="p-2 font-medium whitespace-nowrap">Status UL</th>
                     <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
@@ -849,7 +850,6 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">IP Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Match</th>
                   </tr>
                 </thead>

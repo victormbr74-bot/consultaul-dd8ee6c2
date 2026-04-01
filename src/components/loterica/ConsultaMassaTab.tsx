@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Download, PencilLine, Search, Upload } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { techBadgeClass } from "@/lib/techBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";

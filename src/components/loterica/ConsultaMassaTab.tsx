@@ -436,7 +436,7 @@ const ConsultaMassaTab = () => {
         "Operadora": r.operadora,
         "Match": r.matchedBy,
       }));
-      const wb = jsonToWorkbook(data, "Consulta Massa");
+      const wb = jsonToWorkbook([{ name: "Consulta Massa", data }]);
       await writeFile(wb, `consulta_massa_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (err) {
       alert(`Falha ao exportar: ${(err as Error)?.message || err}`);

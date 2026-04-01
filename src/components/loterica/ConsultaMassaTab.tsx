@@ -445,6 +445,7 @@ const ConsultaMassaTab = () => {
 
 
   const runLookupForTerms = useCallback(async (terms: string[]) => {
+    if (!terms.length) {
       setError("Informe ao menos um codigo UL ou circuito.");
       setMatches([]);
       return false;

@@ -952,7 +952,11 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOemp}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          <Badge variant="outline" className={cn("text-[11px] font-semibold", techBadgeClass(row.operadora))}>
+                            {row.operadora}
+                          </Badge>
+                        </td>
                         <td className="p-2 whitespace-nowrap">{row.matchedBy}</td>
                       </tr>
                     );

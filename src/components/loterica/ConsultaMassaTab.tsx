@@ -411,7 +411,39 @@ const ConsultaMassaTab = () => {
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const uploadDisabled = uploadingUpdates || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
 
-  const runLookupForTerms = useCallback(async (terms: string[]) => {
+  const exportConsultaMassaToExcel = useCallback(async (exportRows: ConsultaMassaRow[]) => {
+    try {
+      const data = exportRows.map((r) => ({
+        "Consulta": r.query,
+        "Status": r.statusText,
+        "Codigo UL": r.codUl,
+        "Nome": r.nome,
+        "Endereco": r.endereco,
+        "Cidade": r.cidade,
+        "UF": r.uf,
+        "Tecnologia": r.tecnologia,
+        "Contato": r.contato,
+        "Status UL": r.statusUl,
+        "CCTO OI": r.cctoOi,
+        "Designacao Nova": r.designacaoNova,
+        "IP NAT": r.ipNat,
+        "IP WAN": r.ipWan,
+        "Loopback Principal": r.loopbackWan,
+        "IP Primario": r.ipPrimario || "-",
+        "CCTO OEMP": r.cctoOemp,
+        "Loopback Secundario": r.loopbackLan,
+        "IP Secundario": r.ipSecundario || "-",
+        "Operadora": r.operadora,
+        "Match": r.matchedBy,
+      }));
+      const wb = jsonToWorkbook(data, "Consulta Massa");
+      await writeFile(wb, `consulta_massa_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      alert(`Falha ao exportar: ${(err as Error)?.message || err}`);
+    }
+  }, []);
+
+
     if (!terms.length) {
       setError("Informe ao menos um codigo UL ou circuito.");
       setMatches([]);

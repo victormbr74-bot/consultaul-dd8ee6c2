@@ -796,6 +796,10 @@ const LotericaDetail = () => {
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
   const noticesSection = hasLoadedRows ? (
     <section className="space-y-3">
+      <div className="text-sm font-medium text-foreground">
+        Avisos da Lotérica — <span className="font-mono">{noticeTargetCode || "-"}</span>{" "}
+        {lotericaNamesByCode[noticeTargetCode] ? `— ${lotericaNamesByCode[noticeTargetCode]}` : ""}
+      </div>
       <LotericaNoticesCard
         codes={loadedCodes}
         namesByCode={lotericaNamesByCode}

@@ -854,11 +854,6 @@ const LotericaDetail = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {!isBulkMode && hasLoadedRows && (
-              <Button variant="outline" size="sm" onClick={fetchHistory}>
-                <History className="w-4 h-4 mr-1" /> Histórico
-              </Button>
-            )}
             <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
               <Save className="w-4 h-4 mr-1" />{" "}
               {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}

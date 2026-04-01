@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Download, PencilLine, Search, Upload } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { techBadgeClass } from "@/lib/techBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
@@ -936,7 +937,11 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[160px] whitespace-normal break-words">{row.cidade}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.uf}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          <Badge variant="outline" className={cn("text-[11px] font-semibold", techBadgeClass(row.tecnologia))}>
+                            {row.tecnologia}
+                          </Badge>
+                        </td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
                         <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOi}</td>
@@ -948,7 +953,11 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOemp}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          <Badge variant="outline" className={cn("text-[11px] font-semibold", techBadgeClass(row.operadora))}>
+                            {row.operadora}
+                          </Badge>
+                        </td>
                         <td className="p-2 whitespace-nowrap">{row.matchedBy}</td>
                       </tr>
                     );
@@ -1058,7 +1067,7 @@ const ConsultaMassaTab = () => {
                   <Badge variant="outline" className="border-white/70 text-white bg-white/10">
                     Status: {normalizeText(selectedRow.status) || "-"}
                   </Badge>
-                  <Badge variant="outline" className="border-white/70 text-white bg-white/10">
+                  <Badge variant="outline" className={cn("font-semibold", techBadgeClass(selectedTecnologia))}>
                     Tecnologia: {selectedTecnologia}
                   </Badge>
                 </div>

@@ -109,7 +109,7 @@ const LotericaNoticesCard = ({
             value={loading ? "Carregando avisos..." : textValue}
             onChange={(event) => onTextValueChange(event.target.value)}
             placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
-            className="min-h-[52px] resize-y bg-background/90 text-sm leading-5"
+            className="min-h-[36px] resize-y bg-background/90 text-sm leading-5"
             readOnly={loading}
           />
         </div>

@@ -836,6 +836,8 @@ const LotericaDetail = () => {
   return (
     <div className="bg-background">
       <div className="container px-4 py-3 border-b space-y-3">
+        {noticesSection}
+
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
@@ -859,20 +861,6 @@ const LotericaDetail = () => {
               {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
             </Button>
           </div>
-        </div>
-
-        {noticesSection}
-
-        <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-          <Textarea
-            value={queryInput}
-            onChange={(e) => setQueryInput(e.target.value)}
-            placeholder="Informe 1 ou mais codigos UL (separados por virgula, espaco ou quebra de linha)"
-            className="min-h-[64px] font-mono text-xs"
-          />
-          <Button variant="outline" onClick={handleConsult} className="lg:self-start">
-            Consultar codigos
-          </Button>
         </div>
 
         {missingCodes.length > 0 && <p className="text-xs text-warning">Codigos nao encontrados: {missingCodes.join(", ")}</p>}

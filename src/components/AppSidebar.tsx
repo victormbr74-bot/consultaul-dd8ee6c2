@@ -242,14 +242,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/consulta-massa" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                    <ListChecks className="mr-2 h-4 w-4" />
-                    <span>Consulta Massa</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>

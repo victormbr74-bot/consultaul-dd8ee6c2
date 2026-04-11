@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from "react";
+import PingExecutionPanel from "@/components/loterica/PingExecutionPanel";
 import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -861,6 +862,15 @@ const PingaoTab = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Execução via Backend */}
+      {querySummary.filter(i => i.status === "ok").length === 1 && (
+        <PingExecutionPanel
+          pageType="pingao"
+          host={querySummary.find(i => i.status === "ok")?.ip || ""}
+          label="Executar Ping via Backend"
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import PingExecutionPanel from "@/components/loterica/PingExecutionPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -413,6 +414,15 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Execução via Backend */}
+      {ips.length > 0 && (
+        <PingExecutionPanel
+          pageType="ping99"
+          host={ips[0]?.normal || ""}
+          label="Executar Ping 99 via Backend"
+        />
       )}
     </div>
   );

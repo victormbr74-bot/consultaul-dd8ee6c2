@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
+import { buildCircuitSearchVariants } from "@/lib/lotericaCircuito";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile, type ImportBasePlanilhaProgress } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
@@ -65,9 +66,13 @@ const buildDashboardSearchFilter = (value: string) => {
 
   const filters = new Set<string>([
     `nome_loterica.ilike.%${term}%`,
-    `ccto_oi.ilike.%${term}%`,
     `cidade.ilike.%${term}%`,
   ]);
+
+  for (const candidate of buildCircuitSearchVariants(term)) {
+    filters.add(`ccto_oi.ilike.%${candidate}%`);
+    filters.add(`ccto_oemp.ilike.%${candidate}%`);
+  }
 
   for (const candidate of buildCodUlSearchVariants(term)) {
     filters.add(`cod_ul.ilike.%${candidate}%`);

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Activity, Download } from "lucide-react";
+import PingExecutionPanel from "./PingExecutionPanel";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -398,6 +399,13 @@ const PingaoNatTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      <PingExecutionPanel
+        ips={querySummary.filter((item) => item.status === "ok").map((item) => item.ip)}
+        tipoTeste="pingao_nat"
+        pageLabel="Pingao NAT"
+        packetCount={packetCount}
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

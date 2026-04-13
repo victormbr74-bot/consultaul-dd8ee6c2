@@ -785,6 +785,77 @@ export type Database = {
         }
         Relationships: []
       }
+      ping_automation_results: {
+        Row: {
+          cod_ul: string | null
+          command_text: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          input_term: string
+          ips: Json
+          packet_count: number | null
+          page_type: string
+          raw_log: string
+          securecrt_session_name: string | null
+          source: string
+          started_at: string | null
+          status: string
+          summary_json: Json
+          target: string | null
+        }
+        Insert: {
+          cod_ul?: string | null
+          command_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          input_term: string
+          ips?: Json
+          packet_count?: number | null
+          page_type: string
+          raw_log?: string
+          securecrt_session_name?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          summary_json?: Json
+          target?: string | null
+        }
+        Update: {
+          cod_ul?: string | null
+          command_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          input_term?: string
+          ips?: Json
+          packet_count?: number | null
+          page_type?: string
+          raw_log?: string
+          securecrt_session_name?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          summary_json?: Json
+          target?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ping_automation_results_cod_ul_fkey"
+            columns: ["cod_ul"]
+            isOneToOne: false
+            referencedRelation: "lotericas"
+            referencedColumns: ["cod_ul"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           active: boolean
@@ -824,6 +895,63 @@ export type Database = {
           user_code?: string | null
           user_id?: string | null
           username?: string | null
+        }
+        Relationships: []
+      }
+      router_script_templates: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          model: string
+          name: string
+          notes: string | null
+          operadora_4g: string
+          owner: string
+          router_role: string
+          script_variant: string
+          switch_topology: string
+          technology: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          model: string
+          name: string
+          notes?: string | null
+          operadora_4g?: string
+          owner: string
+          router_role: string
+          script_variant: string
+          switch_topology: string
+          technology: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          model?: string
+          name?: string
+          notes?: string | null
+          operadora_4g?: string
+          owner?: string
+          router_role?: string
+          script_variant?: string
+          switch_topology?: string
+          technology?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

@@ -23,12 +23,15 @@ const PingExecutionPanel = ({
   pageLabel = "Ping",
   packetCount = 2,
 }: PingExecutionPanelProps) => {
+  const { isAdmin } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<(PingExecutionResponse & { ip: string })[]>([]);
   const [currentIpIdx, setCurrentIpIdx] = useState<number | null>(null);
 
   const validIps = ips.filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip.trim()));
+
+  if (!isAdmin) return null;
 
   const handleExecute = async (credentials: TacacsCredentials) => {
     if (!validIps.length) return;

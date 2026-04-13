@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Wifi, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import TacacsCredentialsDialog, { type TacacsCredentials } from "./TacacsCredentialsDialog";
 import { executePing, getStatusColor, type PingExecutionResponse } from "@/services/pingExecutor";
 
@@ -22,12 +23,15 @@ const PingExecutionPanel = ({
   pageLabel = "Ping",
   packetCount = 2,
 }: PingExecutionPanelProps) => {
+  const { isAdmin } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<(PingExecutionResponse & { ip: string })[]>([]);
   const [currentIpIdx, setCurrentIpIdx] = useState<number | null>(null);
 
   const validIps = ips.filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip.trim()));
+
+  if (!isAdmin) return null;
 
   const handleExecute = async (credentials: TacacsCredentials) => {
     if (!validIps.length) return;

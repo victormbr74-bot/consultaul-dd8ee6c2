@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Activity, Download } from "lucide-react";
+import PingExecutionPanel from "./PingExecutionPanel";
 import {
   dedupeTerms,
   fetchLookupRows,
@@ -768,6 +769,13 @@ const PingaoTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      <PingExecutionPanel
+        ips={querySummary.filter((item) => item.status === "ok").map((item) => item.ip)}
+        tipoTeste="pingao"
+        pageLabel="Pingao"
+        packetCount={packetCount}
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

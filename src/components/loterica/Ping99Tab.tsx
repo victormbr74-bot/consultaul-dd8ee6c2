@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Wifi } from "lucide-react";
 import { fetchLookupRows, resolveMatches } from "@/components/loterica/lotericaLookup";
+import PingExecutionPanel from "./PingExecutionPanel";
 
 interface Ping99TabProps {
   form?: {
@@ -323,6 +324,12 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
           )}
         </CardContent>
       </Card>
+
+      <PingExecutionPanel
+        ips={ips.map((ip) => ip.normal)}
+        tipoTeste="ping99"
+        pageLabel="Ping 99"
+      />
 
       <Card>
         <CardHeader>

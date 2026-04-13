@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Wifi, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import TacacsCredentialsDialog, { type TacacsCredentials } from "./TacacsCredentialsDialog";
 import { executePing, getStatusColor, type PingExecutionResponse } from "@/services/pingExecutor";
 

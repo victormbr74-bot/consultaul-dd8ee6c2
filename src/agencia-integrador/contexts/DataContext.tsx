@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/agencia-integrador/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import type { Agencia, CodEncerramento, ImportLog, Incidente, MeuCaso, Parceira, Topologia } from '@/agencia-integrador/types';
 import {
   addImportLogDb,
@@ -155,6 +156,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (!initializedRef.current) return;
     void refreshMeusCasos();
   }, [refreshMeusCasos]);
+
+  // Realtime subscriptions – refresh data automatically when tables change
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel('app-data-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidentes' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agencias' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parceiras' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topologia' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cod_encerramento' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'import_logs' }, () => void refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meus_casos' }, () => void refreshMeusCasos())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshData, refreshMeusCasos]);
 
   const replaceIncidentes = useCallback(async (data: Incidente[]) => {
     await replaceIncidentesDb(data);

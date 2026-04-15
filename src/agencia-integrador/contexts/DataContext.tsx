@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/agencia-integrador/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import type { Agencia, CodEncerramento, ImportLog, Incidente, MeuCaso, Parceira, Topologia } from '@/agencia-integrador/types';
 import {
   addImportLogDb,

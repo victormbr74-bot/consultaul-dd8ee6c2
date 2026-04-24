@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useRef } from "react";
 
+export type ConsultaSearchMode = "loterica" | "mac";
+
 interface SidebarActionsContextType {
   onExport: (() => void) | undefined;
   setOnExport: (fn: (() => void) | undefined) => void;
@@ -11,6 +13,8 @@ interface SidebarActionsContextType {
   setLotericaTab: (tab: string) => void;
   consultaSearch: string;
   setConsultaSearch: (value: string) => void;
+  consultaSearchMode: ConsultaSearchMode;
+  setConsultaSearchMode: (mode: ConsultaSearchMode) => void;
   showLotericaTabs: boolean;
   setShowLotericaTabs: (show: boolean) => void;
   importInputRef: React.RefObject<HTMLInputElement | null>;
@@ -24,6 +28,7 @@ export const SidebarActionsProvider = ({ children }: { children: ReactNode }) =>
   const [onSearchSubmit, setOnSearchSubmit] = useState<(() => void) | undefined>();
   const [lotericaTab, setLotericaTab] = useState("consulta");
   const [consultaSearch, setConsultaSearch] = useState("");
+  const [consultaSearchMode, setConsultaSearchMode] = useState<ConsultaSearchMode>("loterica");
   const [showLotericaTabs, setShowLotericaTabs] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -34,6 +39,7 @@ export const SidebarActionsProvider = ({ children }: { children: ReactNode }) =>
       onSearchSubmit, setOnSearchSubmit,
       lotericaTab, setLotericaTab,
       consultaSearch, setConsultaSearch,
+      consultaSearchMode, setConsultaSearchMode,
       showLotericaTabs, setShowLotericaTabs,
       importInputRef,
     }}>

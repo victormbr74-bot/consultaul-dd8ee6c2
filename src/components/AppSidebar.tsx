@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function AppSidebar() {
   const appVersionLabel = `v${__APP_VERSION__}`;
@@ -57,6 +58,8 @@ export function AppSidebar() {
     setLotericaTab,
     consultaSearch,
     setConsultaSearch,
+    consultaSearchMode,
+    setConsultaSearchMode,
     showLotericaTabs,
   } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
@@ -80,8 +83,14 @@ export function AppSidebar() {
       return codUlSegment;
     }
   })();
-  const ping99SeedTerm = String(codUlFromDetailRoute || consultaSearch || "").trim();
+  const ping99SeedTerm = String(codUlFromDetailRoute || (consultaSearchMode === "loterica" ? consultaSearch : "") || "").trim();
   const ping99Path = ping99SeedTerm ? `/ping99?q=${encodeURIComponent(ping99SeedTerm)}` : "/ping99";
+  const dashboardSearchPlaceholder =
+    consultaSearchMode === "mac" ? "Buscar por MAC Address..." : "Buscar por codigo, nome, CCTO ou cidade...";
+  const handleDashboardSearchModeChange = (value: string) => {
+    setConsultaSearchMode(value as "loterica" | "mac");
+    setConsultaSearch("");
+  };
 
   const lotericaTabs = [
     { id: "mascara", label: "Mascara", icon: FileText },
@@ -185,20 +194,32 @@ export function AppSidebar() {
       <SidebarContent>
         {isDashboardRoute && (
           <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por codigo, nome, CCTO ou cidade..."
-                className="pl-9 bg-sidebar border-sidebar-border"
-                value={consultaSearch}
-                onChange={(e) => setConsultaSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    onSearchSubmit?.();
-                  }
-                }}
-              />
+            <div className="space-y-2">
+              <Select value={consultaSearchMode} onValueChange={handleDashboardSearchModeChange}>
+                <SelectTrigger className="bg-sidebar border-sidebar-border">
+                  <SelectValue placeholder="Selecione a busca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="loterica">UL / Circuito</SelectItem>
+                  <SelectItem value="mac">MAC Address</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={dashboardSearchPlaceholder}
+                  className="pl-9 bg-sidebar border-sidebar-border"
+                  value={consultaSearch}
+                  onChange={(e) => setConsultaSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSearchSubmit?.();
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}

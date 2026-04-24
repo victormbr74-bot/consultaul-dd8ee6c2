@@ -4,14 +4,16 @@ import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import { buildCodUlExactCandidates, buildCodUlSearchVariants, normalizeCodUlTerm } from "@/lib/lotericaCodUl";
 import { buildCircuitSearchVariants } from "@/lib/lotericaCircuito";
-import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { useSidebarActions, type ConsultaSearchMode } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile, type ImportBasePlanilhaProgress } from "@/lib/importBasePlanilha";
+import { extractMacEquipmentInfo, isViableMacSearchTerm, normalizeMacSearchTerm, type MacEquipmentInfo } from "@/lib/lotericaMac";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -185,6 +187,34 @@ const BASE_NORMALIZED_HEADER_KEYS = new Set<string>([
   ...BASE_ALIAS_KEYS.map((key) => normalizeHeaderKey(key)),
 ]);
 
+const MAC_LOOKUP_MIGRATION = "20260424123000_loterica_mac_lookup.sql";
+
+interface MacLookupRpcRow {
+  cod_ul: string;
+  nome_loterica: string | null;
+  ccto_oi: string | null;
+  ccto_oemp: string | null;
+  designacao_nova: string | null;
+  operadora: string | null;
+  cidade: string | null;
+  uf: string | null;
+  status: string | null;
+  matched_field: string;
+  matched_value: string;
+  raw_data: Record<string, unknown>;
+  total_count: number;
+}
+
+interface MacLookupDisplayRow extends MacLookupRpcRow {
+  equipment: MacEquipmentInfo;
+}
+
+const getSupabaseErrorMessage = (error: { message?: string } | null | undefined) => String(error?.message || "");
+
+const buildMacLookupMissingFunctionMessage = () =>
+  "Banco desatualizado: falta a funcao search_lotericas_by_mac.\n" +
+  `Aplique a migration Supabase '${MAC_LOOKUP_MIGRATION}'.`;
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const {
@@ -196,8 +226,11 @@ const Dashboard = () => {
     lotericaTab,
     consultaSearch: sidebarSearch,
     setConsultaSearch: setSidebarSearch,
+    consultaSearchMode,
+    setConsultaSearchMode,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<any[]>([]);
+  const [macResults, setMacResults] = useState<MacLookupDisplayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -205,20 +238,79 @@ const Dashboard = () => {
   const [importProgress, setImportProgress] = useState<ImportBasePlanilhaProgress | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [localSearch, setLocalSearch] = useState("");
   const search = localSearch;
+  const normalizedMacSearch = normalizeMacSearchTerm(search);
+  const macSearchTooShort = consultaSearchMode === "mac" && search.trim().length > 0 && !isViableMacSearchTerm(search);
+  const handleSearchModeChange = (value: string) => {
+    setConsultaSearchMode(value as ConsultaSearchMode);
+    setSidebarSearch("");
+    setLocalSearch("");
+    setSearchErrorMessage(null);
+  };
 
   const fetchLotericas = useCallback(async () => {
     const term = search.trim();
     if (!term) {
       setLotericas([]);
+      setMacResults([]);
       setTotal(0);
+      setSearchErrorMessage(null);
       setLoading(false);
       return;
     }
+
+    if (consultaSearchMode === "mac" && !isViableMacSearchTerm(term)) {
+      setLotericas([]);
+      setMacResults([]);
+      setTotal(0);
+      setSearchErrorMessage(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setSearchErrorMessage(null);
     try {
+      if (consultaSearchMode === "mac") {
+        const { data, error } = await supabase.rpc("search_lotericas_by_mac", {
+          search_mac: normalizedMacSearch,
+          page_size: PAGE_SIZE,
+          page_offset: page * PAGE_SIZE,
+        });
+
+        if (error) {
+          const errorMessage = getSupabaseErrorMessage(error);
+          const displayMessage =
+            errorMessage.includes("search_lotericas_by_mac") && errorMessage.includes("Could not find the function")
+              ? buildMacLookupMissingFunctionMessage()
+              : "Erro ao buscar MAC Address.";
+
+          console.error("Erro ao buscar MAC Address", error);
+          setMacResults([]);
+          setLotericas([]);
+          setTotal(0);
+          setSearchErrorMessage(displayMessage);
+          return;
+        }
+
+        const rows = ((data || []) as MacLookupRpcRow[]).map((row) => {
+          const rawData = asRecord(row.raw_data);
+          return {
+            ...row,
+            raw_data: rawData,
+            equipment: extractMacEquipmentInfo(rawData, row.matched_field, row.matched_value, normalizedMacSearch),
+          };
+        });
+
+        setMacResults(rows);
+        setLotericas([]);
+        setTotal(Number(rows[0]?.total_count || 0));
+        return;
+      }
+
       const exactCandidates = buildCodUlExactCandidates(term);
 
       if (exactCandidates.length > 1 || (exactCandidates.length === 1 && exactCandidates[0] !== term.toUpperCase())) {
@@ -233,6 +325,7 @@ const Dashboard = () => {
           console.error("Erro ao buscar lotericas por codigo", error);
         } else if ((count || 0) > 0) {
           setLotericas(data || []);
+          setMacResults([]);
           setTotal(count || 0);
           return;
         }
@@ -248,20 +341,25 @@ const Dashboard = () => {
       if (error) {
         console.error("Erro ao buscar lotericas", error);
         setLotericas([]);
+        setMacResults([]);
         setTotal(0);
+        setSearchErrorMessage("Erro ao buscar lotericas.");
         return;
       }
 
       setLotericas(data || []);
+      setMacResults([]);
       setTotal(count || 0);
     } catch (error) {
       console.error("Falha inesperada ao buscar lotericas", error);
       setLotericas([]);
+      setMacResults([]);
       setTotal(0);
+      setSearchErrorMessage(consultaSearchMode === "mac" ? "Falha inesperada ao buscar MAC Address." : "Falha inesperada ao buscar lotericas.");
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [consultaSearchMode, normalizedMacSearch, page, search]);
 
   useEffect(() => {
     void fetchLotericas();
@@ -269,11 +367,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [search]);
+  }, [consultaSearchMode, search]);
 
   const goToFirstResult = useCallback(async () => {
     const term = search.trim();
     if (!term) return;
+    if (consultaSearchMode === "mac") return;
 
     const parsedTerms = parseCodUlTerms(term);
     if (parsedTerms.length > 1) {
@@ -334,7 +433,7 @@ const Dashboard = () => {
       console.error("Falha inesperada ao buscar lotericas (atalho Enter)", error);
       alert("Falha inesperada ao buscar lot\u00E9ricas.");
     }
-  }, [navigate, search, setLotericaTab]);
+  }, [consultaSearchMode, navigate, search, setLotericaTab]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -572,6 +671,14 @@ const Dashboard = () => {
     return "bg-warning/15 text-warning border-warning/30";
   };
 
+  const searchPlaceholder =
+    consultaSearchMode === "mac" ? "Buscar por MAC Address..." : "Buscar por codigo, nome, CCTO ou cidade...";
+  const emptySearchMessage =
+    consultaSearchMode === "mac"
+      ? "Digite um MAC Address para pesquisar."
+      : "Digite um codigo, nome, CCTO ou cidade para pesquisar.";
+  const resultCountLabel = consultaSearchMode === "mac" ? "equipamentos encontrados" : "lotericas encontradas";
+
   return (
     <div className="bg-background">
       <input
@@ -590,17 +697,29 @@ const Dashboard = () => {
         ) : (
           <>
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <Select value={consultaSearchMode} onValueChange={handleSearchModeChange}>
+            <SelectTrigger className="sm:w-[180px]">
+              <SelectValue placeholder="Selecione a busca" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="loterica">UL / Circuito</SelectItem>
+              <SelectItem value="mac">MAC Address</SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
+              placeholder={searchPlaceholder}
               className="pl-10"
               value={search}
               onChange={(e) => setLocalSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  void goToFirstResult();
+                  if (consultaSearchMode === "loterica") {
+                    void goToFirstResult();
+                  }
                 }
               }}
             />
@@ -636,69 +755,137 @@ const Dashboard = () => {
           </Card>
         )}
 
-        {search.trim() ? (
+        {!!searchErrorMessage && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive whitespace-pre-line">
+            {searchErrorMessage}
+          </div>
+        )}
+
+        {search.trim() ? macSearchTooShort ? (
+          <div className="mb-4 text-sm text-muted-foreground">
+            Informe ao menos 6 caracteres hexadecimais do MAC para pesquisar.
+          </div>
+        ) : (
           <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
-            <span>{total} {"lot\u00E9ricas encontradas"}</span>
+            <span>{total} {resultCountLabel}</span>
             <span>{"P\u00E1gina"} {page + 1} {"de"} {totalPages || 1}</span>
           </div>
         ) : (
           <div className="mb-4 text-sm text-muted-foreground">
-            Digite um código, nome, CCTO ou cidade para pesquisar.
+            {emptySearchMessage}
           </div>
         )}
 
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left p-3 font-medium text-muted-foreground">{"C\u00F3digo"}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground">Nome</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground hidden md:table-cell">CCTO</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Cidade/UF</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Operadora</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                        Carregando...
-                      </td>
+              {consultaSearchMode === "mac" ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium text-muted-foreground">MAC</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Equipamento</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Codigo UL</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Nome</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Cidade/UF</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
                     </tr>
-                  ) : lotericas.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                        {"Nenhuma lot\u00E9rica encontrada"}
-                      </td>
-                    </tr>
-                  ) : (
-                    lotericas.map((l) => (
-                      <tr
-                        key={l.cod_ul}
-                        className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => {
-                          setLotericaTab("consulta");
-                          navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`);
-                        }}
-                      >
-                        <td className="p-3 font-mono text-xs font-medium">{l.cod_ul}</td>
-                        <td className="p-3 font-medium">{l.nome_loterica}</td>
-                        <td className="p-3 font-mono text-xs hidden md:table-cell">{l.ccto_oi}</td>
-                        <td className="p-3 hidden lg:table-cell">{l.cidade} - {l.uf}</td>
-                        <td className="p-3 hidden lg:table-cell">{l.operadora}</td>
-                        <td className="p-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(l.status)}`}>
-                            {l.status}
-                          </span>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          Carregando...
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : macResults.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          Nenhum MAC Address encontrado
+                        </td>
+                      </tr>
+                    ) : (
+                      macResults.map((row) => (
+                        <tr
+                          key={`${row.cod_ul}:${row.matched_field}:${row.matched_value}`}
+                          className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setLotericaTab("consulta");
+                            navigate(`/loterica/${encodeURIComponent(row.cod_ul)}`);
+                          }}
+                        >
+                          <td className="p-3 font-mono text-xs font-medium">{row.equipment.matchedMac || row.matched_value}</td>
+                          <td className="p-3">
+                            <div className="font-medium">{row.equipment.equipmentLabel}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {row.equipment.equipmentType}
+                              {row.equipment.details ? ` | ${row.equipment.details}` : ` | Campo: ${row.equipment.matchedFieldLabel}`}
+                            </div>
+                          </td>
+                          <td className="p-3 font-mono text-xs font-medium">{row.cod_ul}</td>
+                          <td className="p-3 font-medium">{row.nome_loterica || "-"}</td>
+                          <td className="p-3 hidden lg:table-cell">{row.cidade || "-"} - {row.uf || "-"}</td>
+                          <td className="p-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(row.status || "")}`}>
+                              {row.status || "-"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium text-muted-foreground">{"C\u00F3digo"}</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Nome</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground hidden md:table-cell">CCTO</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Cidade/UF</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Operadora</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          Carregando...
+                        </td>
+                      </tr>
+                    ) : lotericas.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          {"Nenhuma lot\u00E9rica encontrada"}
+                        </td>
+                      </tr>
+                    ) : (
+                      lotericas.map((l) => (
+                        <tr
+                          key={l.cod_ul}
+                          className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setLotericaTab("consulta");
+                            navigate(`/loterica/${encodeURIComponent(l.cod_ul)}`);
+                          }}
+                        >
+                          <td className="p-3 font-mono text-xs font-medium">{l.cod_ul}</td>
+                          <td className="p-3 font-medium">{l.nome_loterica}</td>
+                          <td className="p-3 font-mono text-xs hidden md:table-cell">{l.ccto_oi}</td>
+                          <td className="p-3 hidden lg:table-cell">{l.cidade} - {l.uf}</td>
+                          <td className="p-3 hidden lg:table-cell">{l.operadora}</td>
+                          <td className="p-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(l.status)}`}>
+                              {l.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </CardContent>
         </Card>

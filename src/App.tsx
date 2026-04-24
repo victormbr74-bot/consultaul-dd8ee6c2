@@ -14,6 +14,7 @@ import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import ConsultaMassa from "./pages/ConsultaMassa";
+import ConsultaMac from "./pages/ConsultaMac";
 import Ping99 from "./pages/Ping99";
 import Pingao from "./pages/Pingao";
 import PingaoNat from "./pages/PingaoNat";
@@ -106,6 +107,7 @@ const App = () => (
                 <Route element={<ProtectedLayout />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/consulta-massa" element={<ConsultaMassa />} />
+                  <Route path="/consulta-mac" element={<ConsultaMac />} />
                   <Route path="/ping99" element={<Ping99 />} />
                   <Route path="/pingao" element={<Pingao />} />
                   <Route path="/pingao-nat" element={<PingaoNat />} />

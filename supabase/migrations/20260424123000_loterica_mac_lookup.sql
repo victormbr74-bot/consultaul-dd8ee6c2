@@ -86,26 +86,34 @@ AS $$
       deduped.*,
       COUNT(*) OVER()::integer AS total_count
     FROM deduped
+  ),
+  paginated AS (
+    SELECT
+      counted.*,
+      row_number() OVER (
+        ORDER BY counted.cod_ul, counted.matched_field
+      )::integer AS row_num
+    FROM counted
   )
   SELECT
-    counted.cod_ul,
-    counted.nome_loterica,
-    counted.ccto_oi,
-    counted.ccto_oemp,
-    counted.designacao_nova,
-    counted.operadora,
-    counted.cidade,
-    counted.uf,
-    counted.status,
-    counted.matched_field,
-    counted.matched_value,
-    counted.raw_data,
-    counted.total_count
-  FROM counted
+    paginated.cod_ul,
+    paginated.nome_loterica,
+    paginated.ccto_oi,
+    paginated.ccto_oemp,
+    paginated.designacao_nova,
+    paginated.operadora,
+    paginated.cidade,
+    paginated.uf,
+    paginated.status,
+    paginated.matched_field,
+    paginated.matched_value,
+    paginated.raw_data,
+    paginated.total_count
+  FROM paginated
   CROSS JOIN params p
-  ORDER BY counted.cod_ul, counted.matched_field
-  OFFSET p.safe_page_offset
-  LIMIT p.safe_page_size;
+  WHERE paginated.row_num > p.safe_page_offset
+    AND paginated.row_num <= (p.safe_page_offset + p.safe_page_size)
+  ORDER BY paginated.row_num;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.normalize_mac_text(text) TO authenticated;

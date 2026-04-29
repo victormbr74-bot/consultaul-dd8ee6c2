@@ -30,7 +30,7 @@ type ParsedPingMetrics = {
   received: number | null;
 };
 
-const SEQUENCE_SIZE = 16;
+const SEQUENCE_SIZE = 14;
 const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PING99_REPEAT = 1;
 const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;

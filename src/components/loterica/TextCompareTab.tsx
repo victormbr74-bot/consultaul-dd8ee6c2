@@ -141,7 +141,7 @@ const MobileResultList = ({
               key={`${side}-${index}-${cell.lineNumber ?? "empty"}`}
               className={cn("grid min-h-[44px] grid-cols-[56px_minmax(0,1fr)] border-b last:border-b-0", diffCellTone(cell, side))}
             >
-              <div className="border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+              <div className="select-none border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground" aria-hidden="true">
                 {cell.lineNumber ?? ""}
               </div>
               <div className={cn("border-l-4 px-3 py-2", diffCellBorder(cell, side))}>
@@ -172,7 +172,7 @@ const DesktopDiffCell = ({
       diffCellTone(cell, side),
     )}
   >
-    <div className="border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+    <div className="select-none border-r bg-background/70 px-3 py-2 text-right font-mono text-[11px] text-muted-foreground" aria-hidden="true">
       {cell.lineNumber ?? ""}
     </div>
     <div className={cn("border-l-4 px-3 py-2", diffCellBorder(cell, side))}>

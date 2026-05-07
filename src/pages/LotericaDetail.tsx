@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import ConsultaTab from "@/components/loterica/ConsultaTab";
 import MascaraTab from "@/components/loterica/MascaraTab";
 import TestesTab from "@/components/loterica/TestesTab";
+import NoConsultaWarning from "@/components/loterica/NoConsultaWarning";
 import Ping99Tab from "@/components/loterica/Ping99Tab";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";

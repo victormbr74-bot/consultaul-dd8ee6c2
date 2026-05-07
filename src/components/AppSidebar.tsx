@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   Store,
   Search,
@@ -145,13 +146,30 @@ export function AppSidebar() {
       void fetchPendingChangeCount();
     }, 30000);
 
+    const isTargetAdmin = profile?.user_code === "418118";
+
     const channel = supabase
       .channel("sidebar-loterica-change-requests")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "loterica_change_requests" },
-        () => {
+        (payload) => {
           void fetchPendingChangeCount();
+          if (
+            isTargetAdmin &&
+            payload.eventType === "INSERT" &&
+            (payload.new as { status?: string })?.status === "pending"
+          ) {
+            const codUl = (payload.new as { cod_ul?: string })?.cod_ul ?? "";
+            toast.info("Nova solicitação de alteração", {
+              description: codUl ? `UL ${codUl} aguarda aprovação.` : "Há uma nova solicitação aguardando aprovação.",
+              duration: 10000,
+              action: {
+                label: "Ver",
+                onClick: () => navigate("/admin/dados"),
+              },
+            });
+          }
         },
       )
       .subscribe();
@@ -160,7 +178,7 @@ export function AppSidebar() {
       window.clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
-  }, [fetchPendingChangeCount, isAdmin]);
+  }, [fetchPendingChangeCount, isAdmin, profile?.user_code, navigate]);
 
   return (
     <Sidebar collapsible="icon">
@@ -217,16 +235,9 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/consulta-mac" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                    <Database className="mr-2 h-4 w-4" />
-                    <span>Consulta MAC</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
 
-              {showLotericaTabs && lotericaTabs.map((tab) => (
+
+              {lotericaTabs.map((tab) => (
                 <SidebarMenuItem key={tab.id}>
                   <SidebarMenuButton
                     onClick={() => openLotericaTab(tab.id)}

@@ -1035,6 +1035,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      normalize_mac_text: { Args: { value: string }; Returns: string }
+      search_lotericas_by_mac: {
+        Args: { page_offset?: number; page_size?: number; search_mac: string }
+        Returns: {
+          ccto_oemp: string
+          ccto_oi: string
+          cidade: string
+          cod_ul: string
+          designacao_nova: string
+          matched_field: string
+          matched_value: string
+          nome_loterica: string
+          operadora: string
+          raw_data: Json
+          status: string
+          total_count: number
+          uf: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "operacao" | "leitura"

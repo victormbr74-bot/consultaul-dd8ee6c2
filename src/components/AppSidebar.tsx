@@ -237,7 +237,7 @@ export function AppSidebar() {
 
 
 
-              {showLotericaTabs && lotericaTabs.map((tab) => (
+              {lotericaTabs.map((tab) => (
                 <SidebarMenuItem key={tab.id}>
                   <SidebarMenuButton
                     onClick={() => openLotericaTab(tab.id)}

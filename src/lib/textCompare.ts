@@ -188,8 +188,9 @@ const mergeSegments = (segments: DiffSegment[]) => {
 };
 
 const buildInlineSegments = (leftText: string, rightText: string, options: TextCompareOptions) => {
-  const leftTokens = leftText.match(/(\s+|[^\s]+)/g) ?? [];
-  const rightTokens = rightText.match(/(\s+|[^\s]+)/g) ?? [];
+  const tokenize = (value: string) => value.match(/[A-Za-zÀ-ÿ0-9_]+|\s+|[^\s]/g) ?? [];
+  const leftTokens = tokenize(leftText);
+  const rightTokens = tokenize(rightText);
 
   const operations = buildDiffOperations(
     leftTokens,

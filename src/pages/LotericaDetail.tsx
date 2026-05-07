@@ -865,9 +865,13 @@ const LotericaDetail = () => {
                 }}
               />
             )}
-            {lotericaTab === "mascara" && <MascaraTab form={activeForm} />}
-            {lotericaTab === "testes" && <TestesTab form={activeForm} />}
-            {lotericaTab === "ping99" && <Ping99Tab form={activeForm} />}
+            {lotericaTab === "mascara" && (
+              activeCode ? <MascaraTab form={activeForm} /> : <NoConsultaWarning />
+            )}
+            {lotericaTab === "testes" && (
+              activeCode ? <TestesTab form={activeForm} /> : <NoConsultaWarning />
+            )}
+            {lotericaTab === "ping99" && <Ping99Tab form={activeCode ? activeForm : undefined} />}
             {lotericaTab === "pingao" && <PingaoTab />}
             {lotericaTab === "pingao-nat" && <PingaoNatTab />}
             {lotericaTab === "script-router-sct" && <ScriptRouterSctTab initialCodUl={activeCode} />}

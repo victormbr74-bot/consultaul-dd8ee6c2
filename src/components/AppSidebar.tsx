@@ -235,14 +235,7 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/consulta-mac" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                    <Database className="mr-2 h-4 w-4" />
-                    <span>Consulta MAC</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+
 
               {showLotericaTabs && lotericaTabs.map((tab) => (
                 <SidebarMenuItem key={tab.id}>

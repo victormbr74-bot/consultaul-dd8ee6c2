@@ -66,7 +66,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [changesLoading, setChangesLoading] = useState(true);
   const [changesSaving, setChangesSaving] = useState(false);
   const [changesError, setChangesError] = useState<string | null>(null);
-  const [expandedChangeId, setExpandedChangeId] = useState<string | null>(null);
+  
   const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
   const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
   const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);

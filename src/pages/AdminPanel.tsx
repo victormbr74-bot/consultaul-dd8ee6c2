@@ -175,7 +175,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       setChangeRequests(view);
       const availableIds = new Set(view.map((item) => item.id));
       setSelectedChangeIds((prev) => prev.filter((id) => availableIds.has(id)));
-      setExpandedChangeId((prev) => (prev && availableIds.has(prev) ? prev : null));
     } catch (err) {
       console.error("Erro ao carregar solicitações de alteração", err);
       setChangeRequests([]);
@@ -433,7 +432,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     setChangesSaving(true);
     try {
       await applyChangeReview(req, "approved", user.id);
-      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
       alert("Alteracao aprovada e aplicada no banco.");
@@ -456,7 +454,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     setChangesSaving(true);
     try {
       await applyChangeReview(req, "rejected", user.id, reason || "Sem motivo informado.");
-      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
       alert("Alteracao rejeitada.");
@@ -522,8 +519,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
           });
         }
       }
-
-      setExpandedChangeId((prev) => (prev && succeededIds.includes(prev) ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => !succeededIds.includes(id)));
       await fetchChangeRequests();
 

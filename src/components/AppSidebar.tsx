@@ -146,30 +146,13 @@ export function AppSidebar() {
       void fetchPendingChangeCount();
     }, 30000);
 
-    const isTargetAdmin = profile?.user_code === "418118";
-
     const channel = supabase
       .channel("sidebar-loterica-change-requests")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "loterica_change_requests" },
-        (payload) => {
+        () => {
           void fetchPendingChangeCount();
-          if (
-            isTargetAdmin &&
-            payload.eventType === "INSERT" &&
-            (payload.new as { status?: string })?.status === "pending"
-          ) {
-            const codUl = (payload.new as { cod_ul?: string })?.cod_ul ?? "";
-            toast.info("Nova solicitação de alteração", {
-              description: codUl ? `UL ${codUl} aguarda aprovação.` : "Há uma nova solicitação aguardando aprovação.",
-              duration: 10000,
-              action: {
-                label: "Ver",
-                onClick: () => navigate("/admin/dados"),
-              },
-            });
-          }
         },
       )
       .subscribe();

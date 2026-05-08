@@ -96,12 +96,26 @@ export function AppSidebar() {
     }
   }, [isLotericaRoute, navigate, setLotericaTab]);
 
+  const warnNoConsulta = useCallback(() => {
+    toast.warning("Nenhuma consulta carregada", {
+      description: "Acesse o menu Consulta UL e realize uma consulta antes de utilizar esta opcao.",
+    });
+  }, []);
+
   const openLotericaTab = useCallback((tabId: string) => {
-    setLotericaTab(tabId);
-    if (!isLotericaRoute) {
-      navigate("/");
+    if (!isLotericaRoute || !codUlFromDetailRoute) {
+      warnNoConsulta();
+      return;
     }
-  }, [isLotericaRoute, navigate, setLotericaTab]);
+    setLotericaTab(tabId);
+  }, [codUlFromDetailRoute, isLotericaRoute, setLotericaTab, warnNoConsulta]);
+
+  const handlePing99Click = useCallback((event: React.MouseEvent) => {
+    if (!ping99SeedTerm) {
+      event.preventDefault();
+      warnNoConsulta();
+    }
+  }, [ping99SeedTerm, warnNoConsulta]);
 
   const fetchPendingChangeCount = useCallback(async () => {
     if (!isAdmin) {

@@ -277,7 +277,7 @@ export function AppSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to={ping99Path} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                  <NavLink to={ping99Path} onClick={handlePing99Click} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Wifi className="mr-2 h-4 w-4" />
                     <span>Ping 99</span>
                   </NavLink>

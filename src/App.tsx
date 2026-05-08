@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
+import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";

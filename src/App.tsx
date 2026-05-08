@@ -67,11 +67,12 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">
-            <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center px-4">
+            <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4">
               <SidebarTrigger />
-              <div className="ml-auto">
-                <ThemeHeaderActions />
+              <div className="flex-1 flex justify-center">
+                <PendingChangeRequestsAlert />
               </div>
+              <ThemeHeaderActions />
             </header>
             <main className="flex-1">{children ?? <Outlet />}</main>
             <RejectedRequestsNotification />

@@ -96,12 +96,26 @@ export function AppSidebar() {
     }
   }, [isLotericaRoute, navigate, setLotericaTab]);
 
+  const warnNoConsulta = useCallback(() => {
+    toast.warning("Nenhuma consulta carregada", {
+      description: "Acesse o menu Consulta UL e realize uma consulta antes de utilizar esta opcao.",
+    });
+  }, []);
+
   const openLotericaTab = useCallback((tabId: string) => {
-    setLotericaTab(tabId);
-    if (!isLotericaRoute) {
-      navigate("/");
+    if (!isLotericaRoute || !codUlFromDetailRoute) {
+      warnNoConsulta();
+      return;
     }
-  }, [isLotericaRoute, navigate, setLotericaTab]);
+    setLotericaTab(tabId);
+  }, [codUlFromDetailRoute, isLotericaRoute, setLotericaTab, warnNoConsulta]);
+
+  const handlePing99Click = useCallback((event: React.MouseEvent) => {
+    if (!ping99SeedTerm) {
+      event.preventDefault();
+      warnNoConsulta();
+    }
+  }, [ping99SeedTerm, warnNoConsulta]);
 
   const fetchPendingChangeCount = useCallback(async () => {
     if (!isAdmin) {
@@ -263,7 +277,7 @@ export function AppSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to={ping99Path} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                  <NavLink to={ping99Path} onClick={handlePing99Click} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Wifi className="mr-2 h-4 w-4" />
                     <span>Ping 99</span>
                   </NavLink>

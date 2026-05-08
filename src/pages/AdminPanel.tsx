@@ -66,7 +66,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [changesLoading, setChangesLoading] = useState(true);
   const [changesSaving, setChangesSaving] = useState(false);
   const [changesError, setChangesError] = useState<string | null>(null);
-  const [expandedChangeId, setExpandedChangeId] = useState<string | null>(null);
+  
   const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
   const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
   const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
@@ -175,7 +175,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       setChangeRequests(view);
       const availableIds = new Set(view.map((item) => item.id));
       setSelectedChangeIds((prev) => prev.filter((id) => availableIds.has(id)));
-      setExpandedChangeId((prev) => (prev && availableIds.has(prev) ? prev : null));
     } catch (err) {
       console.error("Erro ao carregar solicitações de alteração", err);
       setChangeRequests([]);
@@ -433,7 +432,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     setChangesSaving(true);
     try {
       await applyChangeReview(req, "approved", user.id);
-      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
       alert("Alteracao aprovada e aplicada no banco.");
@@ -456,7 +454,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     setChangesSaving(true);
     try {
       await applyChangeReview(req, "rejected", user.id, reason || "Sem motivo informado.");
-      setExpandedChangeId((prev) => (prev === req.id ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => id !== req.id));
       await fetchChangeRequests();
       alert("Alteracao rejeitada.");
@@ -522,8 +519,6 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
           });
         }
       }
-
-      setExpandedChangeId((prev) => (prev && succeededIds.includes(prev) ? null : prev));
       setSelectedChangeIds((prev) => prev.filter((id) => !succeededIds.includes(id)));
       await fetchChangeRequests();
 
@@ -924,13 +919,6 @@ ${failureDetails}`,
                               </td>
                               <td className="p-3">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setExpandedChangeId(expandedChangeId === r.id ? null : r.id)}
-                                  >
-                                    <Eye className="w-4 h-4 mr-1" /> Ver
-                                  </Button>
                                   <Button size="sm" onClick={() => void approveChangeRequest(r)} disabled={changesSaving}>
                                     <Check className="w-4 h-4 mr-1" /> Aprovar
                                   </Button>
@@ -941,42 +929,40 @@ ${failureDetails}`,
                               </td>
                             </tr>
 
-                            {expandedChangeId === r.id && (
-                              <tr className="border-b bg-muted/20">
-                                <td colSpan={7} className="p-4">
-                                  {(r.changed_fields || []).length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">Sem detalhes de alteracao.</div>
-                                  ) : (
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {(r.changed_fields || []).map((k) => {
-                                        const isRaw = k.startsWith("raw_data.");
-                                        const rawKey = isRaw ? k.slice("raw_data.".length) : "";
-                                        const beforeObj = r.before_data && typeof r.before_data === "object" ? r.before_data : {};
-                                        const afterObj = r.after_data && typeof r.after_data === "object" ? r.after_data : {};
-                                        const beforeVal = isRaw ? (beforeObj as any)?.raw_data?.[rawKey] : (beforeObj as any)?.[k];
-                                        const afterVal = isRaw ? (afterObj as any)?.raw_data?.[rawKey] : (afterObj as any)?.[k];
-                                        const label = isRaw ? `raw_data: ${rawKey}` : k;
+                            <tr className="border-b bg-muted/20">
+                              <td colSpan={7} className="p-4">
+                                {(r.changed_fields || []).length === 0 ? (
+                                  <div className="text-sm text-muted-foreground">Sem detalhes de alteração.</div>
+                                ) : (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {(r.changed_fields || []).map((k) => {
+                                      const isRaw = k.startsWith("raw_data.");
+                                      const rawKey = isRaw ? k.slice("raw_data.".length) : "";
+                                      const beforeObj = r.before_data && typeof r.before_data === "object" ? r.before_data : {};
+                                      const afterObj = r.after_data && typeof r.after_data === "object" ? r.after_data : {};
+                                      const beforeVal = isRaw ? (beforeObj as any)?.raw_data?.[rawKey] : (beforeObj as any)?.[k];
+                                      const afterVal = isRaw ? (afterObj as any)?.raw_data?.[rawKey] : (afterObj as any)?.[k];
+                                      const label = isRaw ? `raw_data: ${rawKey}` : k;
 
-                                        return (
-                                          <div key={k} className="rounded-lg border bg-background p-3">
-                                            <div className="text-xs font-medium text-foreground">{label}</div>
-                                            <div className="mt-1 text-xs text-muted-foreground">
-                                              <span className="text-destructive line-through">
-                                                {String(beforeVal ?? "") || "-"}
-                                              </span>
-                                              {" -> "}
-                                              <span className="text-green-700">
-                                                {String(afterVal ?? "") || "-"}
-                                              </span>
-                                            </div>
+                                      return (
+                                        <div key={k} className="rounded-lg border bg-background p-3">
+                                          <div className="text-xs font-medium text-foreground">{label}</div>
+                                          <div className="mt-1 text-xs text-muted-foreground">
+                                            <span className="text-destructive line-through">
+                                              {String(beforeVal ?? "") || "-"}
+                                            </span>
+                                            {" -> "}
+                                            <span className="text-green-700">
+                                              {String(afterVal ?? "") || "-"}
+                                            </span>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
                           </Fragment>
                         ))
                       )}

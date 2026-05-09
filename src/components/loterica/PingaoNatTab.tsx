@@ -334,21 +334,75 @@ const PingaoNatTab = () => {
     setAnalysisRows(analyzed);
   };
 
+  const buildBasicNatExportRow = (item: LookupNatItem) => ({
+    "Codigo UL": item.codUl,
+    Nome: item.nomeLoterica,
+    Cidade: item.cidade,
+    Estado: item.uf,
+    "CCTO OI": item.cctoOi,
+    "Designacao Nova": item.designacaoNova,
+    "CCTO OEMP": item.cctoOemp,
+    "IP NAT": item.ipNat,
+    "Loopback Primario": item.loopbackPrimario,
+    "Loopback Secundario": item.loopbackSecundario,
+    Tecnologia: item.tecnologia,
+    Operadora: item.operadora,
+    Consulta: item.query,
+    "IP alvo": item.ip || "-",
+  });
+
+  const exportConsultaXlsx = async () => {
+    if (!querySummary.length) return;
+    try {
+      const data = querySummary.map(buildBasicNatExportRow);
+      const wb = jsonToWorkbook([{ name: "Pingao NAT Consulta", data }]);
+      await writeFile(wb, "pingao_nat_consulta.xlsx");
+    } catch (err) {
+      alert("Falha ao exportar consulta: " + String((err as Error)?.message || err));
+    }
+  };
+
   const exportResultXlsx = async () => {
     if (!analysisRows.length) return;
     try {
-      const exportRows = analysisRows.map((row) => ({
-        "Código UL": row.codUl,
-        Consulta: row.query,
-        Lotérica: row.nomeLoterica,
-        "IP NAT": row.ip,
-        "Pacotes Enviados": row.sent ?? "",
-        "Pacotes Recebidos": row.received ?? "",
-        "Perda (%)": row.lossPct ?? "",
-        "Tempo (ms)": row.timeMs ?? "",
-        Status: row.status,
-        Observação: row.reason,
-      }));
+      const byIp = new Map<string, LookupNatItem>();
+      const byCod = new Map<string, LookupNatItem>();
+      for (const item of querySummary) {
+        if (item.ip && !byIp.has(item.ip)) byIp.set(item.ip, item);
+        if (item.codUl && item.codUl !== "-" && !byCod.has(item.codUl)) byCod.set(item.codUl, item);
+      }
+
+      const exportRows = analysisRows.map((row) => {
+        const lookup = byIp.get(row.ip) || byCod.get(row.codUl);
+        const basic = lookup
+          ? buildBasicNatExportRow(lookup)
+          : {
+              "Codigo UL": row.codUl,
+              Nome: row.nomeLoterica,
+              Cidade: "-",
+              Estado: "-",
+              "CCTO OI": "-",
+              "Designacao Nova": "-",
+              "CCTO OEMP": "-",
+              "IP NAT": row.ip,
+              "Loopback Primario": "-",
+              "Loopback Secundario": "-",
+              Tecnologia: "-",
+              Operadora: "-",
+              Consulta: row.query,
+              "IP alvo": row.ip,
+            };
+
+        return {
+          ...basic,
+          "Pacotes Enviados": row.sent ?? "",
+          "Pacotes Recebidos": row.received ?? "",
+          "Perda (%)": row.lossPct ?? "",
+          "Tempo (ms)": row.timeMs ?? "",
+          Status: row.status,
+          Observacao: row.reason,
+        };
+      });
       const wb = jsonToWorkbook([{ name: "Pingao NAT Resultado", data: exportRows }]);
       await writeFile(wb, "pingao_nat_resultado.xlsx");
     } catch (err) {

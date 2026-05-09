@@ -623,26 +623,82 @@ const PingaoTab = () => {
     setAnalysisRows(analyzed);
   };
 
+  const buildBasicExportRow = (item: LookupSummaryItem) => ({
+    "Codigo UL": item.codUl,
+    Nome: item.nome,
+    Cidade: item.cidade,
+    Estado: item.uf,
+    "CCTO OI": item.cctoOi,
+    "Designacao Nova": item.designacaoNova,
+    "CCTO OEMP": item.cctoOemp,
+    "IP NAT": item.ipNat,
+    "Loopback Primario": item.loopbackPrimario,
+    "Loopback Secundario": item.loopbackSecundario,
+    Tecnologia: item.tecnologia,
+    Operadora: item.operadora,
+    Consulta: item.query,
+    IP: item.ip || "-",
+    "Perfil Latencia": item.profileLabel,
+  });
+
+  const exportConsultaXlsx = async () => {
+    if (!querySummary.length) return;
+    try {
+      const data = querySummary.map(buildBasicExportRow);
+      const wb = jsonToWorkbook([{ name: "Pingao Consulta", data }]);
+      await writeFile(wb, "pingao_consulta.xlsx");
+    } catch (exportError) {
+      alert("Falha ao exportar consulta: " + String((exportError as Error)?.message || exportError));
+    }
+  };
+
   const exportResultXlsx = async () => {
     if (!analysisRows.length) return;
 
     try {
-      const exportRows = analysisRows.map((row) => ({
-        "Codigo UL": row.codUl,
-        "Consulta": row.query,
-        "IP": row.ip,
-        "Perfil Latencia": row.profileLabel,
-        "Limite (ms)": row.limitMs,
-        "Sucesso (%)": row.successRate ?? "",
-        "Pacotes Recebidos": row.received ?? "",
-        "Pacotes Enviados": row.sent ?? "",
-        "Perda (%)": row.lossPct ?? "",
-        "Latencia Min (ms)": row.minMs ?? "",
-        "Latencia Avg (ms)": row.avgMs ?? "",
-        "Latencia Max (ms)": row.maxMs ?? "",
-        "Status": row.status,
-        "Observacao": row.reason,
-      }));
+      const byIp = new Map<string, LookupSummaryItem>();
+      const byCod = new Map<string, LookupSummaryItem>();
+      for (const item of querySummary) {
+        if (item.ip && !byIp.has(item.ip)) byIp.set(item.ip, item);
+        if (item.codUl && item.codUl !== "-" && !byCod.has(item.codUl)) byCod.set(item.codUl, item);
+      }
+
+      const exportRows = analysisRows.map((row) => {
+        const lookup = byIp.get(row.ip) || byCod.get(row.codUl);
+        const basic = lookup
+          ? buildBasicExportRow(lookup)
+          : {
+              "Codigo UL": row.codUl,
+              Nome: "-",
+              Cidade: "-",
+              Estado: "-",
+              "CCTO OI": "-",
+              "Designacao Nova": "-",
+              "CCTO OEMP": "-",
+              "IP NAT": "-",
+              "Loopback Primario": "-",
+              "Loopback Secundario": "-",
+              Tecnologia: "-",
+              Operadora: "-",
+              Consulta: row.query,
+              IP: row.ip,
+              "Perfil Latencia": row.profileLabel,
+            };
+
+        return {
+          ...basic,
+          "Limite (ms)": row.limitMs,
+          "Sucesso (%)": row.successRate ?? "",
+          "Pacotes Recebidos": row.received ?? "",
+          "Pacotes Enviados": row.sent ?? "",
+          "Perda (%)": row.lossPct ?? "",
+          "Latencia Min (ms)": row.minMs ?? "",
+          "Latencia Avg (ms)": row.avgMs ?? "",
+          "Latencia Max (ms)": row.maxMs ?? "",
+          Status: row.status,
+          Observacao: row.reason,
+        };
+      });
 
       const wb = jsonToWorkbook([{ name: "Pingao Resultado", data: exportRows }]);
       await writeFile(wb, "pingao_resultado.xlsx");

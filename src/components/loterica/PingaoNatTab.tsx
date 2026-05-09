@@ -250,6 +250,7 @@ const PingaoNatTab = () => {
         ip: ip.trim(),
         codUl: "-",
         nomeLoterica: "-",
+        ...EMPTY_NAT_BASIC,
       }));
 
       let lookupSummary: LookupNatItem[] = [];
@@ -263,10 +264,18 @@ const PingaoNatTab = () => {
 
         lookupSummary = matches.map((match) => {
           if (!match.row) {
-            return { query: match.query, status: "not_found" as const, ip: "", codUl: "-", nomeLoterica: "-" };
+            return {
+              query: match.query,
+              status: "not_found" as const,
+              ip: "",
+              codUl: "-",
+              nomeLoterica: "-",
+              ...EMPTY_NAT_BASIC,
+            };
           }
 
           const ip = getNatIp(match.row);
+          const basic = buildNatBasic(match.row);
           if (!ip) {
             return {
               query: match.query,
@@ -274,6 +283,7 @@ const PingaoNatTab = () => {
               ip: "",
               codUl: normalizeText(match.row.cod_ul) || "-",
               nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
+              ...basic,
             };
           }
 
@@ -283,6 +293,7 @@ const PingaoNatTab = () => {
             ip,
             codUl: normalizeText(match.row.cod_ul) || "-",
             nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
+            ...basic,
           };
         });
       }

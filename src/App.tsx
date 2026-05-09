@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
+import UserRequestsStatusAlert from "@/components/UserRequestsStatusAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
@@ -36,7 +37,7 @@ import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
-import RejectedRequestsNotification from "@/components/RejectedRequestsNotification";
+
 
 const queryClient = new QueryClient();
 
@@ -70,13 +71,13 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
           <div className="flex-1 flex flex-col">
             <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4">
               <SidebarTrigger />
-              <div className="flex-1 flex justify-center">
+              <div className="flex-1 flex justify-center items-center gap-2">
                 <PendingChangeRequestsAlert />
+                <UserRequestsStatusAlert />
               </div>
               <ThemeHeaderActions />
             </header>
             <main className="flex-1">{children ?? <Outlet />}</main>
-            <RejectedRequestsNotification />
           </div>
         </div>
       </SidebarProvider>

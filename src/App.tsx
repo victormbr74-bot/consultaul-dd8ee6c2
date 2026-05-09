@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
+import UserRequestsStatusAlert from "@/components/UserRequestsStatusAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";

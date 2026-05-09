@@ -457,6 +457,13 @@ const PingaoNatTab = () => {
             </Button>
             <Button
               variant="outline"
+              onClick={() => void exportConsultaXlsx()}
+              disabled={!querySummary.length}
+            >
+              <Download className="w-4 h-4 mr-1" /> Baixar Excel da consulta
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => {
                 setInput("");
                 setQuerySummary([]);
@@ -470,15 +477,23 @@ const PingaoNatTab = () => {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {querySummary.length > 0 && (
-            <div className="rounded-lg border overflow-auto max-h-[280px]">
+            <div className="rounded-lg border overflow-auto max-h-[320px]">
               <table className="w-full text-xs">
                 <thead className="bg-muted/60 sticky top-0">
                   <tr className="text-left">
-                    <th className="p-2 font-medium">Consulta</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium">Código UL</th>
-                    <th className="p-2 font-medium">Lotérica</th>
-                    <th className="p-2 font-medium">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Status</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Codigo UL</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Nome</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Estado</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Designacao Nova</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OEMP</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Primario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -487,11 +502,19 @@ const PingaoNatTab = () => {
                     const variant = item.status === "ok" ? "default" : item.status === "missing_ip" ? "secondary" : "outline";
                     return (
                       <tr key={`${item.query}-${idx}`} className="border-t align-top">
-                        <td className="p-2 font-mono">{item.query}</td>
-                        <td className="p-2"><Badge variant={variant}>{text}</Badge></td>
-                        <td className="p-2 font-mono">{item.codUl}</td>
-                        <td className="p-2">{item.nomeLoterica}</td>
-                        <td className="p-2 font-mono">{item.ip || "-"}</td>
+                        <td className="p-2 whitespace-nowrap"><Badge variant={variant}>{text}</Badge></td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.codUl}</td>
+                        <td className="p-2 min-w-[200px] whitespace-normal break-words">{item.nomeLoterica}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.cidade}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.uf}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOi}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.designacaoNova}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOemp}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.ipNat}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackPrimario}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackSecundario}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.tecnologia}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.operadora}</td>
                       </tr>
                     );
                   })}

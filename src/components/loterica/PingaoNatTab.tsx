@@ -29,6 +29,16 @@ interface LookupNatItem {
   ip: string;
   codUl: string;
   nomeLoterica: string;
+  cidade: string;
+  uf: string;
+  cctoOi: string;
+  designacaoNova: string;
+  cctoOemp: string;
+  ipNat: string;
+  loopbackPrimario: string;
+  loopbackSecundario: string;
+  tecnologia: string;
+  operadora: string;
 }
 
 interface ParsedLinuxPing {
@@ -52,6 +62,44 @@ const getNatIp = (row: LotericaLookupRow): string => {
   const match = ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
   return match ? match[1] : "";
 };
+
+const EMPTY_NAT_BASIC = {
+  cidade: "-",
+  uf: "-",
+  cctoOi: "-",
+  designacaoNova: "-",
+  cctoOemp: "-",
+  ipNat: "-",
+  loopbackPrimario: "-",
+  loopbackSecundario: "-",
+  tecnologia: "-",
+  operadora: "-",
+};
+
+const readRawTecnologia = (row: LotericaLookupRow): string => {
+  const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+  for (const [key, value] of Object.entries(raw)) {
+    const upper = key.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (upper === "TECNOLOGIA") {
+      const v = normalizeText(value);
+      if (v) return v;
+    }
+  }
+  return "";
+};
+
+const buildNatBasic = (row: LotericaLookupRow) => ({
+  cidade: normalizeText(row.cidade) || "-",
+  uf: normalizeText(row.uf) || "-",
+  cctoOi: normalizeText(row.ccto_oi) || "-",
+  designacaoNova: normalizeText(row.designacao_nova) || "-",
+  cctoOemp: normalizeText(row.ccto_oemp) || "-",
+  ipNat: normalizeText(row.ip_nat) || "-",
+  loopbackPrimario: normalizeText(row.loopback_wan) || "-",
+  loopbackSecundario: normalizeText(row.loopback_lan) || "-",
+  tecnologia: readRawTecnologia(row) || "-",
+  operadora: normalizeText(row.operadora) || "-",
+});
 
 const isIpAddress = (value: string) => {
   const trimmed = value.trim();
@@ -202,6 +250,7 @@ const PingaoNatTab = () => {
         ip: ip.trim(),
         codUl: "-",
         nomeLoterica: "-",
+        ...EMPTY_NAT_BASIC,
       }));
 
       let lookupSummary: LookupNatItem[] = [];
@@ -215,10 +264,18 @@ const PingaoNatTab = () => {
 
         lookupSummary = matches.map((match) => {
           if (!match.row) {
-            return { query: match.query, status: "not_found" as const, ip: "", codUl: "-", nomeLoterica: "-" };
+            return {
+              query: match.query,
+              status: "not_found" as const,
+              ip: "",
+              codUl: "-",
+              nomeLoterica: "-",
+              ...EMPTY_NAT_BASIC,
+            };
           }
 
           const ip = getNatIp(match.row);
+          const basic = buildNatBasic(match.row);
           if (!ip) {
             return {
               query: match.query,
@@ -226,6 +283,7 @@ const PingaoNatTab = () => {
               ip: "",
               codUl: normalizeText(match.row.cod_ul) || "-",
               nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
+              ...basic,
             };
           }
 
@@ -235,6 +293,7 @@ const PingaoNatTab = () => {
             ip,
             codUl: normalizeText(match.row.cod_ul) || "-",
             nomeLoterica: normalizeText(match.row.nome_loterica) || "-",
+            ...basic,
           };
         });
       }
@@ -275,21 +334,75 @@ const PingaoNatTab = () => {
     setAnalysisRows(analyzed);
   };
 
+  const buildBasicNatExportRow = (item: LookupNatItem) => ({
+    "Codigo UL": item.codUl,
+    Nome: item.nomeLoterica,
+    Cidade: item.cidade,
+    Estado: item.uf,
+    "CCTO OI": item.cctoOi,
+    "Designacao Nova": item.designacaoNova,
+    "CCTO OEMP": item.cctoOemp,
+    "IP NAT": item.ipNat,
+    "Loopback Primario": item.loopbackPrimario,
+    "Loopback Secundario": item.loopbackSecundario,
+    Tecnologia: item.tecnologia,
+    Operadora: item.operadora,
+    Consulta: item.query,
+    "IP alvo": item.ip || "-",
+  });
+
+  const exportConsultaXlsx = async () => {
+    if (!querySummary.length) return;
+    try {
+      const data = querySummary.map(buildBasicNatExportRow);
+      const wb = jsonToWorkbook([{ name: "Pingao NAT Consulta", data }]);
+      await writeFile(wb, "pingao_nat_consulta.xlsx");
+    } catch (err) {
+      alert("Falha ao exportar consulta: " + String((err as Error)?.message || err));
+    }
+  };
+
   const exportResultXlsx = async () => {
     if (!analysisRows.length) return;
     try {
-      const exportRows = analysisRows.map((row) => ({
-        "Código UL": row.codUl,
-        Consulta: row.query,
-        Lotérica: row.nomeLoterica,
-        "IP NAT": row.ip,
-        "Pacotes Enviados": row.sent ?? "",
-        "Pacotes Recebidos": row.received ?? "",
-        "Perda (%)": row.lossPct ?? "",
-        "Tempo (ms)": row.timeMs ?? "",
-        Status: row.status,
-        Observação: row.reason,
-      }));
+      const byIp = new Map<string, LookupNatItem>();
+      const byCod = new Map<string, LookupNatItem>();
+      for (const item of querySummary) {
+        if (item.ip && !byIp.has(item.ip)) byIp.set(item.ip, item);
+        if (item.codUl && item.codUl !== "-" && !byCod.has(item.codUl)) byCod.set(item.codUl, item);
+      }
+
+      const exportRows = analysisRows.map((row) => {
+        const lookup = byIp.get(row.ip) || byCod.get(row.codUl);
+        const basic = lookup
+          ? buildBasicNatExportRow(lookup)
+          : {
+              "Codigo UL": row.codUl,
+              Nome: row.nomeLoterica,
+              Cidade: "-",
+              Estado: "-",
+              "CCTO OI": "-",
+              "Designacao Nova": "-",
+              "CCTO OEMP": "-",
+              "IP NAT": row.ip,
+              "Loopback Primario": "-",
+              "Loopback Secundario": "-",
+              Tecnologia: "-",
+              Operadora: "-",
+              Consulta: row.query,
+              "IP alvo": row.ip,
+            };
+
+        return {
+          ...basic,
+          "Pacotes Enviados": row.sent ?? "",
+          "Pacotes Recebidos": row.received ?? "",
+          "Perda (%)": row.lossPct ?? "",
+          "Tempo (ms)": row.timeMs ?? "",
+          Status: row.status,
+          Observacao: row.reason,
+        };
+      });
       const wb = jsonToWorkbook([{ name: "Pingao NAT Resultado", data: exportRows }]);
       await writeFile(wb, "pingao_nat_resultado.xlsx");
     } catch (err) {
@@ -344,6 +457,13 @@ const PingaoNatTab = () => {
             </Button>
             <Button
               variant="outline"
+              onClick={() => void exportConsultaXlsx()}
+              disabled={!querySummary.length}
+            >
+              <Download className="w-4 h-4 mr-1" /> Baixar Excel da consulta
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => {
                 setInput("");
                 setQuerySummary([]);
@@ -357,15 +477,23 @@ const PingaoNatTab = () => {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {querySummary.length > 0 && (
-            <div className="rounded-lg border overflow-auto max-h-[280px]">
+            <div className="rounded-lg border overflow-auto max-h-[320px]">
               <table className="w-full text-xs">
                 <thead className="bg-muted/60 sticky top-0">
                   <tr className="text-left">
-                    <th className="p-2 font-medium">Consulta</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium">Código UL</th>
-                    <th className="p-2 font-medium">Lotérica</th>
-                    <th className="p-2 font-medium">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Status</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Codigo UL</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Nome</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Estado</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Designacao Nova</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OEMP</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Primario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -374,11 +502,19 @@ const PingaoNatTab = () => {
                     const variant = item.status === "ok" ? "default" : item.status === "missing_ip" ? "secondary" : "outline";
                     return (
                       <tr key={`${item.query}-${idx}`} className="border-t align-top">
-                        <td className="p-2 font-mono">{item.query}</td>
-                        <td className="p-2"><Badge variant={variant}>{text}</Badge></td>
-                        <td className="p-2 font-mono">{item.codUl}</td>
-                        <td className="p-2">{item.nomeLoterica}</td>
-                        <td className="p-2 font-mono">{item.ip || "-"}</td>
+                        <td className="p-2 whitespace-nowrap"><Badge variant={variant}>{text}</Badge></td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.codUl}</td>
+                        <td className="p-2 min-w-[200px] whitespace-normal break-words">{item.nomeLoterica}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.cidade}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.uf}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOi}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.designacaoNova}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOemp}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.ipNat}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackPrimario}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackSecundario}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.tecnologia}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.operadora}</td>
                       </tr>
                     );
                   })}

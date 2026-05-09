@@ -394,26 +394,26 @@ const buildConsultaMassaExportFilename = () => {
 
 const buildConsultaMassaExportRows = (rows: ConsultaMassaRow[]) =>
   rows.map((row) => ({
-    Consulta: row.query,
-    Status: row.statusText,
     "Codigo UL": row.codUl,
     Nome: row.nome,
-    Endereco: row.endereco,
     Cidade: row.cidade,
-    UF: row.uf,
-    Tecnologia: row.tecnologia,
-    Contato: row.contato,
-    "Status UL": row.statusUl,
+    Estado: row.uf,
     "CCTO OI": row.cctoOi,
     "Designacao Nova": row.designacaoNova,
-    "IP NAT": row.ipNat,
-    "IP WAN": row.ipWan,
-    "Loopback Principal": row.loopbackWan,
-    "IP Primario": row.ipPrimario || "-",
     "CCTO OEMP": row.cctoOemp,
+    "IP NAT": row.ipNat,
+    "Loopback Primario": row.loopbackWan,
     "Loopback Secundario": row.loopbackLan,
-    "IP Secundario": row.ipSecundario || "-",
+    Tecnologia: row.tecnologia,
     Operadora: row.operadora,
+    Consulta: row.query,
+    Status: row.statusText,
+    Endereco: row.endereco,
+    Contato: row.contato,
+    "Status UL": row.statusUl,
+    "IP WAN": row.ipWan,
+    "IP Primario": row.ipPrimario || "-",
+    "IP Secundario": row.ipSecundario || "-",
     Match: row.matchedBy,
   }));
 
@@ -888,22 +888,22 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Status</th>
                     <th className="p-2 font-medium whitespace-nowrap">Codigo UL</th>
                     <th className="p-2 font-medium whitespace-nowrap">Nome</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
                     <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
-                    <th className="p-2 font-medium whitespace-nowrap">UF</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Contato</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Status UL</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Estado</th>
                     <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
                     <th className="p-2 font-medium whitespace-nowrap">Designacao Nova</th>
-                    <th className="p-2 font-medium whitespace-nowrap">IP NAT</th>
-                    <th className="p-2 font-medium whitespace-nowrap">IP WAN</th>
-                    <th className="p-2 font-medium whitespace-nowrap">Loopback Principal</th>
-                    <th className="p-2 font-medium whitespace-nowrap">IP Primario</th>
                     <th className="p-2 font-medium whitespace-nowrap">CCTO OEMP</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Primario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
-                    <th className="p-2 font-medium whitespace-nowrap">IP Secundario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
                     <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Contato</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Status UL</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP WAN</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP Primario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Match</th>
                   </tr>
                 </thead>
@@ -945,22 +945,22 @@ const ConsultaMassaTab = () => {
                         </td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.codUl}</td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.nome}</td>
-                        <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[160px] whitespace-normal break-words">{row.cidade}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.uf}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
-                        <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
-                        <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOi}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.designacaoNova}</td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.ipNat}</td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.ipWan}</td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.loopbackWan}</td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.ipPrimario || "-"}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.cctoOemp}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.ipNat}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.loopbackWan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
+                        <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
                         <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
+                        <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
+                        <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>
+                        <td className="p-2 whitespace-normal break-words">{row.statusUl}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.ipWan}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.ipPrimario || "-"}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.ipSecundario || "-"}</td>
                         <td className="p-2 whitespace-nowrap">{row.matchedBy}</td>
                       </tr>
                     );

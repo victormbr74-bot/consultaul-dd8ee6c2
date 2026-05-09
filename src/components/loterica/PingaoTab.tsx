@@ -43,6 +43,18 @@ interface LookupSummaryItem {
   limitMs: number;
   techSource: string;
   matchedBy: MatchField | null;
+  // Basic fields
+  nome: string;
+  cidade: string;
+  uf: string;
+  cctoOi: string;
+  designacaoNova: string;
+  cctoOemp: string;
+  ipNat: string;
+  loopbackPrimario: string;
+  loopbackSecundario: string;
+  tecnologia: string;
+  operadora: string;
 }
 
 interface ParsedPingMetrics {
@@ -473,6 +485,33 @@ const PingaoTab = () => {
 
     try {
       const defaultProfileData = getDefaultProfileData(target);
+      const emptyBasic = {
+        nome: "-",
+        cidade: "-",
+        uf: "-",
+        cctoOi: "-",
+        designacaoNova: "-",
+        cctoOemp: "-",
+        ipNat: "-",
+        loopbackPrimario: "-",
+        loopbackSecundario: "-",
+        tecnologia: "-",
+        operadora: "-",
+      };
+      const buildBasic = (row: LotericaLookupRow) => ({
+        nome: normalizeText(row.nome_loterica) || "-",
+        cidade: normalizeText(row.cidade) || "-",
+        uf: normalizeText(row.uf) || "-",
+        cctoOi: normalizeText(row.ccto_oi) || "-",
+        designacaoNova: normalizeText(row.designacao_nova) || "-",
+        cctoOemp: normalizeText(row.ccto_oemp) || "-",
+        ipNat: normalizeText(row.ip_nat) || "-",
+        loopbackPrimario: normalizeText(row.loopback_wan) || "-",
+        loopbackSecundario: normalizeText(row.loopback_lan) || "-",
+        tecnologia: readRawByAliases(row, ["TECNOLOGIA"]) || "-",
+        operadora: normalizeText(row.operadora) || readRawByAliases(row, ["OPERADORA 4G", "OPERADORA"]) || "-",
+      });
+
       const directSummary: LookupSummaryItem[] = directIpTerms.map((ip) => ({
         query: ip.trim(),
         status: "ok" as const,
@@ -483,6 +522,7 @@ const PingaoTab = () => {
         limitMs: defaultProfileData.limitMs,
         techSource: "IP direto",
         matchedBy: null,
+        ...emptyBasic,
       }));
 
       let lookupSummary: LookupSummaryItem[] = [];
@@ -504,11 +544,13 @@ const PingaoTab = () => {
               limitMs: defaultProfileData.limitMs,
               techSource: "-",
               matchedBy: null,
+              ...emptyBasic,
             };
           }
 
           const ip = getLookupIp(match.row, target);
           const profileData = detectLatencyProfile(match.row, target);
+          const basic = buildBasic(match.row);
 
           if (!ip) {
             return {
@@ -521,6 +563,7 @@ const PingaoTab = () => {
               limitMs: profileData.limitMs,
               techSource: profileData.techSource,
               matchedBy: match.matchField ?? null,
+              ...basic,
             };
           }
 
@@ -534,6 +577,7 @@ const PingaoTab = () => {
             limitMs: profileData.limitMs,
             techSource: profileData.techSource,
             matchedBy: match.matchField ?? null,
+            ...basic,
           };
         });
       }
@@ -579,26 +623,82 @@ const PingaoTab = () => {
     setAnalysisRows(analyzed);
   };
 
+  const buildBasicExportRow = (item: LookupSummaryItem) => ({
+    "Codigo UL": item.codUl,
+    Nome: item.nome,
+    Cidade: item.cidade,
+    Estado: item.uf,
+    "CCTO OI": item.cctoOi,
+    "Designacao Nova": item.designacaoNova,
+    "CCTO OEMP": item.cctoOemp,
+    "IP NAT": item.ipNat,
+    "Loopback Primario": item.loopbackPrimario,
+    "Loopback Secundario": item.loopbackSecundario,
+    Tecnologia: item.tecnologia,
+    Operadora: item.operadora,
+    Consulta: item.query,
+    IP: item.ip || "-",
+    "Perfil Latencia": item.profileLabel,
+  });
+
+  const exportConsultaXlsx = async () => {
+    if (!querySummary.length) return;
+    try {
+      const data = querySummary.map(buildBasicExportRow);
+      const wb = jsonToWorkbook([{ name: "Pingao Consulta", data }]);
+      await writeFile(wb, "pingao_consulta.xlsx");
+    } catch (exportError) {
+      alert("Falha ao exportar consulta: " + String((exportError as Error)?.message || exportError));
+    }
+  };
+
   const exportResultXlsx = async () => {
     if (!analysisRows.length) return;
 
     try {
-      const exportRows = analysisRows.map((row) => ({
-        "Codigo UL": row.codUl,
-        "Consulta": row.query,
-        "IP": row.ip,
-        "Perfil Latencia": row.profileLabel,
-        "Limite (ms)": row.limitMs,
-        "Sucesso (%)": row.successRate ?? "",
-        "Pacotes Recebidos": row.received ?? "",
-        "Pacotes Enviados": row.sent ?? "",
-        "Perda (%)": row.lossPct ?? "",
-        "Latencia Min (ms)": row.minMs ?? "",
-        "Latencia Avg (ms)": row.avgMs ?? "",
-        "Latencia Max (ms)": row.maxMs ?? "",
-        "Status": row.status,
-        "Observacao": row.reason,
-      }));
+      const byIp = new Map<string, LookupSummaryItem>();
+      const byCod = new Map<string, LookupSummaryItem>();
+      for (const item of querySummary) {
+        if (item.ip && !byIp.has(item.ip)) byIp.set(item.ip, item);
+        if (item.codUl && item.codUl !== "-" && !byCod.has(item.codUl)) byCod.set(item.codUl, item);
+      }
+
+      const exportRows = analysisRows.map((row) => {
+        const lookup = byIp.get(row.ip) || byCod.get(row.codUl);
+        const basic = lookup
+          ? buildBasicExportRow(lookup)
+          : {
+              "Codigo UL": row.codUl,
+              Nome: "-",
+              Cidade: "-",
+              Estado: "-",
+              "CCTO OI": "-",
+              "Designacao Nova": "-",
+              "CCTO OEMP": "-",
+              "IP NAT": "-",
+              "Loopback Primario": "-",
+              "Loopback Secundario": "-",
+              Tecnologia: "-",
+              Operadora: "-",
+              Consulta: row.query,
+              IP: row.ip,
+              "Perfil Latencia": row.profileLabel,
+            };
+
+        return {
+          ...basic,
+          "Limite (ms)": row.limitMs,
+          "Sucesso (%)": row.successRate ?? "",
+          "Pacotes Recebidos": row.received ?? "",
+          "Pacotes Enviados": row.sent ?? "",
+          "Perda (%)": row.lossPct ?? "",
+          "Latencia Min (ms)": row.minMs ?? "",
+          "Latencia Avg (ms)": row.avgMs ?? "",
+          "Latencia Max (ms)": row.maxMs ?? "",
+          Status: row.status,
+          Observacao: row.reason,
+        };
+      });
 
       const wb = jsonToWorkbook([{ name: "Pingao Resultado", data: exportRows }]);
       await writeFile(wb, "pingao_resultado.xlsx");
@@ -706,6 +806,13 @@ const PingaoTab = () => {
             </Button>
             <Button
               variant="outline"
+              onClick={() => void exportConsultaXlsx()}
+              disabled={!querySummary.length}
+            >
+              <Download className="w-4 h-4 mr-1" /> Baixar Excel da consulta
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => {
                 setInput("");
                 setQuerySummary([]);
@@ -719,17 +826,25 @@ const PingaoTab = () => {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {querySummary.length > 0 && (
-            <div className="rounded-lg border overflow-auto max-h-[280px]">
+            <div className="rounded-lg border overflow-auto max-h-[320px]">
               <table className="w-full text-xs">
                 <thead className="bg-muted/60 sticky top-0">
                   <tr className="text-left">
-                    <th className="p-2 font-medium">Consulta</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium">Codigo UL</th>
-                    <th className="p-2 font-medium">IP</th>
-                    <th className="p-2 font-medium">Encontrado por</th>
-                    <th className="p-2 font-medium">Perfil</th>
-                    <th className="p-2 font-medium">Limite</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Status</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Codigo UL</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Nome</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Cidade</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Estado</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OI</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Designacao Nova</th>
+                    <th className="p-2 font-medium whitespace-nowrap">CCTO OEMP</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP NAT</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Primario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
+                    <th className="p-2 font-medium whitespace-nowrap">IP alvo</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Perfil</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -738,17 +853,25 @@ const PingaoTab = () => {
                     const variant = item.status === "ok" ? "default" : item.status === "missing_ip" ? "secondary" : "outline";
                     return (
                       <tr key={`${item.query}-${idx}`} className="border-t align-top">
-                        <td className="p-2 font-mono">{item.query}</td>
-                        <td className="p-2"><Badge variant={variant}>{text}</Badge></td>
-                        <td className="p-2 font-mono">{item.codUl}</td>
-                        <td className="p-2 font-mono">{item.ip || "-"}</td>
-                        <td className="p-2">{item.matchedBy ? MATCH_FIELD_LABELS[item.matchedBy] : "-"}</td>
-                        <td className="p-2">
+                        <td className="p-2 whitespace-nowrap"><Badge variant={variant}>{text}</Badge></td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.codUl}</td>
+                        <td className="p-2 min-w-[200px] whitespace-normal break-words">{item.nome}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.cidade}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.uf}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOi}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.designacaoNova}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.cctoOemp}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.ipNat}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackPrimario}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.loopbackSecundario}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.tecnologia}</td>
+                        <td className="p-2 whitespace-normal break-words">{item.operadora}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{item.ip || "-"}</td>
+                        <td className="p-2 whitespace-nowrap">
                           <Badge variant="outline" className={cn("font-semibold", profileBadgeClass(item.profile))}>
                             {item.profileLabel}
                           </Badge>
                         </td>
-                        <td className="p-2 font-mono">{item.limitMs} ms</td>
                       </tr>
                     );
                   })}

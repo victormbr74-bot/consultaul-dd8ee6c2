@@ -485,6 +485,33 @@ const PingaoTab = () => {
 
     try {
       const defaultProfileData = getDefaultProfileData(target);
+      const emptyBasic = {
+        nome: "-",
+        cidade: "-",
+        uf: "-",
+        cctoOi: "-",
+        designacaoNova: "-",
+        cctoOemp: "-",
+        ipNat: "-",
+        loopbackPrimario: "-",
+        loopbackSecundario: "-",
+        tecnologia: "-",
+        operadora: "-",
+      };
+      const buildBasic = (row: LotericaLookupRow) => ({
+        nome: normalizeText(row.nome_loterica) || "-",
+        cidade: normalizeText(row.cidade) || "-",
+        uf: normalizeText(row.uf) || "-",
+        cctoOi: normalizeText(row.ccto_oi) || "-",
+        designacaoNova: normalizeText(row.designacao_nova) || "-",
+        cctoOemp: normalizeText(row.ccto_oemp) || "-",
+        ipNat: normalizeText(row.ip_nat) || "-",
+        loopbackPrimario: normalizeText(row.loopback_wan) || "-",
+        loopbackSecundario: normalizeText(row.loopback_lan) || "-",
+        tecnologia: readRawByAliases(row, ["TECNOLOGIA"]) || "-",
+        operadora: normalizeText(row.operadora) || readRawByAliases(row, ["OPERADORA 4G", "OPERADORA"]) || "-",
+      });
+
       const directSummary: LookupSummaryItem[] = directIpTerms.map((ip) => ({
         query: ip.trim(),
         status: "ok" as const,
@@ -495,6 +522,7 @@ const PingaoTab = () => {
         limitMs: defaultProfileData.limitMs,
         techSource: "IP direto",
         matchedBy: null,
+        ...emptyBasic,
       }));
 
       let lookupSummary: LookupSummaryItem[] = [];
@@ -516,11 +544,13 @@ const PingaoTab = () => {
               limitMs: defaultProfileData.limitMs,
               techSource: "-",
               matchedBy: null,
+              ...emptyBasic,
             };
           }
 
           const ip = getLookupIp(match.row, target);
           const profileData = detectLatencyProfile(match.row, target);
+          const basic = buildBasic(match.row);
 
           if (!ip) {
             return {
@@ -533,6 +563,7 @@ const PingaoTab = () => {
               limitMs: profileData.limitMs,
               techSource: profileData.techSource,
               matchedBy: match.matchField ?? null,
+              ...basic,
             };
           }
 
@@ -546,6 +577,7 @@ const PingaoTab = () => {
             limitMs: profileData.limitMs,
             techSource: profileData.techSource,
             matchedBy: match.matchField ?? null,
+            ...basic,
           };
         });
       }

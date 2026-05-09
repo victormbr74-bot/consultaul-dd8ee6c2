@@ -29,6 +29,16 @@ interface LookupNatItem {
   ip: string;
   codUl: string;
   nomeLoterica: string;
+  cidade: string;
+  uf: string;
+  cctoOi: string;
+  designacaoNova: string;
+  cctoOemp: string;
+  ipNat: string;
+  loopbackPrimario: string;
+  loopbackSecundario: string;
+  tecnologia: string;
+  operadora: string;
 }
 
 interface ParsedLinuxPing {

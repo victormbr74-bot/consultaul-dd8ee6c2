@@ -63,6 +63,44 @@ const getNatIp = (row: LotericaLookupRow): string => {
   return match ? match[1] : "";
 };
 
+const EMPTY_NAT_BASIC = {
+  cidade: "-",
+  uf: "-",
+  cctoOi: "-",
+  designacaoNova: "-",
+  cctoOemp: "-",
+  ipNat: "-",
+  loopbackPrimario: "-",
+  loopbackSecundario: "-",
+  tecnologia: "-",
+  operadora: "-",
+};
+
+const readRawTecnologia = (row: LotericaLookupRow): string => {
+  const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+  for (const [key, value] of Object.entries(raw)) {
+    const upper = key.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (upper === "TECNOLOGIA") {
+      const v = normalizeText(value);
+      if (v) return v;
+    }
+  }
+  return "";
+};
+
+const buildNatBasic = (row: LotericaLookupRow) => ({
+  cidade: normalizeText(row.cidade) || "-",
+  uf: normalizeText(row.uf) || "-",
+  cctoOi: normalizeText(row.ccto_oi) || "-",
+  designacaoNova: normalizeText(row.designacao_nova) || "-",
+  cctoOemp: normalizeText(row.ccto_oemp) || "-",
+  ipNat: normalizeText(row.ip_nat) || "-",
+  loopbackPrimario: normalizeText(row.loopback_wan) || "-",
+  loopbackSecundario: normalizeText(row.loopback_lan) || "-",
+  tecnologia: readRawTecnologia(row) || "-",
+  operadora: normalizeText(row.operadora) || "-",
+});
+
 const isIpAddress = (value: string) => {
   const trimmed = value.trim();
   const match = trimmed.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);

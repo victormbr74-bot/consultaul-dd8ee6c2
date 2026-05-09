@@ -43,6 +43,18 @@ interface LookupSummaryItem {
   limitMs: number;
   techSource: string;
   matchedBy: MatchField | null;
+  // Basic fields
+  nome: string;
+  cidade: string;
+  uf: string;
+  cctoOi: string;
+  designacaoNova: string;
+  cctoOemp: string;
+  ipNat: string;
+  loopbackPrimario: string;
+  loopbackSecundario: string;
+  tecnologia: string;
+  operadora: string;
 }
 
 interface ParsedPingMetrics {

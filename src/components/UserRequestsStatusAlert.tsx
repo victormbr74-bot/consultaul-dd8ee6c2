@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { BellRing, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-
-const AUTO_DISMISS_MS = 2 * 60 * 1000; // 2 minutes
 
 type ReviewedRequest = {
   id: string;
@@ -22,37 +27,43 @@ const UserRequestsStatusAlert = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<ReviewedRequest[]>([]);
-  const [dismissed, setDismissed] = useState(false);
-  const dismissTimerRef = useRef<number | null>(null);
-  const seenIdsRef = useRef<Set<string>>(new Set());
+  const [open, setOpen] = useState(false);
 
-  const scheduleAutoDismiss = useCallback(() => {
-    if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
-    dismissTimerRef.current = window.setTimeout(() => {
-      setDismissed(true);
-    }, AUTO_DISMISS_MS);
-  }, []);
+  const getAcknowledgedIds = () => {
+    try {
+      const stored = localStorage.getItem(`ack_requests_${user?.id}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const addAcknowledgedId = (ids: string[]) => {
+    if (!user?.id) return;
+    try {
+      const existing = getAcknowledgedIds();
+      const next = Array.from(new Set([...existing, ...ids]));
+      localStorage.setItem(`ack_requests_${user.id}`, JSON.stringify(next));
+    } catch {}
+  };
 
   const fetchReviewed = useCallback(async () => {
     if (!user?.id || isAdmin) return;
-    const since = new Date(Date.now() - AUTO_DISMISS_MS).toISOString();
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // last 7 days
     const { data, error } = await (supabase as never as typeof supabase)
       .from("loterica_change_requests" as never)
       .select("id, cod_ul, status, reviewed_at, review_note")
       .eq("proposed_by", user.id)
       .in("status", ["approved", "rejected"])
       .gte("reviewed_at", since)
-      .order("reviewed_at", { ascending: false })
-      .limit(20);
+      .order("reviewed_at", { ascending: false });
+      
     if (error) return;
     const list = ((data as unknown) as ReviewedRequest[]) || [];
-    setRequests(list);
-    if (list.length > 0) {
-      setDismissed(false);
-      scheduleAutoDismiss();
-      list.forEach((r) => seenIdsRef.current.add(r.id));
-    }
-  }, [user?.id, isAdmin, scheduleAutoDismiss]);
+    const ackIds = getAcknowledgedIds();
+    const unacknowledged = list.filter((r) => !ackIds.includes(r.id));
+    setRequests(unacknowledged);
+  }, [user?.id, isAdmin]);
 
   useEffect(() => {
     if (!user?.id || isAdmin) return;
@@ -71,82 +82,106 @@ const UserRequestsStatusAlert = () => {
         (payload) => {
           const row = payload.new as ReviewedRequest;
           if (!row || (row.status !== "approved" && row.status !== "rejected")) return;
-          if (!seenIdsRef.current.has(row.id)) {
-            seenIdsRef.current.add(row.id);
-            if (row.status === "approved") {
-              toast.success("✅ Solicitação aprovada", {
-                description: `Sua alteração da UL ${row.cod_ul} foi aprovada.`,
-                duration: 15000,
-              });
-            } else {
-              toast.error("❌ Solicitação rejeitada", {
-                description: row.review_note
-                  ? `UL ${row.cod_ul}: ${row.review_note}`
-                  : `Sua alteração da UL ${row.cod_ul} foi rejeitada.`,
-                duration: 15000,
-              });
-            }
+          const ackIds = getAcknowledgedIds();
+          if (!ackIds.includes(row.id)) {
+            // Auto open the popup when a new notification arrives
+            setOpen(true);
+            void fetchReviewed();
           }
-          void fetchReviewed();
         },
       )
       .subscribe();
 
     return () => {
-      if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
       void supabase.removeChannel(channel);
     };
   }, [user?.id, isAdmin, fetchReviewed]);
 
-  if (isAdmin || dismissed || requests.length === 0) return null;
-
-  const approvedCount = requests.filter((r) => r.status === "approved").length;
-  const rejectedCount = requests.filter((r) => r.status === "rejected").length;
-  const onlyApproved = approvedCount > 0 && rejectedCount === 0;
-  const onlyRejected = rejectedCount > 0 && approvedCount === 0;
-
-  const Icon = onlyRejected ? AlertTriangle : CheckCircle2;
-  const label = onlyApproved
-    ? approvedCount === 1
-      ? "Solicitação aprovada"
-      : `${approvedCount} solicitações aprovadas`
-    : onlyRejected
-      ? rejectedCount === 1
-        ? "Solicitação rejeitada"
-        : `${rejectedCount} solicitações rejeitadas`
-      : `${approvedCount} aprovada(s) · ${rejectedCount} rejeitada(s)`;
+  if (isAdmin || requests.length === 0) return null;
 
   const total = requests.length;
-  const lastCod = requests[0]?.cod_ul;
 
-  const colorClasses = onlyRejected
-    ? "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
-    : "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300 dark:hover:text-emerald-200";
+  const handleDismissAll = () => {
+    addAcknowledgedId(requests.map((r) => r.id));
+    setRequests([]);
+    setOpen(false);
+  };
+
+  const handleItemClick = (cod_ul: string) => {
+    navigate(`/loterica/${cod_ul}`);
+    setOpen(false);
+  };
 
   return (
-    <div className="flex items-center gap-1">
+    <>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => lastCod && navigate(`/loterica/${lastCod}`)}
-        className={cn("h-8 gap-2 animate-pulse", colorClasses)}
+        onClick={() => setOpen(true)}
+        className={cn(
+          "h-8 gap-2 border-sky-500/50 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 hover:text-sky-800",
+          "dark:text-sky-300 dark:hover:text-sky-200 animate-pulse"
+        )}
       >
-        <Icon className="w-4 h-4" />
-        <span className="hidden sm:inline">{label}</span>
-        <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+        <BellRing className="w-4 h-4" />
+        <span className="hidden sm:inline">Notificações</span>
+        <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-sky-500/20">
           {total}
         </Badge>
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 text-muted-foreground"
-        onClick={() => setDismissed(true)}
-        aria-label="Fechar"
-      >
-        <X className="w-4 h-4" />
-      </Button>
-    </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Notificações de Solicitações</DialogTitle>
+            <DialogDescription>
+              Acompanhe o status das suas alterações sugeridas.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] mt-4">
+            <div className="flex flex-col gap-3 pr-4">
+              {requests.map((r) => (
+                <div 
+                  key={r.id} 
+                  className={cn(
+                    "p-3 rounded-md border text-sm flex gap-3 items-start cursor-pointer transition-colors",
+                    r.status === "approved" 
+                      ? "bg-emerald-50/50 border-emerald-200 hover:bg-emerald-100/50 dark:bg-emerald-500/10 dark:border-emerald-500/20"
+                      : "bg-destructive/10 border-destructive/20 hover:bg-destructive/20"
+                  )}
+                  onClick={() => handleItemClick(r.cod_ul)}
+                >
+                  {r.status === "approved" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-semibold mb-1">
+                      UL {r.cod_ul}: {r.status === "approved" ? "Aprovada" : "Rejeitada"}
+                    </p>
+                    {r.review_note ? (
+                      <p className="text-muted-foreground">{r.review_note}</p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        {r.status === "approved" 
+                          ? "Sua solicitação de alteração foi aprovada e aplicada." 
+                          : "Sua solicitação não foi aprovada pelo administrador."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end mt-4 pt-4 border-t">
+            <Button onClick={handleDismissAll} variant="outline">
+              Marcar como lidas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

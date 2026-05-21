@@ -18,6 +18,7 @@ import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import LotericaNoticesCard, { type LotericaNoticeView } from "@/components/loterica/LotericaNoticesCard";
+import { notifyJirayabBatch } from "@/lib/jirayabNotify";
 import type { Tables } from "@/integrations/supabase/types";
 
 const EDITABLE_KEYS = [
@@ -661,6 +662,10 @@ const LotericaDetail = () => {
             }
             return next;
           });
+        }
+
+        if (successCodes.length) {
+          void notifyJirayabBatch(successCodes, "update");
         }
 
         if (!errors.length) {

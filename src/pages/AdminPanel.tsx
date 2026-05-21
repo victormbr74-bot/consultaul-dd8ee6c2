@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound } from "lucide-react";
+import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound, Webhook } from "lucide-react";
+import { notifyJirayab } from "@/lib/jirayabNotify";
 
 type UserRow = {
   id: string;
@@ -72,6 +73,10 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
   const [lotericaUpdatesSaving, setLotericaUpdatesSaving] = useState(false);
   const [lotericaUpdatesError, setLotericaUpdatesError] = useState<string | null>(null);
+  const [jirayabUrl, setJirayabUrl] = useState("");
+  const [jirayabEnabled, setJirayabEnabled] = useState(true);
+  const [jirayabLoading, setJirayabLoading] = useState(false);
+  const [jirayabSaving, setJirayabSaving] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
@@ -228,8 +233,56 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     } else {
       void fetchChangeRequests();
       void fetchLotericaUpdatesSetting();
+      void fetchJirayabSetting();
     }
   }, [authLoading, isAdmin, navigate, section]);
+
+  const fetchJirayabSetting = async () => {
+    setJirayabLoading(true);
+    try {
+      const { data } = await (supabase as any)
+        .from("app_settings")
+        .select("value_text, value_boolean")
+        .eq("key", "jirayab_webhook_url")
+        .maybeSingle();
+      setJirayabUrl(String((data as any)?.value_text || ""));
+      setJirayabEnabled(Boolean((data as any)?.value_boolean ?? true));
+    } catch (e) {
+      console.error("Erro carregando jirayab webhook", e);
+    } finally {
+      setJirayabLoading(false);
+    }
+  };
+
+  const saveJirayabSetting = async () => {
+    if (!user?.id) return;
+    setJirayabSaving(true);
+    try {
+      const { error } = await (supabase as any).from("app_settings").upsert(
+        {
+          key: "jirayab_webhook_url",
+          value_text: jirayabUrl.trim() || null,
+          value_boolean: jirayabEnabled,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        },
+        { onConflict: "key" },
+      );
+      if (error) throw new Error(error.message);
+      alert("Webhook do Jirayab salvo.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao salvar.");
+    } finally {
+      setJirayabSaving(false);
+    }
+  };
+
+  const testJirayabWebhook = async () => {
+    const code = window.prompt("Informe um cod_ul existente para testar o envio:");
+    if (!code) return;
+    await notifyJirayab(code.trim(), "manual", { test: true });
+    alert("Teste enviado. Verifique o n8n / console.");
+  };
 
   const sortedUsers = useMemo(
     () => [...users].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
@@ -401,6 +454,9 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         .eq("cod_ul", req.cod_ul);
 
       if (updateError) throw new Error(updateError.message);
+
+      // Dispara webhook do Jirayab em background (não bloqueia o fluxo de aprovação).
+      void notifyJirayab(req.cod_ul, "approved_change", { review_note: reviewNote ?? null });
     }
 
     const updatePayload: Record<string, unknown> = {
@@ -808,6 +864,46 @@ ${failureDetails}`,
                 {!!lotericaUpdatesError && (
                   <div className="text-sm text-destructive whitespace-pre-line">{lotericaUpdatesError}</div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Webhook className="w-5 h-5" /> Webhook Jirayab (n8n)
+                </CardTitle>
+                <div className="flex items-center gap-3">
+                  <Badge variant={jirayabEnabled && jirayabUrl ? "default" : "secondary"}>
+                    {jirayabUrl ? (jirayabEnabled ? "Ativo" : "Pausado") : "Não configurado"}
+                  </Badge>
+                  <Switch
+                    checked={jirayabEnabled}
+                    onCheckedChange={setJirayabEnabled}
+                    disabled={jirayabLoading || jirayabSaving}
+                    aria-label="Ativar webhook do Jirayab"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  URL do webhook do n8n que receberá os dados da UL sempre que uma alteração for
+                  aprovada ou um admin editar diretamente. Deixe em branco para desativar.
+                </p>
+                <div className="flex flex-col gap-2 md:flex-row">
+                  <Input
+                    type="url"
+                    placeholder="https://n8n.seudominio.com/webhook/jirayab"
+                    value={jirayabUrl}
+                    onChange={(e) => setJirayabUrl(e.target.value)}
+                    disabled={jirayabLoading || jirayabSaving}
+                  />
+                  <Button onClick={saveJirayabSetting} disabled={jirayabSaving}>
+                    <Save className="w-4 h-4 mr-1" /> Salvar
+                  </Button>
+                  <Button variant="outline" onClick={testJirayabWebhook} disabled={!jirayabUrl || jirayabSaving}>
+                    Testar
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

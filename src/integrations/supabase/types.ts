@@ -125,18 +125,21 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           value_boolean: boolean
+          value_text: string | null
         }
         Insert: {
           key: string
           updated_at?: string
           updated_by?: string | null
           value_boolean?: boolean
+          value_text?: string | null
         }
         Update: {
           key?: string
           updated_at?: string
           updated_by?: string | null
           value_boolean?: boolean
+          value_text?: string | null
         }
         Relationships: []
       }

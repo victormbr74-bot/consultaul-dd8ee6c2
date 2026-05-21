@@ -233,8 +233,56 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     } else {
       void fetchChangeRequests();
       void fetchLotericaUpdatesSetting();
+      void fetchJirayabSetting();
     }
   }, [authLoading, isAdmin, navigate, section]);
+
+  const fetchJirayabSetting = async () => {
+    setJirayabLoading(true);
+    try {
+      const { data } = await (supabase as any)
+        .from("app_settings")
+        .select("value_text, value_boolean")
+        .eq("key", "jirayab_webhook_url")
+        .maybeSingle();
+      setJirayabUrl(String((data as any)?.value_text || ""));
+      setJirayabEnabled(Boolean((data as any)?.value_boolean ?? true));
+    } catch (e) {
+      console.error("Erro carregando jirayab webhook", e);
+    } finally {
+      setJirayabLoading(false);
+    }
+  };
+
+  const saveJirayabSetting = async () => {
+    if (!user?.id) return;
+    setJirayabSaving(true);
+    try {
+      const { error } = await (supabase as any).from("app_settings").upsert(
+        {
+          key: "jirayab_webhook_url",
+          value_text: jirayabUrl.trim() || null,
+          value_boolean: jirayabEnabled,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        },
+        { onConflict: "key" },
+      );
+      if (error) throw new Error(error.message);
+      alert("Webhook do Jirayab salvo.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao salvar.");
+    } finally {
+      setJirayabSaving(false);
+    }
+  };
+
+  const testJirayabWebhook = async () => {
+    const code = window.prompt("Informe um cod_ul existente para testar o envio:");
+    if (!code) return;
+    await notifyJirayab(code.trim(), "manual", { test: true });
+    alert("Teste enviado. Verifique o n8n / console.");
+  };
 
   const sortedUsers = useMemo(
     () => [...users].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),

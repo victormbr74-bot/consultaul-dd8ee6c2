@@ -870,6 +870,46 @@ ${failureDetails}`,
             <Card>
               <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="flex items-center gap-2">
+                  <Webhook className="w-5 h-5" /> Webhook Jirayab (n8n)
+                </CardTitle>
+                <div className="flex items-center gap-3">
+                  <Badge variant={jirayabEnabled && jirayabUrl ? "default" : "secondary"}>
+                    {jirayabUrl ? (jirayabEnabled ? "Ativo" : "Pausado") : "Não configurado"}
+                  </Badge>
+                  <Switch
+                    checked={jirayabEnabled}
+                    onCheckedChange={setJirayabEnabled}
+                    disabled={jirayabLoading || jirayabSaving}
+                    aria-label="Ativar webhook do Jirayab"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  URL do webhook do n8n que receberá os dados da UL sempre que uma alteração for
+                  aprovada ou um admin editar diretamente. Deixe em branco para desativar.
+                </p>
+                <div className="flex flex-col gap-2 md:flex-row">
+                  <Input
+                    type="url"
+                    placeholder="https://n8n.seudominio.com/webhook/jirayab"
+                    value={jirayabUrl}
+                    onChange={(e) => setJirayabUrl(e.target.value)}
+                    disabled={jirayabLoading || jirayabSaving}
+                  />
+                  <Button onClick={saveJirayabSetting} disabled={jirayabSaving}>
+                    <Save className="w-4 h-4 mr-1" /> Salvar
+                  </Button>
+                  <Button variant="outline" onClick={testJirayabWebhook} disabled={!jirayabUrl || jirayabSaving}>
+                    Testar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="flex items-center gap-2">
                   <Eye className="w-5 h-5" /> Aprovacoes Pendentes ({changeRequests.length})
                 </CardTitle>
                 <div className="flex flex-wrap items-center gap-2">

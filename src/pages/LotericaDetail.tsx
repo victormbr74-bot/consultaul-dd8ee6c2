@@ -664,6 +664,10 @@ const LotericaDetail = () => {
           });
         }
 
+        if (successCodes.length) {
+          void notifyJirayabBatch(successCodes, "update");
+        }
+
         if (!errors.length) {
           alert(successCodes.length === 1 ? "Salvo com sucesso!" : `${successCodes.length} lotericas salvas com sucesso!`);
           return;

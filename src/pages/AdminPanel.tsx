@@ -402,6 +402,9 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         .eq("cod_ul", req.cod_ul);
 
       if (updateError) throw new Error(updateError.message);
+
+      // Dispara webhook do Jirayab em background (não bloqueia o fluxo de aprovação).
+      void notifyJirayab(req.cod_ul, "approved_change", { review_note: reviewNote ?? null });
     }
 
     const updatePayload: Record<string, unknown> = {

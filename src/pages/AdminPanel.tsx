@@ -73,6 +73,10 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
   const [lotericaUpdatesSaving, setLotericaUpdatesSaving] = useState(false);
   const [lotericaUpdatesError, setLotericaUpdatesError] = useState<string | null>(null);
+  const [jirayabUrl, setJirayabUrl] = useState("");
+  const [jirayabEnabled, setJirayabEnabled] = useState(true);
+  const [jirayabLoading, setJirayabLoading] = useState(false);
+  const [jirayabSaving, setJirayabSaving] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");

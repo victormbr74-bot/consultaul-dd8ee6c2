@@ -479,6 +479,30 @@ export type Database = {
         }
         Relationships: []
       }
+      jirayab_stage: {
+        Row: {
+          circuito: string | null
+          cod_ul: string
+          resp_backup: string | null
+          resp_principal: string | null
+          sim_card: string | null
+        }
+        Insert: {
+          circuito?: string | null
+          cod_ul: string
+          resp_backup?: string | null
+          resp_principal?: string | null
+          sim_card?: string | null
+        }
+        Update: {
+          circuito?: string | null
+          cod_ul?: string
+          resp_backup?: string | null
+          resp_principal?: string | null
+          sim_card?: string | null
+        }
+        Relationships: []
+      }
       loterica_change_requests: {
         Row: {
           after_data: Json | null

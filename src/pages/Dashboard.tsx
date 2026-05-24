@@ -196,6 +196,7 @@ const Dashboard = () => {
     setLotericaTab,
     lotericaTab,
     consultaSearch: sidebarSearch,
+    setConsultaSearch,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<Tables<"lotericas">[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,8 +207,7 @@ const Dashboard = () => {
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
-  const [localSearch, setLocalSearch] = useState("");
-  const search = localSearch;
+  const search = sidebarSearch;
 
   const fetchLotericas = useCallback(async () => {
     const term = search.trim();
@@ -553,7 +553,7 @@ const Dashboard = () => {
     setOnExport(() => handleExport);
     setOnImportClick(() => () => importRef.current?.click());
     setOnSearchSubmit(() => () => {
-      setLocalSearch(sidebarSearch);
+      void goToFirstResult();
     });
     return () => {
       setShowLotericaTabs(false);
@@ -596,7 +596,7 @@ const Dashboard = () => {
               placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
               className="pl-10"
               value={search}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={(e) => setConsultaSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();

@@ -804,19 +804,6 @@ const LotericaDetail = () => {
           </Button>
         </div>
 
-        {!isBulkMode && (
-          <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-            <Input
-              value={queryInput}
-              onChange={(e) => setQueryInput(e.target.value)}
-              placeholder="Informe um codigo UL"
-              className="font-mono text-xs"
-            />
-            <Button variant="outline" onClick={handleConsult} className="lg:self-start">
-              Consultar codigo
-            </Button>
-          </div>
-        )}
 
         {missingCodes.length > 0 && <p className="text-xs text-warning">Codigos nao encontrados: {missingCodes.join(", ")}</p>}
       </div>

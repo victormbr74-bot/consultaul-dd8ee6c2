@@ -596,7 +596,7 @@ const Dashboard = () => {
               placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
               className="pl-10"
               value={search}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={(e) => setConsultaSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();

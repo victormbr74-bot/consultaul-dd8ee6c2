@@ -553,7 +553,7 @@ const Dashboard = () => {
     setOnExport(() => handleExport);
     setOnImportClick(() => () => importRef.current?.click());
     setOnSearchSubmit(() => () => {
-      setLocalSearch(sidebarSearch);
+      void goToFirstResult();
     });
     return () => {
       setShowLotericaTabs(false);

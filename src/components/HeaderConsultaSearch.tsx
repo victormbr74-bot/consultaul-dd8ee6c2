@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
@@ -6,7 +7,14 @@ import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 const HeaderConsultaSearch = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { consultaSearch, setConsultaSearch, onSearchSubmit, setLotericaTab } = useSidebarActions();
+  const pastedChangeRef = useRef(false);
+  const {
+    consultaSearch,
+    setConsultaSearch,
+    setConsultaSearchMode,
+    onSearchSubmit,
+    setLotericaTab,
+  } = useSidebarActions();
 
   return (
     <div className="relative w-full max-w-xl">
@@ -15,7 +23,14 @@ const HeaderConsultaSearch = () => {
         placeholder="Buscar por codigo, nome, CCTO ou cidade..."
         className="h-9 pl-9"
         value={consultaSearch}
-        onChange={(e) => setConsultaSearch(e.target.value)}
+        onChange={(e) => {
+          setConsultaSearch(e.target.value);
+          setConsultaSearchMode(pastedChangeRef.current ? "paste" : "manual");
+          pastedChangeRef.current = false;
+        }}
+        onPaste={() => {
+          pastedChangeRef.current = true;
+        }}
         onKeyDown={(e) => {
           if (e.key !== "Enter") return;
 
@@ -23,7 +38,7 @@ const HeaderConsultaSearch = () => {
           setLotericaTab("consulta");
 
           if (location.pathname !== "/") {
-            navigate("/");
+            navigate("/", { state: { submitConsultaSearch: true } });
             return;
           }
 

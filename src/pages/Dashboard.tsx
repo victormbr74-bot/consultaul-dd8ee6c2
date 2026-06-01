@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { jsonToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -187,6 +187,7 @@ const BASE_NORMALIZED_HEADER_KEYS = new Set<string>([
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     setOnExport,
     setOnImportClick,
@@ -195,6 +196,7 @@ const Dashboard = () => {
     setLotericaTab,
     lotericaTab,
     consultaSearch: sidebarSearch,
+    consultaSearchMode,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<Tables<"lotericas">[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,7 +211,7 @@ const Dashboard = () => {
 
   const fetchLotericas = useCallback(async () => {
     const term = search.trim();
-    if (!term) {
+    if (!term || consultaSearchMode === "paste") {
       setLotericas([]);
       setTotal(0);
       setLoading(false);
@@ -259,7 +261,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [consultaSearchMode, search, page]);
 
   useEffect(() => {
     void fetchLotericas();
@@ -333,6 +335,14 @@ const Dashboard = () => {
       alert("Falha inesperada ao buscar lot\u00E9ricas.");
     }
   }, [navigate, search, setLotericaTab]);
+
+  useEffect(() => {
+    const state = location.state as { submitConsultaSearch?: boolean } | null;
+    if (!state?.submitConsultaSearch) return;
+
+    navigate(location.pathname, { replace: true, state: null });
+    void goToFirstResult();
+  }, [goToFirstResult, location.pathname, location.state, navigate]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -562,6 +572,7 @@ const Dashboard = () => {
   }, [sidebarSearch, goToFirstResult, handleExport, setOnExport, setOnImportClick, setOnSearchSubmit, setShowLotericaTabs]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const showPreviewResults = search.trim().length > 0 && consultaSearchMode === "manual";
 
   const statusColor = (status: string) => {
     const s = status?.toUpperCase() || "";
@@ -619,10 +630,14 @@ const Dashboard = () => {
           </Card>
         )}
 
-        {search.trim() ? (
+        {showPreviewResults ? (
           <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
             <span>{total} {"lot\u00E9ricas encontradas"}</span>
             <span>{"P\u00E1gina"} {page + 1} {"de"} {totalPages || 1}</span>
+          </div>
+        ) : search.trim() ? (
+          <div className="mb-4 text-sm text-muted-foreground">
+            Pressione Enter para abrir os dados da loterica.
           </div>
         ) : (
           <div className="mb-4 text-sm text-muted-foreground">
@@ -630,6 +645,7 @@ const Dashboard = () => {
           </div>
         )}
 
+        {showPreviewResults && (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -685,8 +701,9 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+        )}
 
-        {totalPages > 1 && (
+        {showPreviewResults && totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
               <ChevronLeft className="w-4 h-4" />

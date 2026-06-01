@@ -93,14 +93,15 @@ ${linhas.join("\n")}
   const telnetSecundario = loopbackSecundario ? `telnet ${loopbackSecundario} /source-interface ${SOURCE_INTERFACE}` : "";
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Terminal className="w-5 h-5" /> Teste Ping e Acesso
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Terminal className="w-5 h-5" /> Testes da Loterica
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">Acesso</h3>
           <CommandRow label="Acesso Primario" command={loopbackPrimario ? `ssh ${loopbackPrimario}` : ""} id="acesso-primario" />
           <CommandRow label="Acesso Secundario" command={loopbackSecundario ? `ssh ${loopbackSecundario}` : ""} id="acesso-secundario" />
           {ipNat && (
@@ -110,45 +111,35 @@ ${linhas.join("\n")}
               <CommandRow label="Acesso NAT" command={acessoNat} id="acesso-nat" />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Comandos de Teste</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+        <section className="space-y-2 border-t pt-4">
+          <h3 className="text-sm font-medium">Comandos de Teste</h3>
           <CommandRow label="Ping Primario" command={pingPrimario} id="ping-primario" />
           <CommandRow label="Tempo Roteamento Primario" command={tempoPrimario} id="tempo-primario" />
           <CommandRow label="Ping Secundario" command={pingSecundario} id="ping-secundario" />
           <CommandRow label="Tempo Roteamento Secundario" command={tempoSecundario} id="tempo-secundario" />
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Telnet</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+        <section className="space-y-2 border-t pt-4">
+          <h3 className="text-sm font-medium">Telnet</h3>
           <CommandRow label="Telnet Primario" command={telnetPrimario} id="telnet-primario" />
           <CommandRow label="Telnet Secundario" command={telnetSecundario} id="telnet-secundario" />
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Script TCL</CardTitle>
-          {tclScript && <CopyBtn text={tclScript} id="script-tcl" />}
-        </CardHeader>
-        <CardContent>
+        <section className="space-y-2 border-t pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-medium">Script TCL</h3>
+            {tclScript && <CopyBtn text={tclScript} id="script-tcl" />}
+          </div>
           {tclScript ? (
             <pre className="text-xs font-mono bg-muted/50 p-3 rounded whitespace-pre-wrap">{tclScript}</pre>
           ) : (
             <div className="text-sm text-muted-foreground">Sem dados de loopback para gerar script.</div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </section>
+      </CardContent>
+    </Card>
   );
 };
 

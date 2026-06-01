@@ -9,11 +9,10 @@ import { useSidebarActions } from "@/contexts/SidebarActionsContext";
 import { formatImportBasePlanilhaSummary, importBasePlanilhaFile, type ImportBasePlanilhaProgress } from "@/lib/importBasePlanilha";
 import PingaoTab from "@/components/loterica/PingaoTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const EXPORT_BATCH_SIZE = 1000;
@@ -196,7 +195,6 @@ const Dashboard = () => {
     setLotericaTab,
     lotericaTab,
     consultaSearch: sidebarSearch,
-    setConsultaSearch,
   } = useSidebarActions();
   const [lotericas, setLotericas] = useState<Tables<"lotericas">[]>([]);
   const [loading, setLoading] = useState(true);
@@ -589,22 +587,7 @@ const Dashboard = () => {
           <ScriptRouterSctTab />
         ) : (
           <>
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={"Buscar por c\u00F3digo, nome, CCTO ou cidade..."}
-              className="pl-10"
-              value={search}
-              onChange={(e) => setConsultaSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void goToFirstResult();
-                }
-              }}
-            />
-          </div>
+        <div className="mb-6 flex justify-end">
           <Button variant="ghost" size="icon" onClick={() => void fetchLotericas()} title="Atualizar resultados">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -643,7 +626,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="mb-4 text-sm text-muted-foreground">
-            Digite um código, nome, CCTO ou cidade para pesquisar.
+            Use a busca no topo para pesquisar por codigo, nome, CCTO ou cidade.
           </div>
         )}
 

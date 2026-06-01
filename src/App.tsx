@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
+import HeaderConsultaSearch from "@/components/HeaderConsultaSearch";
 import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
 import UserRequestsStatusAlert from "@/components/UserRequestsStatusAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
@@ -71,7 +72,8 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
           <div className="flex-1 flex flex-col">
             <header className="sticky top-0 z-50 h-12 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4">
               <SidebarTrigger />
-              <div className="flex-1 flex justify-center items-center gap-2">
+              <div className="flex-1 flex justify-center items-center gap-2 min-w-0">
+                <HeaderConsultaSearch />
                 <PendingChangeRequestsAlert />
                 <UserRequestsStatusAlert />
               </div>

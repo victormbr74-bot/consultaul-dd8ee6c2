@@ -39,7 +39,6 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export function AppSidebar() {
   const appVersionLabel = `v${__APP_VERSION__}`;
@@ -53,16 +52,12 @@ export function AppSidebar() {
   const {
     onExport,
     onImportClick,
-    onSearchSubmit,
     lotericaTab,
     setLotericaTab,
     consultaSearch,
-    setConsultaSearch,
-    showLotericaTabs,
   } = useSidebarActions();
   const [pendingChangeCount, setPendingChangeCount] = useState(0);
 
-  const isDashboardRoute = location.pathname === "/";
   const isLotericaRoute = location.pathname.startsWith("/loterica/");
   const isDashboardToolView = location.pathname === "/" && (lotericaTab === "pingao" || lotericaTab === "script-router-sct");
   const isConsultaUlActive =
@@ -198,28 +193,6 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por codigo, nome, CCTO ou cidade..."
-              className="pl-9 bg-sidebar border-sidebar-border"
-              value={consultaSearch}
-              onChange={(e) => setConsultaSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (!isDashboardRoute) {
-                    setLotericaTab("consulta");
-                    navigate("/");
-                  }
-                  onSearchSubmit?.();
-                }
-              }}
-            />
-          </div>
-        </div>
-
         <SidebarGroup>
           <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
           <SidebarGroupContent>

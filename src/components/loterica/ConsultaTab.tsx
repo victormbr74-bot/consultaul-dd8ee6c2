@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import TestesTab from "@/components/loterica/TestesTab";
 
 type MainField = {
   label: string;
@@ -76,75 +77,81 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{"Dados Edit\u00E1veis"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {FIELDS.map((f) => (
-              <div
-                key={f.key || f.label}
-                className={cn("space-y-1.5", f.wide ? "md:col-span-2 xl:col-span-3" : "")}
-              >
-                <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                {f.multiline ? (
-                  <Textarea
-                    rows={f.rows || 3}
-                    wrap={f.noWrap ? "off" : undefined}
-                    className={cn(
-                      f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
-                      f.mono ? "font-mono text-xs" : "",
-                    )}
-                    value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
-                    onChange={(e) => {
-                      if (f.key) {
-                        setForm({ ...form, [f.key]: e.target.value });
-                        return;
-                      }
-                      setRawValue(f.rawKeys || [], e.target.value);
-                    }}
-                  />
-                ) : (
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <aside className="min-w-0 xl:sticky xl:top-16 xl:self-start">
+        <TestesTab form={form} />
+      </aside>
+
+      <div className="min-w-0 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{"Dados Edit\u00E1veis"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              {FIELDS.map((f) => (
+                <div
+                  key={f.key || f.label}
+                  className={cn("space-y-1.5", f.wide ? "md:col-span-2 2xl:col-span-3" : "")}
+                >
+                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                  {f.multiline ? (
+                    <Textarea
+                      rows={f.rows || 3}
+                      wrap={f.noWrap ? "off" : undefined}
+                      className={cn(
+                        f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
+                        f.mono ? "font-mono text-xs" : "",
+                      )}
+                      value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
+                      onChange={(e) => {
+                        if (f.key) {
+                          setForm({ ...form, [f.key]: e.target.value });
+                          return;
+                        }
+                        setRawValue(f.rawKeys || [], e.target.value);
+                      }}
+                    />
+                  ) : (
+                    <Input
+                      className={f.mono ? "font-mono text-xs" : ""}
+                      value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
+                      onChange={(e) => {
+                        if (f.key) {
+                          setForm({ ...form, [f.key]: e.target.value });
+                          return;
+                        }
+                        setRawValue(f.rawKeys || [], e.target.value);
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Dados Adicionais</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              {EXTRA_FIELDS.map((f) => (
+                <div key={f.label} className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
                   <Input
                     className={f.mono ? "font-mono text-xs" : ""}
-                    value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
-                    onChange={(e) => {
-                      if (f.key) {
-                        setForm({ ...form, [f.key]: e.target.value });
-                        return;
-                      }
-                      setRawValue(f.rawKeys || [], e.target.value);
-                    }}
+                    value={String(getRawValue(f.keys) ?? "")}
+                    placeholder="-"
+                    onChange={(e) => setRawValue(f.keys, e.target.value)}
                   />
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Dados Adicionais</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {EXTRA_FIELDS.map((f) => (
-              <div key={f.label} className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                <Input
-                  className={f.mono ? "font-mono text-xs" : ""}
-                  value={String(getRawValue(f.keys) ?? "")}
-                  placeholder="-"
-                  onChange={(e) => setRawValue(f.keys, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

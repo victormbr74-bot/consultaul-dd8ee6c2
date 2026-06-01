@@ -29,14 +29,14 @@ const UserRequestsStatusAlert = () => {
   const [requests, setRequests] = useState<ReviewedRequest[]>([]);
   const [open, setOpen] = useState(false);
 
-  const getAcknowledgedIds = () => {
+  const getAcknowledgedIds = useCallback(() => {
     try {
       const stored = localStorage.getItem(`ack_requests_${user?.id}`);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
-  };
+  }, [user?.id]);
 
   const addAcknowledgedId = (ids: string[]) => {
     if (!user?.id) return;
@@ -44,7 +44,9 @@ const UserRequestsStatusAlert = () => {
       const existing = getAcknowledgedIds();
       const next = Array.from(new Set([...existing, ...ids]));
       localStorage.setItem(`ack_requests_${user.id}`, JSON.stringify(next));
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   const fetchReviewed = useCallback(async () => {
@@ -63,7 +65,7 @@ const UserRequestsStatusAlert = () => {
     const ackIds = getAcknowledgedIds();
     const unacknowledged = list.filter((r) => !ackIds.includes(r.id));
     setRequests(unacknowledged);
-  }, [user?.id, isAdmin]);
+  }, [user?.id, isAdmin, getAcknowledgedIds]);
 
   useEffect(() => {
     if (!user?.id || isAdmin) return;
@@ -95,7 +97,7 @@ const UserRequestsStatusAlert = () => {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, isAdmin, fetchReviewed]);
+  }, [user?.id, isAdmin, fetchReviewed, getAcknowledgedIds]);
 
   if (isAdmin || requests.length === 0) return null;
 

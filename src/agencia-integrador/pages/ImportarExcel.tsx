@@ -199,7 +199,7 @@ function parseTopologiaSheet(ws: ExcelJS.Worksheet): Topologia[] {
     if (/\d/.test(v)) return false;
     if (/concentrador/i.test(v)) return false;
     if (/^(g\d+|edd)$/i.test(v)) return false;
-    return /^[a-zA-Z\/\-\s]+$/.test(v);
+    return /^[a-zA-Z/-\s]+$/.test(v);
   };
 
   const findNearestRegion = (rowIndex: number) => {

@@ -796,10 +796,13 @@ const LotericaDetail = () => {
             )}
         </div>
 
-        {noticesSection}
-
-        {hasLoadedRows && !isBulkMode && activeCode && (
-          <RouterConfigCard codUl={activeCode} nome={activeForm?.nome_loterica} />
+        {hasLoadedRows && !isBulkMode && activeCode ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 items-start">
+            {noticesSection}
+            <RouterConfigCard codUl={activeCode} nome={activeForm?.nome_loterica} />
+          </div>
+        ) : (
+          noticesSection
         )}
 
         <div className="flex justify-end">

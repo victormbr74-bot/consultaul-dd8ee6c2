@@ -87,12 +87,12 @@ const LotericaNoticesCard = ({
       </CardHeader>
 
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pb-3">
         {isMultiCode && (
-          <div className="space-y-1.5">
-            <Label>{"UL do aviso"}</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">{"UL do aviso"}</Label>
             <Select value={selectedCode} onValueChange={onSelectedCodeChange}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder={"Selecione a UL"} />
               </SelectTrigger>
               <SelectContent>
@@ -106,25 +106,25 @@ const LotericaNoticesCard = ({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="loterica-aviso-textarea">{"Informa\u00E7\u00F5es"}</Label>
+        <div className="space-y-1">
+          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Informa\u00E7\u00F5es"}</Label>
           <Textarea
             id="loterica-aviso-textarea"
             value={loading ? "Carregando avisos..." : textValue}
             onChange={(event) => onTextValueChange(event.target.value)}
             placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
-            className="min-h-[104px] resize-y bg-background/90 text-sm leading-5"
+            className="min-h-[72px] resize-y bg-background/70 text-xs leading-5"
             readOnly={loading}
           />
         </div>
 
         <div className="flex justify-end gap-2">
           {isAdmin && hasNotices && (
-            <Button type="button" variant="outline" onClick={onClear} disabled={clearing || loading || saving}>
+            <Button type="button" variant="outline" size="sm" onClick={onClear} disabled={clearing || loading || saving}>
               {clearing ? "Apagando..." : "Apagar avisos"}
             </Button>
           )}
-          <Button onClick={onSubmit} disabled={submitDisabled}>
+          <Button size="sm" onClick={onSubmit} disabled={submitDisabled}>
             {saving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
@@ -132,6 +132,7 @@ const LotericaNoticesCard = ({
         {!!error && <p className="text-xs text-destructive whitespace-pre-line">{error}</p>}
         {!!successMessage && <p className="text-xs text-success whitespace-pre-line">{successMessage}</p>}
       </CardContent>
+
     </Card>
   );
 };

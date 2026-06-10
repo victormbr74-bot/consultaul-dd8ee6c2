@@ -18,6 +18,7 @@ import {
   ListChecks,
   Activity,
   PlusCircle,
+  Wrench,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";

@@ -13,6 +13,7 @@ import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import HeaderConsultaSearch from "@/components/HeaderConsultaSearch";
 import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
 import UserRequestsStatusAlert from "@/components/UserRequestsStatusAlert";
+import RouterConfigReminderAlert from "@/components/RouterConfigReminderAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
@@ -38,6 +39,7 @@ import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
+import RouterConfigsReport from "./pages/RouterConfigsReport";
 
 
 const queryClient = new QueryClient();
@@ -76,6 +78,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
                 <HeaderConsultaSearch />
                 <PendingChangeRequestsAlert />
                 <UserRequestsStatusAlert />
+                <RouterConfigReminderAlert />
               </div>
               <ThemeHeaderActions />
             </header>
@@ -133,6 +136,7 @@ const App = () => (
                   <Route path="/admin/dados" element={<AdminPanel section="data" />} />
                   <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
                   <Route path="/admin/import-nat" element={<ImportNatIps />} />
+                  <Route path="/relatorio-roteador" element={<RouterConfigsReport />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

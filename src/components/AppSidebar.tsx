@@ -18,6 +18,7 @@ import {
   ListChecks,
   Activity,
   PlusCircle,
+  Wrench,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -285,6 +286,15 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/relatorio-roteador" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Wrench className="mr-2 h-4 w-4" />
+                    <span>Config. Roteador</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
 
               {isAdmin && (
                 <SidebarMenuItem>

@@ -596,6 +596,42 @@ export type Database = {
           },
         ]
       }
+      loterica_router_configs: {
+        Row: {
+          cod_ul: string
+          config_type: string
+          created_at: string
+          created_by: string
+          id: string
+          observacao: string
+          reminder_acknowledged_at: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          cod_ul: string
+          config_type: string
+          created_at?: string
+          created_by: string
+          id?: string
+          observacao: string
+          reminder_acknowledged_at?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          cod_ul?: string
+          config_type?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          observacao?: string
+          reminder_acknowledged_at?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lotericas: {
         Row: {
           ccto_oemp: string | null

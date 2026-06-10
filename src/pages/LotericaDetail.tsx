@@ -798,6 +798,10 @@ const LotericaDetail = () => {
 
         {noticesSection}
 
+        {hasLoadedRows && !isBulkMode && activeCode && (
+          <RouterConfigCard codUl={activeCode} nome={activeForm?.nome_loterica} />
+        )}
+
         <div className="flex justify-end">
           <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
             <Save className="w-4 h-4 mr-1" />{" "}

@@ -77,6 +77,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
                 <HeaderConsultaSearch />
                 <PendingChangeRequestsAlert />
                 <UserRequestsStatusAlert />
+                <RouterConfigReminderAlert />
               </div>
               <ThemeHeaderActions />
             </header>

@@ -60,31 +60,32 @@ const LotericaNoticesCard = ({
   const selectedLabel = selectedCode ? [selectedCode, selectedName || "Sem nome"].join(" - ") : "";
 
   return (
-    <Card className={cn("border", hasNotices ? "border-warning/40 bg-warning/10" : "border-dashed")}>
-      <CardHeader className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-              {hasNotices ? <AlertTriangle className="h-5 w-5 text-warning" /> : <MessageSquarePlus className="h-5 w-5" />}
+    <Card className={cn("border border-blue-400/30 bg-blue-400/10 backdrop-blur-sm h-full")}>
+      <CardHeader className="space-y-1 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-0.5">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              {hasNotices ? <AlertTriangle className="h-4 w-4 text-blue-500" /> : <MessageSquarePlus className="h-4 w-4 text-blue-500" />}
               <span>{"Avisos da lot\u00E9rica"}</span>
-              {selectedLabel ? <span className="text-sm font-medium text-foreground/80">{selectedLabel}</span> : null}
+              {selectedLabel ? <span className="text-xs font-medium text-foreground/80">{selectedLabel}</span> : null}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {"Visualize o hist\u00F3rico e adicione a nova informa\u00E7\u00E3o no final da mesma caixa de texto."}
+            <p className="text-xs text-muted-foreground">
+              {"Visualize o hist\u00F3rico e adicione a nova informa\u00E7\u00E3o no final do texto."}
             </p>
           </div>
 
           <Badge
             variant="outline"
             className={cn(
-              "shrink-0",
-              hasNotices ? "border-warning/40 bg-warning/15 text-warning" : "border-border bg-background text-muted-foreground",
+              "shrink-0 text-xs",
+              "border-blue-400/40 bg-blue-400/15 text-blue-600 dark:text-blue-300",
             )}
           >
             {noticeCount} aviso{noticeCount === 1 ? "" : "s"}
           </Badge>
         </div>
       </CardHeader>
+
 
       <CardContent className="space-y-4">
         {isMultiCode && (

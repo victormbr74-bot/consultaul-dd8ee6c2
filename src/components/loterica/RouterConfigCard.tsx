@@ -100,29 +100,32 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
   };
 
   return (
-    <Card className="border-dashed">
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-          <Wrench className="h-5 w-5" />
+    <Card className="border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-sm h-full">
+      <CardHeader className="py-3">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <Wrench className="h-4 w-4 text-emerald-500" />
           <span>Configurações no Roteador</span>
-          <span className="text-sm font-medium text-foreground/70">
+          <span className="text-xs font-medium text-foreground/70">
             {codUl}
             {nome ? ` - ${nome}` : ""}
           </span>
           {history.length > 0 && (
-            <Badge variant="outline" className="ml-auto">
-              {history.length} registro{history.length === 1 ? "" : "s"}
+            <Badge
+              variant="outline"
+              className="ml-auto text-xs border-emerald-400/40 bg-emerald-400/15 text-emerald-700 dark:text-emerald-300"
+            >
+              {history.length} reg.
             </Badge>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Tipo</Label>
+      <CardContent className="space-y-3 pb-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Tipo</Label>
             <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione PRINCIPAL ou BACKUP" />
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="PRINCIPAL ou BACKUP" />
               </SelectTrigger>
               <SelectContent>
                 {ROUTER_CONFIG_TIPOS.map((t) => (
@@ -133,11 +136,11 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Configuração feita</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Configuração feita</Label>
             <Select value={configType} onValueChange={setConfigType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a configuração" />
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
                 {ROUTER_CONFIG_TYPES.map((t) => (
@@ -149,15 +152,16 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
             </Select>
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label>
+        <div className="space-y-1">
+          <Label className="text-xs">
             Observação <span className="text-destructive">*</span>
           </Label>
           <Textarea
-            rows={3}
+            rows={2}
             placeholder="Descreva o que foi feito e o porquê (obrigatório)"
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
+            className="min-h-[60px] resize-y bg-background/70 text-xs leading-5"
           />
         </div>
         <div className="flex justify-end">
@@ -170,9 +174,9 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
         {loading ? (
           <p className="text-xs text-muted-foreground">Carregando histórico...</p>
         ) : history.length > 0 ? (
-          <div className="space-y-2 border-t pt-3">
-            <p className="text-xs font-medium text-muted-foreground">Histórico recente</p>
-            <ul className="space-y-2 max-h-60 overflow-auto">
+          <div className="space-y-1.5 border-t border-emerald-400/20 pt-2">
+            <p className="text-[11px] font-medium text-muted-foreground">Histórico recente</p>
+            <ul className="space-y-1.5 max-h-40 overflow-auto">
               {history.map((h) => {
                 const ageMs = Date.now() - new Date(h.created_at).getTime();
                 const overdue = !!user && h.created_by === user.id && ageMs > 3 * 24 * 60 * 60 * 1000;
@@ -180,13 +184,13 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
                   <li
                     key={h.id}
                     className={cn(
-                      "text-xs rounded border p-2",
-                      overdue ? "border-destructive/40 bg-destructive/5" : "border-border",
+                      "text-[11px] rounded border p-1.5",
+                      overdue ? "border-destructive/40 bg-destructive/5" : "border-border/60 bg-background/40",
                     )}
                   >
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <Badge variant="secondary">{h.tipo}</Badge>
-                      <Badge variant="outline">{h.config_type}</Badge>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{h.tipo}</Badge>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{h.config_type}</Badge>
                       <span className="text-muted-foreground">
                         {new Date(h.created_at).toLocaleString("pt-BR")}
                       </span>
@@ -209,3 +213,4 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
 };
 
 export default RouterConfigCard;
+

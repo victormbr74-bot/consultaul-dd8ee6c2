@@ -60,25 +60,25 @@ const LotericaNoticesCard = ({
   const selectedLabel = selectedCode ? [selectedCode, selectedName || "Sem nome"].join(" - ") : "";
 
   return (
-    <Card className={cn("border", hasNotices ? "border-warning/40 bg-warning/10" : "border-dashed")}>
-      <CardHeader className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-              {hasNotices ? <AlertTriangle className="h-5 w-5 text-warning" /> : <MessageSquarePlus className="h-5 w-5" />}
+    <Card className={cn("border border-blue-400/30 bg-blue-400/10 backdrop-blur-sm h-full")}>
+      <CardHeader className="space-y-1 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-0.5">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              {hasNotices ? <AlertTriangle className="h-4 w-4 text-blue-500" /> : <MessageSquarePlus className="h-4 w-4 text-blue-500" />}
               <span>{"Avisos da lot\u00E9rica"}</span>
-              {selectedLabel ? <span className="text-sm font-medium text-foreground/80">{selectedLabel}</span> : null}
+              {selectedLabel ? <span className="text-xs font-medium text-foreground/80">{selectedLabel}</span> : null}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {"Visualize o hist\u00F3rico e adicione a nova informa\u00E7\u00E3o no final da mesma caixa de texto."}
+            <p className="text-xs text-muted-foreground">
+              {"Visualize o hist\u00F3rico e adicione a nova informa\u00E7\u00E3o no final do texto."}
             </p>
           </div>
 
           <Badge
             variant="outline"
             className={cn(
-              "shrink-0",
-              hasNotices ? "border-warning/40 bg-warning/15 text-warning" : "border-border bg-background text-muted-foreground",
+              "shrink-0 text-xs",
+              "border-blue-400/40 bg-blue-400/15 text-blue-600 dark:text-blue-300",
             )}
           >
             {noticeCount} aviso{noticeCount === 1 ? "" : "s"}
@@ -86,12 +86,13 @@ const LotericaNoticesCard = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+
+      <CardContent className="space-y-3 pb-3">
         {isMultiCode && (
-          <div className="space-y-1.5">
-            <Label>{"UL do aviso"}</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">{"UL do aviso"}</Label>
             <Select value={selectedCode} onValueChange={onSelectedCodeChange}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder={"Selecione a UL"} />
               </SelectTrigger>
               <SelectContent>
@@ -105,25 +106,25 @@ const LotericaNoticesCard = ({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="loterica-aviso-textarea">{"Informa\u00E7\u00F5es"}</Label>
+        <div className="space-y-1">
+          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Informa\u00E7\u00F5es"}</Label>
           <Textarea
             id="loterica-aviso-textarea"
             value={loading ? "Carregando avisos..." : textValue}
             onChange={(event) => onTextValueChange(event.target.value)}
             placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
-            className="min-h-[104px] resize-y bg-background/90 text-sm leading-5"
+            className="min-h-[72px] resize-y bg-background/70 text-xs leading-5"
             readOnly={loading}
           />
         </div>
 
         <div className="flex justify-end gap-2">
           {isAdmin && hasNotices && (
-            <Button type="button" variant="outline" onClick={onClear} disabled={clearing || loading || saving}>
+            <Button type="button" variant="outline" size="sm" onClick={onClear} disabled={clearing || loading || saving}>
               {clearing ? "Apagando..." : "Apagar avisos"}
             </Button>
           )}
-          <Button onClick={onSubmit} disabled={submitDisabled}>
+          <Button size="sm" onClick={onSubmit} disabled={submitDisabled}>
             {saving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
@@ -131,6 +132,7 @@ const LotericaNoticesCard = ({
         {!!error && <p className="text-xs text-destructive whitespace-pre-line">{error}</p>}
         {!!successMessage && <p className="text-xs text-success whitespace-pre-line">{successMessage}</p>}
       </CardContent>
+
     </Card>
   );
 };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Loader2, PencilLine, Save, X } from "lucide-react";
+import { Download, Loader2, PencilLine, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,6 +51,7 @@ const RouterConfigsReport = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({ tipo: "", config_type: "", observacao: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,6 +181,30 @@ const RouterConfigsReport = () => {
     toast.success("Configuracao atualizada");
     cancelEdit();
     void load();
+  };
+
+  const deleteConfig = async (row: Row) => {
+    if (!isAdmin && row.created_by !== user?.id) {
+      toast.error("Sem permissao para excluir esta configuracao.");
+      return;
+    }
+
+    if (!window.confirm(`Excluir a configuracao ${row.tipo} - ${row.config_type} da UL ${row.cod_ul}?`)) {
+      return;
+    }
+
+    setDeletingId(row.id);
+    const { error } = await supabase.from("loterica_router_configs" as never).delete().eq("id", row.id);
+    setDeletingId(null);
+
+    if (error) {
+      toast.error("Falha ao excluir configuracao", { description: error.message });
+      return;
+    }
+
+    toast.success("Configuracao excluida");
+    if (editingId === row.id) cancelEdit();
+    setRows((current) => current.filter((item) => item.id !== row.id));
   };
 
   const stats = useMemo(() => {
@@ -356,9 +381,21 @@ const RouterConfigsReport = () => {
                               </Button>
                             </div>
                           ) : canEdit ? (
-                            <Button size="icon" variant="ghost" onClick={() => startEdit(r)}>
-                              <PencilLine className="h-4 w-4" />
-                            </Button>
+                            <div className="flex justify-end gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => startEdit(r)}>
+                                <PencilLine className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => void deleteConfig(r)}
+                                disabled={deletingId === r.id}
+                                className="text-destructive hover:text-destructive"
+                                aria-label="Excluir configuracao"
+                              >
+                                {deletingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                              </Button>
+                            </div>
                           ) : null}
                         </TableCell>
                       </TableRow>

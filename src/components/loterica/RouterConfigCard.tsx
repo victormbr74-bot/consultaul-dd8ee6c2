@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Wrench, AlertTriangle, Loader2 } from "lucide-react";
+import { Wrench, AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,13 +43,14 @@ interface RouterConfigCardProps {
 }
 
 const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [tipo, setTipo] = useState<string>("");
   const [configType, setConfigType] = useState<string>("");
   const [observacao, setObservacao] = useState("");
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<RouterConfigRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!codUl) return;
@@ -97,6 +98,29 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
     setTipo("");
     setConfigType("");
     void load();
+  };
+
+  const handleDelete = async (item: RouterConfigRow) => {
+    if (!isAdmin && item.created_by !== user?.id) {
+      toast.error("Sem permissao para excluir esta configuracao.");
+      return;
+    }
+
+    if (!window.confirm(`Excluir a configuracao ${item.tipo} - ${item.config_type} da UL ${item.cod_ul}?`)) {
+      return;
+    }
+
+    setDeletingId(item.id);
+    const { error } = await supabase.from("loterica_router_configs" as never).delete().eq("id", item.id);
+    setDeletingId(null);
+
+    if (error) {
+      toast.error("Falha ao excluir configuracao", { description: error.message });
+      return;
+    }
+
+    toast.success("Configuracao excluida");
+    setHistory((current) => current.filter((row) => row.id !== item.id));
   };
 
   return (
@@ -180,6 +204,7 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
               {history.map((h) => {
                 const ageMs = Date.now() - new Date(h.created_at).getTime();
                 const overdue = !!user && h.created_by === user.id && ageMs > 3 * 24 * 60 * 60 * 1000;
+                const canDelete = isAdmin || (!!user?.id && h.created_by === user.id);
                 return (
                   <li
                     key={h.id}
@@ -195,9 +220,22 @@ const RouterConfigCard = ({ codUl, nome }: RouterConfigCardProps) => {
                         {new Date(h.created_at).toLocaleString("pt-BR")}
                       </span>
                       {overdue && (
-                        <span className="ml-auto flex items-center gap-1 text-destructive">
+                        <span className={cn("flex items-center gap-1 text-destructive", canDelete ? "" : "ml-auto")}>
                           <AlertTriangle className="h-3 w-3" /> Verificar
                         </span>
+                      )}
+                      {canDelete && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="ml-auto h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => void handleDelete(h)}
+                          disabled={deletingId === h.id}
+                          aria-label="Excluir configuracao"
+                        >
+                          {deletingId === h.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
                       )}
                     </div>
                     <p className="mt-1 whitespace-pre-wrap">{h.observacao}</p>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,9 +57,10 @@ const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
 interface ConsultaTabProps {
   form: any;
   setForm: (form: any) => void;
+  saveButton?: ReactNode;
 }
 
-const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
+const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
   const raw = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
 
   const getRawValue = (keys: string[]) => {
@@ -84,8 +86,9 @@ const ConsultaTab = ({ form, setForm }: ConsultaTabProps) => {
 
       <div className="min-w-0 space-y-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-lg">{"Dados Edit\u00E1veis"}</CardTitle>
+            {saveButton}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">

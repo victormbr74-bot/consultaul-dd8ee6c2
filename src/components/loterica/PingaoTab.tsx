@@ -30,6 +30,7 @@ const MAX_PACKET_COUNT = 20;
 type LinkProfile = "primario" | "secundario" | "brisanet" | "4g" | "vsat";
 type PingStatus = "UP" | "DOWN" | "PERDA DE PACOTE" | "ALTA LATENCIA" | "SEM DADOS";
 type LookupMode = "auto" | "cod_ul" | "ccto";
+type PingTarget = LinkTarget | "ambos";
 
 type LookupStatus = "ok" | "missing_ip" | "not_found";
 
@@ -167,6 +168,10 @@ const getDefaultProfileData = (target: LinkTarget) => ({
   limitMs: target === "primario" ? PROFILE_LIMITS.primario : PROFILE_LIMITS.secundario,
   techSource: target === "primario" ? "Primario" : "Secundario",
 });
+
+const getTargetsForSelection = (target: PingTarget): LinkTarget[] => (target === "ambos" ? ["primario", "secundario"] : [target]);
+
+const getDefaultProfileDataForSelection = (target: PingTarget) => getDefaultProfileData(target === "ambos" ? "primario" : target);
 
 const detectLatencyProfile = (row: LotericaLookupRow, target: LinkTarget) => {
   const tecnologia = readRawByAliases(row, ["TECNOLOGIA"]);
@@ -425,9 +430,14 @@ const targetButtonClass = (option: LinkTarget, selected: boolean, muted = false)
   return "border-amber-500/40 bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-400";
 };
 
+const bothTargetButtonClass = (selected: boolean) =>
+  selected
+    ? "border-emerald-500/40 bg-emerald-500 text-white shadow-sm hover:bg-emerald-600"
+    : "border-border bg-background text-muted-foreground hover:bg-muted/50";
+
 const PingaoTab = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [target, setTarget] = useState<LinkTarget>("primario");
+  const [target, setTarget] = useState<PingTarget>("primario");
   const [lookupMode, setLookupMode] = useState<LookupMode>("auto");
   const [input, setInput] = useState("");
   const [packetCountInput, setPacketCountInput] = useState(String(DEFAULT_PACKET_COUNT));
@@ -453,7 +463,7 @@ const PingaoTab = () => {
 
     return { total, up, down, loss, highLatency, noData };
   }, [analysisRows]);
-  const brisanetSecondarySelected = target === "secundario" && querySummary.some((item) => item.profile === "brisanet");
+  const brisanetSecondarySelected = getTargetsForSelection(target).includes("secundario") && querySummary.some((item) => item.profile === "brisanet");
 
   const copy = (text: string, id: string) => {
     if (!text) return;
@@ -462,7 +472,7 @@ const PingaoTab = () => {
     setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500);
   };
 
-  const handleTargetChange = (nextTarget: LinkTarget) => {
+  const handleTargetChange = (nextTarget: PingTarget) => {
     if (nextTarget === target) return;
     setTarget(nextTarget);
     setQuerySummary([]);
@@ -484,7 +494,8 @@ const PingaoTab = () => {
     setError("");
 
     try {
-      const defaultProfileData = getDefaultProfileData(target);
+      const selectedTargets = getTargetsForSelection(target);
+      const defaultProfileData = getDefaultProfileDataForSelection(target);
       const emptyBasic = {
         nome: "-",
         cidade: "-",
@@ -532,9 +543,9 @@ const PingaoTab = () => {
         const rows = await fetchLookupRows(lookupTerms, { fields });
         const matches = resolveMatches(lookupTerms, rows, { fields });
 
-        lookupSummary = matches.map((match) => {
+        lookupSummary = matches.flatMap((match) => {
           if (!match.row) {
-            return {
+            return [{
               query: match.query,
               status: "not_found" as const,
               ip: "",
@@ -545,18 +556,35 @@ const PingaoTab = () => {
               techSource: "-",
               matchedBy: null,
               ...emptyBasic,
-            };
+            }];
           }
 
-          const ip = getLookupIp(match.row, target);
-          const profileData = detectLatencyProfile(match.row, target);
           const basic = buildBasic(match.row);
 
-          if (!ip) {
+          return selectedTargets.map((selectedTarget) => {
+            const ip = getLookupIp(match.row, selectedTarget);
+            const profileData = detectLatencyProfile(match.row, selectedTarget);
+            const query = selectedTargets.length > 1 ? `${match.query} (${profileData.profileLabel})` : match.query;
+
+            if (!ip) {
+              return {
+                query,
+                status: "missing_ip" as const,
+                ip: "",
+                codUl: normalizeText(match.row.cod_ul) || "-",
+                profile: profileData.profile,
+                profileLabel: profileData.profileLabel,
+                limitMs: profileData.limitMs,
+                techSource: profileData.techSource,
+                matchedBy: match.matchField ?? null,
+                ...basic,
+              };
+            }
+
             return {
-              query: match.query,
-              status: "missing_ip" as const,
-              ip: "",
+              query,
+              status: "ok" as const,
+              ip,
               codUl: normalizeText(match.row.cod_ul) || "-",
               profile: profileData.profile,
               profileLabel: profileData.profileLabel,
@@ -565,20 +593,7 @@ const PingaoTab = () => {
               matchedBy: match.matchField ?? null,
               ...basic,
             };
-          }
-
-          return {
-            query: match.query,
-            status: "ok" as const,
-            ip,
-            codUl: normalizeText(match.row.cod_ul) || "-",
-            profile: profileData.profile,
-            profileLabel: profileData.profileLabel,
-            limitMs: profileData.limitMs,
-            techSource: profileData.techSource,
-            matchedBy: match.matchField ?? null,
-            ...basic,
-          };
+          });
         });
       }
 
@@ -595,7 +610,7 @@ const PingaoTab = () => {
   const runPingResultAnalysis = (rawText?: string) => {
     const sourceText = typeof rawText === "string" ? rawText : pingResultInput;
     const parsed = parsePingOutput(sourceText);
-    const defaultProfileData = getDefaultProfileData(target);
+    const defaultProfileData = getDefaultProfileDataForSelection(target);
 
     const ipIndex = new Map<string, LookupSummaryItem>();
     for (const item of querySummary) {
@@ -743,6 +758,14 @@ const PingaoTab = () => {
                 )}
               >
                 Secundario
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTargetChange("ambos")}
+                className={cn("min-w-[180px] justify-center font-semibold", bothTargetButtonClass(target === "ambos"))}
+              >
+                Primario + Secundario
               </Button>
             </div>
             {brisanetSecondarySelected ? (

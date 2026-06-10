@@ -18,7 +18,6 @@ import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import LotericaNoticesCard, { type LotericaNoticeView } from "@/components/loterica/LotericaNoticesCard";
-import RouterConfigCard from "@/components/loterica/RouterConfigCard";
 import { notifyJirayabBatch } from "@/lib/jirayabNotify";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -143,6 +142,14 @@ const buildChangePayload = (beforeRecord: any, afterRecord: any) => {
 
   return { changes, beforeChanges };
 };
+
+const hasLotericaChanges = (rows: any[], forms: Record<string, any>) =>
+  rows.some((row) => {
+    const code = String(row?.cod_ul || "").trim();
+    if (!code) return false;
+    const currentForm = forms[code] || row;
+    return Object.keys(buildChangePayload(row, currentForm).changes).length > 0;
+  });
 
 const buildLotericaNoticesMissingTableMessage = () =>
   "Banco desatualizado: falta a tabela loterica_notices.\n" +
@@ -750,9 +757,16 @@ const LotericaDetail = () => {
 
   const nonAdminUpdatesBlocked = !isAdmin && !lotericaUpdatesEnabled;
   const hasLoadedRows = lotericas.length > 0;
+  const hasPendingChanges = hasLoadedRows && hasLotericaChanges(lotericas, formsByCode);
   const saveDisabled = saving || !hasLoadedRows || (!isAdmin && (lotericaUpdatesLoading || nonAdminUpdatesBlocked));
+  const saveButton = hasPendingChanges ? (
+    <Button size="sm" onClick={handleSave} disabled={saveDisabled} className="shrink-0">
+      <Save className="w-4 h-4 mr-1" />{" "}
+      {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
+    </Button>
+  ) : null;
   const noticesSection = hasLoadedRows ? (
-    <section className="space-y-3">
+    <section className="space-y-3 h-full">
       <LotericaNoticesCard
         codes={loadedCodes}
         namesByCode={lotericaNamesByCode}
@@ -796,22 +810,7 @@ const LotericaDetail = () => {
             )}
         </div>
 
-        {hasLoadedRows && !isBulkMode && activeCode ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 items-start">
-            {noticesSection}
-            <RouterConfigCard codUl={activeCode} nome={activeForm?.nome_loterica} />
-          </div>
-        ) : (
-          noticesSection
-        )}
-
-        <div className="flex justify-end">
-          <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-            <Save className="w-4 h-4 mr-1" />{" "}
-            {saving ? "Salvando..." : isAdmin ? "Salvar" : nonAdminUpdatesBlocked ? "Bloqueado pelo ADM" : "Enviar p/ Aprovacao"}
-          </Button>
-        </div>
-
+        {noticesSection}
 
         {missingCodes.length > 0 && <p className="text-xs text-warning">Codigos nao encontrados: {missingCodes.join(", ")}</p>}
       </div>
@@ -847,6 +846,7 @@ const LotericaDetail = () => {
                   </h2>
                   <ConsultaTab
                     form={rowForm}
+                    saveButton={saveButton}
                     setForm={(nextForm) => {
                       setFormsByCode((prev) => ({ ...prev, [rowCode]: nextForm }));
                     }}
@@ -860,6 +860,7 @@ const LotericaDetail = () => {
             {lotericaTab === "consulta" && (
               <ConsultaTab
                 form={activeForm}
+                saveButton={saveButton}
                 setForm={(nextForm) => {
                   if (!activeCode) return;
                   setFormsByCode((prev) => ({ ...prev, [activeCode]: nextForm }));

@@ -18,6 +18,7 @@ import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import LotericaNoticesCard, { type LotericaNoticeView } from "@/components/loterica/LotericaNoticesCard";
+import RouterConfigCard from "@/components/loterica/RouterConfigCard";
 import { notifyJirayabBatch } from "@/lib/jirayabNotify";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -810,7 +811,14 @@ const LotericaDetail = () => {
             )}
         </div>
 
-        {noticesSection}
+        {hasLoadedRows && !isBulkMode && activeCode ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 items-stretch">
+            {noticesSection}
+            <RouterConfigCard codUl={activeCode} nome={activeForm?.nome_loterica} />
+          </div>
+        ) : (
+          noticesSection
+        )}
 
         {missingCodes.length > 0 && <p className="text-xs text-warning">Codigos nao encontrados: {missingCodes.join(", ")}</p>}
       </div>

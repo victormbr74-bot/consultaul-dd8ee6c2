@@ -13,6 +13,7 @@ import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import HeaderConsultaSearch from "@/components/HeaderConsultaSearch";
 import PendingChangeRequestsAlert from "@/components/PendingChangeRequestsAlert";
 import UserRequestsStatusAlert from "@/components/UserRequestsStatusAlert";
+import RouterConfigReminderAlert from "@/components/RouterConfigReminderAlert";
 import { supabaseConfigError } from "@/integrations/supabase/client";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";

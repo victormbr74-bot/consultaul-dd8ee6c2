@@ -39,6 +39,7 @@ import Backup4G from "@/pages/alarmes/Backup4G";
 import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
+import RouterConfigsReport from "./pages/RouterConfigsReport";
 
 
 const queryClient = new QueryClient();

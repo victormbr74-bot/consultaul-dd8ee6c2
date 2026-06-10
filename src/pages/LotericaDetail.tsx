@@ -18,6 +18,7 @@ import PingaoTab from "@/components/loterica/PingaoTab";
 import PingaoNatTab from "@/components/loterica/PingaoNatTab";
 import ScriptRouterSctTab from "@/components/loterica/ScriptRouterSctTab";
 import LotericaNoticesCard, { type LotericaNoticeView } from "@/components/loterica/LotericaNoticesCard";
+import RouterConfigCard from "@/components/loterica/RouterConfigCard";
 import { notifyJirayabBatch } from "@/lib/jirayabNotify";
 import type { Tables } from "@/integrations/supabase/types";
 

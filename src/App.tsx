@@ -136,6 +136,7 @@ const App = () => (
                   <Route path="/admin/dados" element={<AdminPanel section="data" />} />
                   <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
                   <Route path="/admin/import-nat" element={<ImportNatIps />} />
+                  <Route path="/relatorio-roteador" element={<RouterConfigsReport />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

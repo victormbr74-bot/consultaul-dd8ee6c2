@@ -543,7 +543,7 @@ const PingaoTab = () => {
         const rows = await fetchLookupRows(lookupTerms, { fields });
         const matches = resolveMatches(lookupTerms, rows, { fields });
 
-        lookupSummary = matches.flatMap((match) => {
+        lookupSummary = matches.flatMap((match): LookupSummaryItem[] => {
           if (!match.row) {
             return [{
               query: match.query,

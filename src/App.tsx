@@ -22,6 +22,7 @@ import ConsultaMac from "./pages/ConsultaMac";
 import Ping99 from "./pages/Ping99";
 import Pingao from "./pages/Pingao";
 import PingaoNat from "./pages/PingaoNat";
+import PingaoRota from "./pages/PingaoRota";
 import TextCompare from "./pages/TextCompare";
 import Validacao from "./pages/Validacao";
 import LotericaDetail from "./pages/LotericaDetail";
@@ -119,6 +120,7 @@ const App = () => (
                   <Route path="/ping99" element={<Ping99 />} />
                   <Route path="/pingao" element={<Pingao />} />
                   <Route path="/pingao-nat" element={<PingaoNat />} />
+                  <Route path="/pingao-rota" element={<PingaoRota />} />
                   <Route path="/validacao" element={<Validacao />} />
                   <Route path="/comparar-texto" element={<TextCompare />} />
                   <Route path="/loterica/cadastrar" element={<LotericaCreate />} />

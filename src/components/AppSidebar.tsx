@@ -280,6 +280,15 @@ export function AppSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
+                  <NavLink to="/pingao-rota" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <Activity className="mr-2 h-4 w-4" />
+                    <span>Pingao Rota</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
                   <NavLink to="/comparar-texto" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <FileText className="mr-2 h-4 w-4" />
                     <span>Comparar Texto</span>

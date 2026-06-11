@@ -183,13 +183,18 @@ const PingaoRotaTab = () => {
     // Try to match each target IP in the pasted text
     for (const target of validTargets) {
       const escaped = target.ip.replace(/\./g, "\\.");
-      // Capture line containing IP/32; uptime is the last comma-separated token
-      const regex = new RegExp(`(^|\\n)([^\\n]*\\b${escaped}/32\\b[^\\n]*)`, "i");
-      const match = pasted.match(regex);
       const key = `${target.ip}|${target.link}`;
       seen.add(key);
 
-      if (!match) {
+      // Find ALL lines containing IP/32 and pick the route line (has "via"),
+      // ignoring command-echo lines like "...#sh ip route | inc   10.x.x.x/32"
+      const lineRegex = new RegExp(`^[^\\n]*\\b${escaped}/32\\b[^\\n]*$`, "gim");
+      const candidates = pasted.match(lineRegex) ?? [];
+      const routeLine = candidates
+        .map((l) => l.trim())
+        .find((l) => /\bvia\b/i.test(l) && !/#\s*sh\s+ip\s+route/i.test(l) && !/\|/.test(l));
+
+      if (!routeLine) {
         results.push({
           ip: target.ip,
           codUl: target.codUl,
@@ -202,9 +207,8 @@ const PingaoRotaTab = () => {
         continue;
       }
 
-      const line = match[2].trim();
-      // last whitespace/comma separated token
-      const tokens = line.split(/[\s,]+/).filter(Boolean);
+      // last whitespace/comma separated token of the route line
+      const tokens = routeLine.split(/[\s,]+/).filter(Boolean);
       const last = tokens[tokens.length - 1] ?? "";
       const parsed = parseRouteUptime(last);
 

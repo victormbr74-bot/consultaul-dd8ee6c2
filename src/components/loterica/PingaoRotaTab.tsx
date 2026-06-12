@@ -446,6 +446,23 @@ const PingaoRotaTab = () => {
           </div>
 
           {analysisRows.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={showOnlyAbove24h}
+                  onChange={(e) => setShowOnlyAbove24h(e.target.checked)}
+                />
+                <span className="font-medium">Mostrar somente rotas acima de 24h</span>
+              </label>
+              <span className="text-muted-foreground">
+                Acima de 24h: <strong className="text-foreground">{above24hCount}</strong> de {analysisRows.length}
+              </span>
+            </div>
+          )}
+
+          {analysisRows.length > 0 && (
             <div className="rounded-lg border overflow-auto max-h-[360px]">
               <table className="w-full text-xs">
                 <thead className="bg-muted/60 sticky top-0">
@@ -460,21 +477,35 @@ const PingaoRotaTab = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {analysisRows.map((r, idx) => (
-                    <tr key={`${r.ip}-${r.link}-${idx}`} className="border-t">
-                      <td className="p-2 font-mono">{r.codUl}</td>
-                      <td className="p-2">{r.nome}</td>
-                      <td className="p-2 capitalize">{r.link}</td>
-                      <td className="p-2 font-mono">{r.ip}</td>
-                      <td className="p-2 font-mono">{r.tempoRota}</td>
-                      <td className="p-2 font-mono">{r.dataRota}</td>
-                      <td className="p-2">
-                        <Badge variant="outline" className={cn("font-semibold", statusBadge(r.status))}>
-                          {r.status}
-                        </Badge>
+                  {displayedRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-4 text-center text-muted-foreground">
+                        Nenhuma rota acima de 24h.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    displayedRows.map((r, idx) => (
+                      <tr
+                        key={`${r.ip}-${r.link}-${idx}`}
+                        className={cn(
+                          "border-t",
+                          r.totalSeconds >= 86400 && r.status === "OK" && "bg-red-500/5",
+                        )}
+                      >
+                        <td className="p-2 font-mono">{r.codUl}</td>
+                        <td className="p-2">{r.nome}</td>
+                        <td className="p-2 capitalize">{r.link}</td>
+                        <td className="p-2 font-mono">{r.ip}</td>
+                        <td className="p-2 font-mono">{r.tempoRota}</td>
+                        <td className="p-2 font-mono">{r.dataRota}</td>
+                        <td className="p-2">
+                          <Badge variant="outline" className={cn("font-semibold", statusBadge(r.status))}>
+                            {r.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

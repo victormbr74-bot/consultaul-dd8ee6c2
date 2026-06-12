@@ -39,54 +39,36 @@ Deno.serve(async (req) => {
 
     let processed = 0;
     let updated = 0;
-    let errors = 0;
-    const BATCH = 400;
+    const errors: string[] = [];
+    const BATCH = 500;
 
     for (let i = 0; i < entries.length; i += BATCH) {
       const slice = entries.slice(i, i + BATCH);
-      const values = slice
-        .map(([cod, r]) => {
-          const esc = (v: string | null) =>
-            v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`;
-          return `(${esc(cod)},${esc(r.ccto_oi)},${esc(r.loopback_wan)},${esc(r.modelo)},${esc(r.ip99)},${esc(r.ipsw)})`;
-        })
-        .join(",");
+      const payload = slice.map(([cod_ul, r]) => ({
+        cod_ul,
+        ccto_oi: r.ccto_oi,
+        loopback_wan: r.loopback_wan,
+        modelo: r.modelo,
+        ip99: r.ip99,
+        ipsw: r.ipsw,
+      }));
 
-      const sql = `
-        UPDATE public.lotericas l SET
-          ccto_oi = COALESCE(t.ccto_oi, l.ccto_oi),
-          loopback_wan = COALESCE(t.loopback_wan, l.loopback_wan),
-          raw_data = l.raw_data
-            || jsonb_build_object('MODELO ROTEADOR',
-                CASE
-                  WHEN t.modelo IS NULL THEN l.raw_data->>'MODELO ROTEADOR'
-                  WHEN (l.raw_data->>'MODELO ROTEADOR') ILIKE '%/ SCT %'
-                    THEN t.modelo || ' / SCT ' || split_part(l.raw_data->>'MODELO ROTEADOR',' / SCT ',2)
-                  ELSE t.modelo
-                END)
-            || jsonb_build_object('REDE LAN', COALESCE(t.ip99, l.raw_data->>'REDE LAN'))
-            || jsonb_build_object('IP SWITCH', COALESCE(t.ipsw, l.raw_data->>'IP SWITCH')),
-          updated_at = now()
-        FROM (VALUES ${values}) AS t(cod_ul, ccto_oi, loopback_wan, modelo, ip99, ipsw)
-        WHERE l.cod_ul = t.cod_ul
-        RETURNING l.cod_ul;
-      `;
+      const { data: affected, error } = await supabase.rpc("apply_principal_updates", {
+        payload,
+      });
 
-      const { data: rows, error } = await supabase.rpc("exec_sql_returning", { p_sql: sql });
       if (error) {
-        // Fallback: try via direct query through PostgREST is not available;
-        // Use a per-row upsert as last resort
-        console.error("rpc error", error);
-        errors += slice.length;
+        errors.push(`batch ${i}: ${error.message}`);
       } else {
-        updated += Array.isArray(rows) ? rows.length : 0;
+        updated += Number(affected ?? 0);
       }
       processed += slice.length;
     }
 
-    return new Response(JSON.stringify({ processed, updated, errors, total: entries.length }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ processed, updated, errorsCount: errors.length, errors: errors.slice(0, 5) }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: String((e as Error)?.message || e) }), {
       status: 500,

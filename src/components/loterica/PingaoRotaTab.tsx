@@ -40,6 +40,7 @@ interface AnalyzedRotaRow {
   link: string;
   tempoRota: string;
   dataRota: string;
+  totalSeconds: number;
   status: "OK" | "SEM ROTA" | "NAO RECONHECIDO";
 }
 

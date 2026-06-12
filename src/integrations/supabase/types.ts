@@ -1065,6 +1065,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_principal_updates: { Args: { payload: Json }; Returns: number }
       can_manage_app_data: { Args: { _user_id: string }; Returns: boolean }
       can_manage_app_settings: { Args: never; Returns: boolean }
       has_role: {

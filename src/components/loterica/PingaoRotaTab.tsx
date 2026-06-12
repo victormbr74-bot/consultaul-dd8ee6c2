@@ -65,6 +65,7 @@ const PingaoRotaTab = () => {
 
   const [pasted, setPasted] = useState("");
   const [analysisRows, setAnalysisRows] = useState<AnalyzedRotaRow[]>([]);
+  const [showOnlyAbove24h, setShowOnlyAbove24h] = useState(false);
 
   const validTargets = useMemo(() => targets.filter((t) => t.status === "ok" && t.ip), [targets]);
 

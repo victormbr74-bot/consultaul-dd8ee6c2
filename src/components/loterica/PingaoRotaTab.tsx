@@ -245,10 +245,21 @@ const PingaoRotaTab = () => {
     setAnalysisRows(results);
   };
 
+  const displayedRows = useMemo(
+    () => (showOnlyAbove24h ? analysisRows.filter((r) => r.totalSeconds >= 86400) : analysisRows),
+    [analysisRows, showOnlyAbove24h],
+  );
+
+  const above24hCount = useMemo(
+    () => analysisRows.filter((r) => r.totalSeconds >= 86400).length,
+    [analysisRows],
+  );
+
   const exportXlsx = async () => {
-    if (!analysisRows.length) return;
+    const source = showOnlyAbove24h ? displayedRows : analysisRows;
+    if (!source.length) return;
     try {
-      const data = analysisRows.map((r) => ({
+      const data = source.map((r) => ({
         "Codigo UL": r.codUl,
         Nome: r.nome,
         IP: r.ip,
@@ -258,7 +269,7 @@ const PingaoRotaTab = () => {
         Status: r.status,
       }));
       const wb = jsonToWorkbook([{ name: "Pingao Rota", data }]);
-      await writeFile(wb, "pingao_rota.xlsx");
+      await writeFile(wb, showOnlyAbove24h ? "pingao_rota_acima_24h.xlsx" : "pingao_rota.xlsx");
     } catch (err) {
       alert("Falha ao exportar: " + String((err as Error)?.message || err));
     }

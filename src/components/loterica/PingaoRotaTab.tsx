@@ -204,6 +204,7 @@ const PingaoRotaTab = () => {
           link: target.link,
           tempoRota: "-",
           dataRota: "-",
+          totalSeconds: 0,
           status: "SEM ROTA",
         });
         continue;
@@ -222,6 +223,7 @@ const PingaoRotaTab = () => {
           link: target.link,
           tempoRota: last || "-",
           dataRota: "-",
+          totalSeconds: 0,
           status: "NAO RECONHECIDO",
         });
         continue;
@@ -235,6 +237,7 @@ const PingaoRotaTab = () => {
         link: target.link,
         tempoRota: parsed.raw,
         dataRota: formatDateTime(installed),
+        totalSeconds: parsed.totalSeconds,
         status: "OK",
       });
     }

@@ -70,6 +70,32 @@ function asText(value: unknown): string | null {
   return text === "" ? null : text;
 }
 
+function textIncludes(value: unknown, needle: string) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes(needle.toUpperCase());
+}
+
+function normalizeLotericaRawData(row: Record<string, unknown>) {
+  const raw = { ...row };
+  const simCard = asText(pick(raw, ["SIM CARD 4G"]));
+  const operadora = asText(pick(raw, ["OPERADORA 4G", "operadora", "Operadora", "RESP BACKUP"]));
+  if (!simCard || (!textIncludes(simCard, "BRISANET") && !textIncludes(operadora, "BRISANET"))) return raw;
+
+  const currentBackup = asText(pick(raw, ["CIRCUITO BACKUP"]));
+  raw["CIRCUITO BACKUP"] = currentBackup || simCard;
+
+  for (const key of Object.keys(raw)) {
+    if (normalizeHeaderKey(key) === normalizeHeaderKey("SIM CARD 4G")) {
+      raw[key] = "";
+    }
+  }
+
+  return raw;
+}
+
 function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -100,9 +126,10 @@ function asIsoDate(value: unknown): string | null {
 }
 
 function toLoterica(row: Record<string, unknown>, userId: string) {
+  const rawData = normalizeLotericaRawData(row);
   const codUl =
     asText(
-      pick(row, [
+      pick(rawData, [
         "cod_ul",
         "CODIGO DA LOTERICA_",
         "Codigo da Loterica_",
@@ -114,22 +141,22 @@ function toLoterica(row: Record<string, unknown>, userId: string) {
 
   return {
     cod_ul: codUl,
-    nome_loterica: asText(pick(row, ["NOME UL", "nome_loterica", "Nome Loterica"])),
-    ccto_oi: asText(pick(row, ["CCTO OI", "ccto_oi"])),
-    ccto_oemp: asText(pick(row, ["CCTO OEMP", "ccto_oemp"])),
-    operadora: asText(pick(row, ["OPERADORA 4G", "operadora", "Operadora"])),
-    ip_nat: asText(pick(row, ["IP NAT", "ip_nat"])),
-    ip_wan: asText(pick(row, ["IP WAN", "ip_wan"])),
-    loopback_wan: asText(pick(row, ["LOOPBACK PRINCIPAL", "loopback_wan", "Loopback Principal"])),
+    nome_loterica: asText(pick(rawData, ["NOME UL", "nome_loterica", "Nome Loterica"])),
+    ccto_oi: asText(pick(rawData, ["CCTO OI", "ccto_oi"])),
+    ccto_oemp: asText(pick(rawData, ["CCTO OEMP", "ccto_oemp"])),
+    operadora: asText(pick(rawData, ["OPERADORA 4G", "operadora", "Operadora"])),
+    ip_nat: asText(pick(rawData, ["IP NAT", "ip_nat"])),
+    ip_wan: asText(pick(rawData, ["IP WAN", "ip_wan"])),
+    loopback_wan: asText(pick(rawData, ["LOOPBACK PRINCIPAL", "loopback_wan", "Loopback Principal"])),
     // BUGFIX mantido: mapear loopback secundario da coluna correta, nao REDE LAN.
-    loopback_lan: asText(pick(row, ["LOOPBACK SECUNDARIO", "loopback_lan", "Loopback Secundario"])),
-    endereco: asText(pick(row, ["ENDERECO", "endereco", "Endereco"])),
-    contato: asText(pick(row, ["CONTATO", "contato", "Contato"])),
-    status: asText(pick(row, ["STATUS UL", "status", "Status"])),
-    cidade: asText(pick(row, ["MUNICIPIO", "cidade", "Cidade"])),
-    uf: asText(pick(row, ["UF", "uf"])),
-    designacao_nova: asText(pick(row, ["DESIGINACAO NOVA", "DESIGNACAO NOVA", "designacao_nova", "Designacao Nova"])),
-    raw_data: row,
+    loopback_lan: asText(pick(rawData, ["LOOPBACK SECUNDARIO", "loopback_lan", "Loopback Secundario"])),
+    endereco: asText(pick(rawData, ["ENDERECO", "endereco", "Endereco"])),
+    contato: asText(pick(rawData, ["CONTATO", "contato", "Contato"])),
+    status: asText(pick(rawData, ["STATUS UL", "status", "Status"])),
+    cidade: asText(pick(rawData, ["MUNICIPIO", "cidade", "Cidade"])),
+    uf: asText(pick(rawData, ["UF", "uf"])),
+    designacao_nova: asText(pick(rawData, ["DESIGINACAO NOVA", "DESIGNACAO NOVA", "designacao_nova", "Designacao Nova"])),
+    raw_data: rawData,
     updated_at: new Date().toISOString(),
     updated_by: userId,
   };

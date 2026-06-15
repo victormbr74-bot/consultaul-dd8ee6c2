@@ -14,6 +14,7 @@ describe("lotericaMassUpdate", () => {
         "CODIGO UL": "21-000111-1",
         "CCTO OEM": "OEMP-123456",
         "Empresa OEMP": "CLARO",
+        "Circuito Backup": "BRISANET-123",
       },
       {
         "CODIGO UL": "",
@@ -37,6 +38,7 @@ describe("lotericaMassUpdate", () => {
       },
       rawPatch: {
         "EMPRESA OEMP": "CLARO",
+        "CIRCUITO BACKUP": "BRISANET-123",
       },
     });
     expect(result.entries[0].rowNumbers).toEqual([2, 3]);
@@ -48,6 +50,7 @@ describe("lotericaMassUpdate", () => {
         COD_UL: "21-000111-1",
         "CCTO OI": "219123456789",
         "Empresa OEMP": "CLARO",
+        "CIRCUITO BACKUP": "BRISANET-123",
       },
     ]).entries[0];
 
@@ -58,6 +61,7 @@ describe("lotericaMassUpdate", () => {
         raw_data: {
           "EMPRESA OEMP": "OI",
           "CIRCUITO OEMP": "MANTER",
+          "CIRCUITO BACKUP": "",
         },
       },
       entry,
@@ -68,6 +72,7 @@ describe("lotericaMassUpdate", () => {
       raw_data: {
         "EMPRESA OEMP": "CLARO",
         "CIRCUITO OEMP": "MANTER",
+        "CIRCUITO BACKUP": "BRISANET-123",
       },
     });
     expect(beforeChanges).toEqual({
@@ -75,6 +80,7 @@ describe("lotericaMassUpdate", () => {
       raw_data: {
         "EMPRESA OEMP": "OI",
         "CIRCUITO OEMP": "MANTER",
+        "CIRCUITO BACKUP": "",
       },
     });
   });

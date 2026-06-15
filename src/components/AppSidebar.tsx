@@ -17,6 +17,7 @@ import {
   Database,
   ListChecks,
   Activity,
+  BookOpen,
   PlusCircle,
   Wrench,
 } from "lucide-react";
@@ -300,6 +301,15 @@ export function AppSidebar() {
                   <NavLink to="/relatorio-roteador" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Wrench className="mr-2 h-4 w-4" />
                     <span>Config. Roteador</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/base-conhecimento" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    <span>Base Conhecimento</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

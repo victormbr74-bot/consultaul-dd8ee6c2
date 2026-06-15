@@ -62,6 +62,7 @@ interface ConsultaMassaRow {
   cctoOemp: string;
   operadora: string;
   tecnologia: string;
+  circuitoBackup: string;
   ipPrimario: string;
   ipSecundario: string;
   matchedBy: string;
@@ -330,6 +331,11 @@ const FIELD_SECTIONS: FieldSection[] = [
         fallback: (row) => row.operadora,
       },
       {
+        label: "Circuito Backup",
+        mono: true,
+        aliases: ["CIRCUITO BACKUP"],
+      },
+      {
         label: "SIM Card 4G",
         mono: true,
         aliases: ["SIM CARD 4G"],
@@ -405,6 +411,7 @@ const buildConsultaMassaExportRows = (rows: ConsultaMassaRow[]) =>
     "Loopback Primario": row.loopbackWan,
     "Loopback Secundario": row.loopbackLan,
     Tecnologia: row.tecnologia,
+    "Circuito Backup": row.circuitoBackup,
     Operadora: row.operadora,
     Consulta: row.query,
     Status: row.statusText,
@@ -507,6 +514,7 @@ const ConsultaMassaTab = () => {
         cctoOemp: "-",
         operadora: "-",
         tecnologia: "-",
+        circuitoBackup: "-",
         ipPrimario: "",
         ipSecundario: "",
         matchedBy: "-",
@@ -541,6 +549,7 @@ const ConsultaMassaTab = () => {
         cctoOemp: normalizeText(row.ccto_oemp) || "-",
         operadora: normalizeText(row.operadora) || "-",
         tecnologia: getByAliases(rawLookup, ["TECNOLOGIA"]) || "-",
+        circuitoBackup: getByAliases(rawLookup, ["CIRCUITO BACKUP"]) || "-",
         ipPrimario,
         ipSecundario,
         matchedBy: primary.matchedBy !== "-" ? primary.matchedBy : secondary.matchedBy,
@@ -897,6 +906,7 @@ const ConsultaMassaTab = () => {
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Primario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Loopback Secundario</th>
                     <th className="p-2 font-medium whitespace-nowrap">Tecnologia</th>
+                    <th className="p-2 font-medium whitespace-nowrap">Circuito Backup</th>
                     <th className="p-2 font-medium whitespace-nowrap">Operadora</th>
                     <th className="p-2 font-medium whitespace-nowrap">Endereco</th>
                     <th className="p-2 font-medium whitespace-nowrap">Contato</th>
@@ -954,6 +964,7 @@ const ConsultaMassaTab = () => {
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackWan}</td>
                         <td className="p-2 font-mono whitespace-nowrap">{row.loopbackLan}</td>
                         <td className="p-2 whitespace-normal break-words">{row.tecnologia}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.circuitoBackup}</td>
                         <td className="p-2 whitespace-normal break-words">{row.operadora}</td>
                         <td className="p-2 min-w-[280px] whitespace-normal break-words">{row.endereco}</td>
                         <td className="p-2 min-w-[220px] whitespace-normal break-words">{row.contato}</td>

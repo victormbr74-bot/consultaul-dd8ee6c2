@@ -183,6 +183,12 @@ const MASS_UPDATE_FIELDS: MassUpdateFieldSpec[] = [
   },
   {
     kind: "raw",
+    rawKey: "CIRCUITO BACKUP",
+    label: "Circuito Backup",
+    aliases: ["CIRCUITO BACKUP", "BACKUP BRISANET", "BRISANET"],
+  },
+  {
+    kind: "raw",
     rawKey: "TECNOLOGIA",
     label: "Tecnologia",
     aliases: ["TECNOLOGIA"],
@@ -406,6 +412,7 @@ export const createMassUpdateTemplateWorkbook = () => {
     { header: "CCTO OEMP", key: "ccto_oemp", width: 20, style: { numFmt: "@" } },
     { header: "EMPRESA OEMP", key: "empresa_oemp", width: 20, style: { numFmt: "@" } },
     { header: "CIRCUITO OEMP", key: "circuito_oemp", width: 24, style: { numFmt: "@" } },
+    { header: "CIRCUITO BACKUP", key: "circuito_backup", width: 24, style: { numFmt: "@" } },
     { header: "OPERADORA", key: "operadora", width: 18, style: { numFmt: "@" } },
     { header: "ENDERECO", key: "endereco", width: 36, style: { numFmt: "@" } },
     { header: "CONTATO", key: "contato", width: 26, style: { numFmt: "@" } },
@@ -420,6 +427,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       ccto_oemp: "",
       empresa_oemp: "",
       circuito_oemp: "",
+      circuito_backup: "",
       operadora: "",
       endereco: "",
       contato: "",
@@ -432,6 +440,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       ccto_oemp: "OEMP-123456",
       empresa_oemp: "CLARO",
       circuito_oemp: "CLARO-123456",
+      circuito_backup: "",
       operadora: "VIVO",
       endereco: "",
       contato: "",
@@ -444,6 +453,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       ccto_oemp: "",
       empresa_oemp: "",
       circuito_oemp: "",
+      circuito_backup: "BRISANET-123456",
       operadora: "",
       endereco: "Rua Exemplo, 123 - Centro",
       contato: "(11) 99999-9999 / Maria",
@@ -478,7 +488,7 @@ export const createMassUpdateTemplateWorkbook = () => {
     { item: "Colunas vazias", descricao: "Sao ignoradas. Preencha somente o que precisa atualizar." },
     { item: "Duplicidade", descricao: "Se o mesmo COD_UL aparecer em mais de uma linha, o ultimo valor preenchido prevalece." },
     { item: "Campos comuns", descricao: "Use CCTO OI, LOOPBACK PRINCIPAL, LOOPBACK SECUNDARIO e CCTO OEMP para atualizacoes de circuito." },
-    { item: "Campos extras", descricao: "Tambem sao aceitos EMPRESA OEMP, CIRCUITO OEMP, OPERADORA, ENDERECO, CONTATO, STATUS, CIDADE, UF e TECNOLOGIA." },
+    { item: "Campos extras", descricao: "Tambem sao aceitos EMPRESA OEMP, CIRCUITO OEMP, CIRCUITO BACKUP, OPERADORA, ENDERECO, CONTATO, STATUS, CIDADE, UF e TECNOLOGIA." },
   ]);
 
   instructions.getRow(1).eachCell((cell) => {

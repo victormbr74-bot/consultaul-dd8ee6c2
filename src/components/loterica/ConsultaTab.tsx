@@ -45,6 +45,7 @@ const EXTRA_FIELDS: Array<{ label: string; keys: string[]; mono?: boolean }> = [
   { label: "Per\u00EDmetro", keys: ["PERIMETRO", "PER\u00CDMETRO"] },
   { label: "Tecnologia", keys: ["TECNOLOGIA"] },
   { label: "Modelo Roteador", keys: ["MODELO ROTEADOR"] },
+  { label: "Circuito Backup", keys: ["CIRCUITO BACKUP"], mono: true },
   { label: "SIM Card 4G", keys: ["SIM CARD 4G"], mono: true },
   { label: "Owner", keys: ["OWNER"] },
   { label: "Resp. Backup", keys: ["RESP BACKUP"] },

@@ -41,6 +41,7 @@ import BackupSencinet from "@/pages/alarmes/BackupSencinet";
 import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
 import RouterConfigsReport from "./pages/RouterConfigsReport";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 
 const queryClient = new QueryClient();
@@ -139,6 +140,7 @@ const App = () => (
                   <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
                   <Route path="/admin/import-nat" element={<ImportNatIps />} />
                   <Route path="/relatorio-roteador" element={<RouterConfigsReport />} />
+                  <Route path="/base-conhecimento" element={<KnowledgeBase />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

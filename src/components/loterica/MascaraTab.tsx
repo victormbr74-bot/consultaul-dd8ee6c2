@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { KnowledgeBaseReferenceDialog } from "@/components/KnowledgeBaseReferenceDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { normalizeKnowledgeText, type KnowledgeBaseRow } from "@/lib/knowledgeBase";
 import { copyRichTextToClipboard } from "@/lib/richClipboard";
 import { buildEmailDraftUrl } from "@/lib/validacaoEmail";
 import { isOutlookDraftConfigured, openOutlookHtmlDraft } from "@/lib/outlookDraft";
@@ -37,6 +39,8 @@ type MascaraForm = {
 interface MascaraTabProps {
   form: MascaraForm;
 }
+
+type GuideScope = "principal" | "backup";
 
 const DEFEITOS_OEMP: Defeito[] = [
   { value: "TROCA DE SWITCH", desc: "FAVOR REALIZAR A TROCA DO SWITCH NA UNIDADE" },
@@ -149,10 +153,37 @@ const containsAny = (value: string, terms: string[]) => {
   return terms.some((term) => normalized.includes(term));
 };
 
+const extractProcedureLines = (content: string) => {
+  const lines = content.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => normalizeKnowledgeText(line).startsWith("procedimento"));
+  const relevant = startIndex >= 0 ? lines.slice(startIndex + 1) : lines;
+  return relevant
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^(resumo|contexto|operadora|tipo|gatilhos):/i.test(line));
+};
+
+const scoreKnowledgeRow = (row: KnowledgeBaseRow, requiredTerms: string[], preferredTerms: string[]) => {
+  const haystack = normalizeKnowledgeText([row.title, row.category, row.summary, row.content, ...(row.tags || [])].join(" "));
+  const requiredScore = requiredTerms.reduce((score, term) => {
+    if (!term) return score;
+    return haystack.includes(normalizeKnowledgeText(term)) ? score + 6 : score;
+  }, 0);
+  const preferredScore = preferredTerms.reduce((score, term) => {
+    if (!term) return score;
+    return haystack.includes(normalizeKnowledgeText(term)) ? score + 2 : score;
+  }, 0);
+  return requiredScore + preferredScore;
+};
+
 const MascaraTab = ({ form }: MascaraTabProps) => {
   const [copied, setCopied] = useState<string | null>(null);
   const [activeMask, setActiveMask] = useState("oemp");
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [guideScope, setGuideScope] = useState<GuideScope>("principal");
+  const [knowledgeRows, setKnowledgeRows] = useState<KnowledgeBaseRow[]>([]);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+  const [knowledgeLoadError, setKnowledgeLoadError] = useState("");
 
   const [defeitoOemp, setDefeitoOemp] = useState("");
   const [defeitoAtiva, setDefeitoAtiva] = useState("");
@@ -559,16 +590,36 @@ Contato de Autorizacao: ${contatoEnc}`;
     enc: "Encerramento",
   };
 
-  const knowledgeKeywords = [
-    "mascara",
-    maskLabelByValue[activeMask],
-    activeMask === "enc" ? "encerramento" : "abertura",
-    operadora,
-    circuitoOemp,
-    designacaoOi,
-    defeitoOemp,
-    defeitoAtiva,
-  ].filter(Boolean);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadKnowledgeRows = async () => {
+      setKnowledgeLoading(true);
+      setKnowledgeLoadError("");
+      const { data, error } = await (supabase as any)
+        .from("knowledge_base")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1000);
+
+      if (cancelled) return;
+
+      setKnowledgeLoading(false);
+      if (error) {
+        setKnowledgeRows([]);
+        setKnowledgeLoadError("Base de conhecimento nao encontrada ou nao carregada.");
+        return;
+      }
+
+      setKnowledgeRows((data as KnowledgeBaseRow[]) || []);
+    };
+
+    void loadKnowledgeRows();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const aberturaSignal = [empresaOemp, circuitoOemp, circuitoBackup, simCard, operadora4g, respBackup, vsat, modeloRoteador].join(" ");
   const hasOemp = hasMeaningfulValue(circuitoOemp) && normalizeSignal(circuitoOemp) !== "NAO OEMP";
@@ -576,12 +627,28 @@ Contato de Autorizacao: ${contatoEnc}`;
   const has4g = hasMeaningfulValue(simCard) || containsAny(aberturaSignal, ["4G", "SIM CARD", "LTE", "VIVO", "TIM", "ARQIA", "CLARO", "BRISANET"]);
   const backupType = hasVsat ? "VSAT" : has4g ? "4G" : "Backup";
 
-  const aberturaGuides = [
+  const knowledgeKeywords = [
+    "mascara",
+    maskLabelByValue[activeMask],
+    activeMask === "enc" ? "encerramento" : "abertura",
+    guideScope,
+    guideScope === "principal" ? "principal oemp" : `backup ${backupType}`,
+    operadora,
+    operadora4g,
+    circuitoOemp,
+    circuitoBackup,
+    designacaoOi,
+    defeitoOemp,
+    defeitoAtiva,
+  ].filter(Boolean);
+
+  const fallbackGuides = [
     {
       enabled: hasOemp,
+      scope: "principal" as const,
       title: "Principal / OEMP",
       icon: Route,
-      badge: empresaOemp || "Empresa OEMP",
+      badge: empresaOemp || operadora || "Empresa OEMP",
       reference: circuitoOemp,
       steps: [
         "Confirme Empresa OEMP, CCTO OEMP, contato local e endereco.",
@@ -592,6 +659,7 @@ Contato de Autorizacao: ${contatoEnc}`;
     },
     {
       enabled: hasVsat,
+      scope: "backup" as const,
       title: "Backup VSAT",
       icon: Satellite,
       badge: respBackup || "VSAT",
@@ -605,6 +673,7 @@ Contato de Autorizacao: ${contatoEnc}`;
     },
     {
       enabled: has4g,
+      scope: "backup" as const,
       title: "Backup 4G",
       icon: RadioTower,
       badge: operadora4g || "Operadora 4G",
@@ -618,11 +687,13 @@ Contato de Autorizacao: ${contatoEnc}`;
     },
   ].filter((guide) => guide.enabled);
 
-  const activeGuides = aberturaGuides.length
-    ? aberturaGuides
-    : [
+  const fallbackGuide =
+    fallbackGuides.find((guide) => guide.scope === guideScope) ||
+    fallbackGuides[0] ||
+    ([
         {
           enabled: true,
+          scope: guideScope,
           title: "Orientacao geral",
           icon: BookOpen,
           badge: "Sem backup identificado",
@@ -634,14 +705,91 @@ Contato de Autorizacao: ${contatoEnc}`;
             "Registre o protocolo da operadora no acompanhamento.",
           ],
         },
-      ];
+      ][0]);
 
-  const AberturaGuidePanel = () => (
+  const selectedKnowledgeGuide = useMemo(() => {
+    if (!knowledgeRows.length) return null;
+
+    const requiredTerms =
+      guideScope === "principal"
+        ? ["principal", "oemp", empresaOemp, operadora].filter(Boolean)
+        : ["backup", backupType, operadora4g, respBackup].filter(Boolean);
+
+    const preferredTerms =
+      guideScope === "principal"
+        ? ["mascara", "abertura", "chamado", circuitoOemp, designacaoOi].filter(Boolean)
+        : ["mascara", "abertura", "chamado", circuitoBackup, simCard, "operadora 4g"].filter(Boolean);
+
+    const ranked = knowledgeRows
+      .map((row) => ({ row, score: scoreKnowledgeRow(row, requiredTerms, preferredTerms) }))
+      .filter((item) => item.score >= 4)
+      .sort((a, b) => b.score - a.score || new Date(b.row.updated_at).getTime() - new Date(a.row.updated_at).getTime());
+
+    return ranked[0]?.row || null;
+  }, [
+    backupType,
+    circuitoBackup,
+    circuitoOemp,
+    designacaoOi,
+    empresaOemp,
+    guideScope,
+    knowledgeRows,
+    operadora,
+    operadora4g,
+    respBackup,
+    simCard,
+  ]);
+
+  const activeGuide = selectedKnowledgeGuide
+    ? {
+        title: selectedKnowledgeGuide.title,
+        icon: guideScope === "principal" ? Route : hasVsat ? Satellite : RadioTower,
+        badge:
+          guideScope === "principal"
+            ? empresaOemp || operadora || selectedKnowledgeGuide.category || "Principal"
+            : operadora4g || respBackup || selectedKnowledgeGuide.category || backupType,
+        reference:
+          guideScope === "principal"
+            ? circuitoOemp || designacaoOi
+            : circuitoBackup || simCard || vsat,
+        summary: selectedKnowledgeGuide.summary || "",
+        steps: extractProcedureLines(selectedKnowledgeGuide.content),
+        source: "base" as const,
+      }
+    : {
+        ...fallbackGuide,
+        summary: "",
+        source: "fallback" as const,
+      };
+
+  const AberturaGuidePanel = () => {
+    const Icon = activeGuide.icon;
+    return (
     <Card className="lg:sticky lg:top-4">
       <CardHeader className="space-y-2">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5" />
           <CardTitle className="text-base">Orientacao de abertura</CardTitle>
+        </div>
+        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted/40 p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={guideScope === "principal" ? "default" : "ghost"}
+            className="h-8"
+            onClick={() => setGuideScope("principal")}
+          >
+            Principal
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={guideScope === "backup" ? "default" : "ghost"}
+            className="h-8"
+            onClick={() => setGuideScope("backup")}
+          >
+            Backup
+          </Button>
         </div>
         <div className="flex flex-wrap gap-1">
           {empresaOemp ? <Badge variant="outline">OEMP: {empresaOemp}</Badge> : null}
@@ -651,40 +799,58 @@ Contato de Autorizacao: ${contatoEnc}`;
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-          Referencia detectada: {backupType}
-          {circuitoBackup ? ` / ${circuitoBackup}` : ""}
+          {guideScope === "principal"
+            ? `Referencia principal: ${circuitoOemp || designacaoOi || "-"}`
+            : `Referencia backup: ${backupType}${circuitoBackup ? ` / ${circuitoBackup}` : ""}`}
         </div>
 
-        {activeGuides.map((guide, guideIndex) => {
-          const Icon = guide.icon;
-          return (
-            <div key={guide.title} className="space-y-3">
-              {guideIndex > 0 ? <Separator /> : null}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">{guide.title}</h3>
-                </div>
-                <div className="grid gap-1 text-xs">
-                  <span className="text-muted-foreground">Responsavel/operadora</span>
-                  <span className="font-medium">{guide.badge}</span>
-                  <span className="text-muted-foreground">Referencia</span>
-                  <span className="font-mono text-[11px]">{guide.reference || "-"}</span>
-                </div>
-              </div>
-              <ol className="space-y-2">
-                {guide.steps.map((step, index) => (
-                  <li key={step} className="flex gap-2 text-xs leading-5">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                      {index + 1}
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
+        {knowledgeLoading ? (
+          <div className="text-xs text-muted-foreground">Carregando base de conhecimento...</div>
+        ) : null}
+
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">{activeGuide.title}</h3>
+              {activeGuide.source === "base" ? <Badge variant="secondary" className="text-[10px]">Base</Badge> : null}
             </div>
-          );
-        })}
+            {activeGuide.summary ? (
+              <p className="rounded-md bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">{activeGuide.summary}</p>
+            ) : null}
+            <div className="grid gap-1 text-xs">
+              <span className="text-muted-foreground">Responsavel/operadora</span>
+              <span className="font-medium">{activeGuide.badge}</span>
+              <span className="text-muted-foreground">Referencia</span>
+              <span className="font-mono text-[11px]">{activeGuide.reference || "-"}</span>
+              {knowledgeLoadError ? (
+                <span className="text-[11px] text-warning">{knowledgeLoadError}</span>
+              ) : null}
+              {activeGuide.source === "fallback" && !knowledgeLoading && !knowledgeLoadError ? (
+                <span className="text-[11px] text-muted-foreground">
+                  Nenhum procedimento correspondente encontrado na base.
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <Separator />
+          <ol className="space-y-2">
+            {activeGuide.steps.map((step, index) => (
+              <li key={`${step}-${index}`} className="flex gap-2 text-xs leading-5">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <span>{step.replace(/^\d+[\).\s-]+/, "")}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {guideScope === "backup" && !hasVsat && !has4g ? (
+          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+            Backup sem tecnologia identificada. Confira VSAT, SIM Card 4G, Circuito Backup e Operadora 4G na base da loterica.
+          </div>
+        ) : null}
 
         <Button variant="outline" size="sm" className="w-full" onClick={() => setKnowledgeOpen(true)}>
           <BookOpen className="h-4 w-4" />
@@ -692,7 +858,8 @@ Contato de Autorizacao: ${contatoEnc}`;
         </Button>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   return (
     <>

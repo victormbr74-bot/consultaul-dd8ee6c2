@@ -93,6 +93,32 @@ export function AppSidebar() {
     }
   }, [isLotericaRoute, navigate, setLotericaTab]);
 
+  const handleGlobalImport = useCallback(() => {
+    if (onImportClick) {
+      onImportClick();
+      return;
+    }
+
+    setLotericaTab("consulta");
+    navigate("/");
+    toast.info("Importacao disponivel na Consulta UL.", {
+      description: "Aguarde a tela carregar e clique em Importar novamente.",
+    });
+  }, [navigate, onImportClick, setLotericaTab]);
+
+  const handleGlobalExport = useCallback(() => {
+    if (onExport) {
+      onExport();
+      return;
+    }
+
+    setLotericaTab("consulta");
+    navigate("/");
+    toast.info("Exportacao disponivel na Consulta UL.", {
+      description: "Aguarde a tela carregar e clique em Exportar novamente.",
+    });
+  }, [navigate, onExport, setLotericaTab]);
+
   const warnNoConsulta = useCallback(() => {
     toast.warning("Nenhuma consulta carregada", {
       description: "Acesse o menu Consulta UL e realize uma consulta antes de utilizar esta opcao.",
@@ -335,13 +361,13 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => onImportClick?.()} disabled={!onImportClick}>
+                <SidebarMenuButton onClick={handleGlobalImport}>
                   <Upload className="mr-2 h-4 w-4" />
                   <span>Importar</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => onExport?.()} disabled={!onExport}>
+                <SidebarMenuButton onClick={handleGlobalExport}>
                   <Download className="mr-2 h-4 w-4" />
                   <span>Exportar</span>
                 </SidebarMenuButton>

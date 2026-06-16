@@ -5,6 +5,7 @@ import { readExcel, sheetToJson } from "@/lib/excelCompat";
 export type KnowledgeBaseImportItem = {
   title: string;
   category: string | null;
+  summary: string | null;
   tags: string[];
   content: string;
 };
@@ -13,6 +14,7 @@ export type KnowledgeBaseRow = {
   id: string;
   title: string;
   category: string | null;
+  summary: string | null;
   content: string;
   tags: string[] | null;
   created_by: string | null;
@@ -114,6 +116,7 @@ const rowToImportItem = (row: Record<string, unknown>): KnowledgeBaseImportItem 
   return {
     title,
     category: category || null,
+    summary: summary || null,
     tags: parseKnowledgeTags(firstFilled(row, ["Tags"]), context, operator, type, triggers),
     content: buildContent({ context, operator, type, triggers, summary, procedure }),
   };

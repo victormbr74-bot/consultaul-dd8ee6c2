@@ -592,7 +592,6 @@ const Dashboard = () => {
         accept=".xlsx,.xls,.xlsm,.csv"
         className="hidden"
         onChange={handleImport}
-        disabled={importing}
       />
       <main className="container px-4 py-6 max-w-6xl">
         {lotericaTab === "pingao" ? (

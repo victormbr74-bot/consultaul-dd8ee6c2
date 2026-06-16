@@ -576,19 +576,15 @@ const ConsultaMassaTab = () => {
 
   useLayoutEffect(() => {
     setOnImportClick(() => () => uploadInputRef.current?.click());
-    if (rows.length > 0) {
-      setOnExport(() => () => {
-        void downloadLookupResults();
-      });
-    } else {
-      setOnExport(undefined);
-    }
+    setOnExport(() => () => {
+      void downloadLookupResults();
+    });
 
     return () => {
       setOnImportClick(undefined);
       setOnExport(undefined);
     };
-  }, [downloadLookupResults, rows.length, setOnExport, setOnImportClick]);
+  }, [downloadLookupResults, setOnExport, setOnImportClick]);
 
   const summary = useMemo(() => {
     const ok = rows.filter((row) => row.statusType === "ok").length;

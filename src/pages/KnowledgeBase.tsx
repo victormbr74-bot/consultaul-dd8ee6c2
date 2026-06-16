@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 const emptyForm = {
   title: "",
   category: "",
+  summary: "",
   tags: "",
   content: "",
 };
@@ -35,6 +36,15 @@ const parseTags = (value: string) =>
         .filter(Boolean),
     ),
   );
+
+const knowledgeBaseErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string })?.message || error || "");
+  const code = String((error as { code?: string })?.code || "");
+  if (code === "PGRST205" || message.includes("knowledge_base") || message.includes("404")) {
+    return "Tabela knowledge_base nao encontrada no Supabase. Aplique as migrations antes de cadastrar procedimentos.";
+  }
+  return message;
+};
 
 const KnowledgeBase = () => {
   const { user, isAdmin } = useAuth();
@@ -58,7 +68,7 @@ const KnowledgeBase = () => {
     setLoading(false);
 
     if (error) {
-      toast.error("Falha ao carregar base de conhecimento", { description: String(error.message || error) });
+      toast.error("Falha ao carregar base de conhecimento", { description: knowledgeBaseErrorMessage(error) });
       setRows([]);
       return;
     }
@@ -75,7 +85,7 @@ const KnowledgeBase = () => {
     if (!term) return rows;
 
     return rows.filter((row) => {
-      const haystack = normalize([row.title, row.category, row.content, ...(row.tags || [])].join(" "));
+      const haystack = normalize([row.title, row.category, row.summary, row.content, ...(row.tags || [])].join(" "));
       return haystack.includes(term);
     });
   }, [query, rows]);
@@ -101,6 +111,7 @@ const KnowledgeBase = () => {
     const payload = {
       title,
       category: form.category.trim() || null,
+      summary: form.summary.trim() || null,
       content,
       tags: parseTags(form.tags),
       updated_at: new Date().toISOString(),
@@ -117,7 +128,7 @@ const KnowledgeBase = () => {
     setSaving(false);
 
     if (error) {
-      toast.error("Falha ao salvar procedimento", { description: String(error.message || error) });
+      toast.error("Falha ao salvar procedimento", { description: knowledgeBaseErrorMessage(error) });
       return;
     }
 
@@ -131,6 +142,7 @@ const KnowledgeBase = () => {
     setForm({
       title: row.title || "",
       category: row.category || "",
+      summary: row.summary || "",
       tags: (row.tags || []).join(", "),
       content: row.content || "",
     });
@@ -149,7 +161,7 @@ const KnowledgeBase = () => {
     setDeletingId(null);
 
     if (error) {
-      toast.error("Falha ao excluir procedimento", { description: String(error.message || error) });
+      toast.error("Falha ao excluir procedimento", { description: knowledgeBaseErrorMessage(error) });
       return;
     }
 
@@ -178,6 +190,7 @@ const KnowledgeBase = () => {
       const payload = items.map((item) => ({
         title: item.title,
         category: item.category,
+        summary: item.summary,
         tags: item.tags,
         content: item.content,
         created_by: user.id,
@@ -263,6 +276,16 @@ const KnowledgeBase = () => {
           </div>
 
           <div className="space-y-1.5">
+            <Label>Resumo</Label>
+            <Textarea
+              value={form.summary}
+              onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
+              rows={3}
+              placeholder="Resumo curto do que esta sendo cadastrado e quando usar este procedimento..."
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <Label>Procedimento</Label>
             <Textarea
               value={form.content}
@@ -332,6 +355,9 @@ const KnowledgeBase = () => {
                               </Badge>
                             ))}
                           </div>
+                        ) : null}
+                        {row.summary ? (
+                          <p className="rounded-md bg-muted/50 p-3 text-sm leading-6 text-muted-foreground">{row.summary}</p>
                         ) : null}
                         <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{row.content}</p>
                         <p className="text-xs text-muted-foreground">

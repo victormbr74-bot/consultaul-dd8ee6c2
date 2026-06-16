@@ -26,7 +26,7 @@ type KnowledgeBaseReferenceDialogProps = {
 
 const scoreRow = (row: KnowledgeBaseRow, terms: string[]) => {
   const tags = row.tags || [];
-  const haystack = normalizeKnowledgeText([row.title, row.category, row.content, ...tags].join(" "));
+  const haystack = normalizeKnowledgeText([row.title, row.category, row.summary, row.content, ...tags].join(" "));
   return terms.reduce((score, term) => {
     if (!term) return score;
     if (haystack.includes(term)) return score + 2;
@@ -39,6 +39,15 @@ const extractProcedureLines = (content: string) => {
   const startIndex = lines.findIndex((line) => normalizeKnowledgeText(line).startsWith("procedimento"));
   const relevant = startIndex >= 0 ? lines.slice(startIndex + 1) : lines;
   return relevant.map((line) => line.trim()).filter(Boolean);
+};
+
+const knowledgeBaseErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string })?.message || error || "");
+  const code = String((error as { code?: string })?.code || "");
+  if (code === "PGRST205" || message.includes("knowledge_base") || message.includes("404")) {
+    return "Tabela knowledge_base nao encontrada no Supabase. Aplique as migrations antes de consultar a base.";
+  }
+  return message;
 };
 
 export const KnowledgeBaseReferenceDialog = ({
@@ -63,7 +72,7 @@ export const KnowledgeBaseReferenceDialog = ({
     setLoading(false);
 
     if (error) {
-      toast.error("Falha ao carregar base de conhecimento", { description: String(error.message || error) });
+      toast.error("Falha ao carregar base de conhecimento", { description: knowledgeBaseErrorMessage(error) });
       setRows([]);
       return;
     }
@@ -183,6 +192,9 @@ export const KnowledgeBaseReferenceDialog = ({
                           </Badge>
                         ))}
                       </div>
+                    ) : null}
+                    {selected.summary ? (
+                      <p className="rounded-md bg-muted/50 p-3 text-sm leading-6 text-muted-foreground">{selected.summary}</p>
                     ) : null}
                   </div>
 

@@ -1,26 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, PencilLine, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, Loader2, PencilLine, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { parseKnowledgeBaseFile, type KnowledgeBaseRow } from "@/lib/knowledgeBase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-type KnowledgeBaseRow = {
-  id: string;
-  title: string;
-  category: string | null;
-  content: string;
-  tags: string[] | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
 
 const emptyForm = {
   title: "",
@@ -55,6 +45,8 @@ const KnowledgeBase = () => {
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -166,14 +158,81 @@ const KnowledgeBase = () => {
     setRows((current) => current.filter((item) => item.id !== row.id));
   };
 
+  const importProcedures = async (file: File) => {
+    if (!user?.id) {
+      toast.error("Sessao expirada.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const items = await parseKnowledgeBaseFile(file);
+      if (!items.length) {
+        toast.error("Nenhum procedimento valido encontrado.", {
+          description: "Confira se o arquivo segue o modelo XLSX/DOCX.",
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const payload = items.map((item) => ({
+        title: item.title,
+        category: item.category,
+        tags: item.tags,
+        content: item.content,
+        created_by: user.id,
+        updated_at: now,
+      }));
+
+      const { error } = await (supabase as any).from("knowledge_base").insert(payload);
+      if (error) throw error;
+
+      toast.success(`${payload.length} procedimento(s) importado(s).`);
+      void loadRows();
+    } catch (error) {
+      toast.error("Falha ao importar base", { description: String((error as Error).message || error) });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="container px-4 py-6 space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Plus className="h-5 w-5" />
             {editingId ? "Editar Procedimento" : "Novo Procedimento"}
           </CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <a href="/templates/base_conhecimento_modelo.xlsx" download>
+                <Download className="h-4 w-4" />
+                Modelo XLSX
+              </a>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/templates/base_conhecimento_modelo.docx" download>
+                <Download className="h-4 w-4" />
+                Modelo DOCX
+              </a>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Importar base
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.docx"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void importProcedures(file);
+              }}
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_260px]">

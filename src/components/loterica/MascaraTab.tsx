@@ -6,10 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { KnowledgeBaseReferenceDialog } from "@/components/KnowledgeBaseReferenceDialog";
 import { copyRichTextToClipboard } from "@/lib/richClipboard";
 import { buildEmailDraftUrl } from "@/lib/validacaoEmail";
 import { isOutlookDraftConfigured, openOutlookHtmlDraft } from "@/lib/outlookDraft";
-import { Copy, Check, Mail, Plus, Table } from "lucide-react";
+import { BookOpen, Check, Copy, Mail, Plus, RadioTower, Route, Satellite, Table } from "lucide-react";
 import { toast } from "sonner";
 
 type Defeito = {
@@ -121,8 +124,35 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+const normalizeSignal = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+
+const rawText = (raw: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = String(raw[key] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+};
+
+const hasMeaningfulValue = (value: string) => {
+  const normalized = normalizeSignal(value);
+  return !!normalized && !["-", "NA", "N/A", "NAO", "NAO SE APLICA", "NULL", "SEM"].includes(normalized);
+};
+
+const containsAny = (value: string, terms: string[]) => {
+  const normalized = normalizeSignal(value);
+  return terms.some((term) => normalized.includes(term));
+};
+
 const MascaraTab = ({ form }: MascaraTabProps) => {
   const [copied, setCopied] = useState<string | null>(null);
+  const [activeMask, setActiveMask] = useState("oemp");
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
 
   const [defeitoOemp, setDefeitoOemp] = useState("");
   const [defeitoAtiva, setDefeitoAtiva] = useState("");
@@ -250,6 +280,11 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const circuitoOemp = String(form.ccto_oemp || raw["CIRCUITO OEMP"] || "NAO OEMP");
   const operadora = form.operadora || "";
   const simCard = String(raw["SIM CARD 4G"] || "");
+  const empresaOemp = rawText(raw, ["EMPRESA OEMP"]);
+  const circuitoBackup = rawText(raw, ["CIRCUITO BACKUP", "BACKUP BRISANET", "BRISANET"]) || simCard;
+  const operadora4g = rawText(raw, ["OPERADORA 4G"]) || operadora;
+  const respBackup = rawText(raw, ["RESP BACKUP", "RESPONSAVEL BACKUP", "RESPONSÁVEL BACKUP"]);
+  const vsat = rawText(raw, ["VSAT"]);
   const modeloRoteador = String(raw["MODELO ROTEADOR"] || "");
   const cep = String(raw["CEP"] || "");
   const cidade = String(form.cidade || raw["MUNICIPIO"] || "");
@@ -516,15 +551,170 @@ Contato de Autorizacao: ${contatoEnc}`;
     ["Contato de Autorizacao", contatoEnc],
   ];
 
+  const maskLabelByValue: Record<string, string> = {
+    oemp: "OEMP OI",
+    mam: "MAM/SCT",
+    wt: "WT Telecom",
+    ativa: "ATIVA",
+    enc: "Encerramento",
+  };
+
+  const knowledgeKeywords = [
+    "mascara",
+    maskLabelByValue[activeMask],
+    activeMask === "enc" ? "encerramento" : "abertura",
+    operadora,
+    circuitoOemp,
+    designacaoOi,
+    defeitoOemp,
+    defeitoAtiva,
+  ].filter(Boolean);
+
+  const aberturaSignal = [empresaOemp, circuitoOemp, circuitoBackup, simCard, operadora4g, respBackup, vsat, modeloRoteador].join(" ");
+  const hasOemp = hasMeaningfulValue(circuitoOemp) && normalizeSignal(circuitoOemp) !== "NAO OEMP";
+  const hasVsat = hasMeaningfulValue(vsat) || containsAny(aberturaSignal, ["VSAT", "SATELITE", "SATELITE"]);
+  const has4g = hasMeaningfulValue(simCard) || containsAny(aberturaSignal, ["4G", "SIM CARD", "LTE", "VIVO", "TIM", "ARQIA", "CLARO", "BRISANET"]);
+  const backupType = hasVsat ? "VSAT" : has4g ? "4G" : "Backup";
+
+  const aberturaGuides = [
+    {
+      enabled: hasOemp,
+      title: "Principal / OEMP",
+      icon: Route,
+      badge: empresaOemp || "Empresa OEMP",
+      reference: circuitoOemp,
+      steps: [
+        "Confirme Empresa OEMP, CCTO OEMP, contato local e endereco.",
+        "Use a mascara OEMP OI para chamado principal; use WT Telecom quando o provedor exigir.",
+        "Selecione o defeito reclamado e mantenha atualizacao por voz a cada 1 hora.",
+        "Copie a mascara e registre o protocolo retornado pela operadora.",
+      ],
+    },
+    {
+      enabled: hasVsat,
+      title: "Backup VSAT",
+      icon: Satellite,
+      badge: respBackup || "VSAT",
+      reference: circuitoBackup || vsat,
+      steps: [
+        "Valide se o backup esta marcado como VSAT ou Sencinet.",
+        "Use a abertura MAM/SCT com COD UL, endereco, contato e horario de acesso.",
+        "Informe circuito backup/VSAT e modelo do roteador quando existir.",
+        "Acompanhe retorno da operadora e atualize o chamado interno.",
+      ],
+    },
+    {
+      enabled: has4g,
+      title: "Backup 4G",
+      icon: RadioTower,
+      badge: operadora4g || "Operadora 4G",
+      reference: simCard || circuitoBackup,
+      steps: [
+        "Confirme operadora 4G, SIM Card ou circuito backup.",
+        "Use a abertura MAM/SCT para tratar falha de chip, sinal, inoperancia ou intermitencia.",
+        "Inclua modelo do roteador, contato de validacao e horario de acesso.",
+        "Se a operadora devolver protocolo, registre no chamado antes de encerrar.",
+      ],
+    },
+  ].filter((guide) => guide.enabled);
+
+  const activeGuides = aberturaGuides.length
+    ? aberturaGuides
+    : [
+        {
+          enabled: true,
+          title: "Orientacao geral",
+          icon: BookOpen,
+          badge: "Sem backup identificado",
+          reference: designacaoOi || circuitoOemp || "-",
+          steps: [
+            "Confirme os dados editaveis da loterica antes de abrir chamado.",
+            "Use a mascara ATIVA para circuito principal quando nao houver OEMP/backup identificado.",
+            "Preencha defeito reclamado, contato local e horario de funcionamento.",
+            "Registre o protocolo da operadora no acompanhamento.",
+          ],
+        },
+      ];
+
+  const AberturaGuidePanel = () => (
+    <Card className="lg:sticky lg:top-4">
+      <CardHeader className="space-y-2">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5" />
+          <CardTitle className="text-base">Orientacao de abertura</CardTitle>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {empresaOemp ? <Badge variant="outline">OEMP: {empresaOemp}</Badge> : null}
+          {hasVsat ? <Badge variant="secondary">VSAT</Badge> : null}
+          {has4g ? <Badge variant="secondary">4G: {operadora4g || "-"}</Badge> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+          Referencia detectada: {backupType}
+          {circuitoBackup ? ` / ${circuitoBackup}` : ""}
+        </div>
+
+        {activeGuides.map((guide, guideIndex) => {
+          const Icon = guide.icon;
+          return (
+            <div key={guide.title} className="space-y-3">
+              {guideIndex > 0 ? <Separator /> : null}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold">{guide.title}</h3>
+                </div>
+                <div className="grid gap-1 text-xs">
+                  <span className="text-muted-foreground">Responsavel/operadora</span>
+                  <span className="font-medium">{guide.badge}</span>
+                  <span className="text-muted-foreground">Referencia</span>
+                  <span className="font-mono text-[11px]">{guide.reference || "-"}</span>
+                </div>
+              </div>
+              <ol className="space-y-2">
+                {guide.steps.map((step, index) => (
+                  <li key={step} className="flex gap-2 text-xs leading-5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          );
+        })}
+
+        <Button variant="outline" size="sm" className="w-full" onClick={() => setKnowledgeOpen(true)}>
+          <BookOpen className="h-4 w-4" />
+          Ver base completa
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <Tabs defaultValue="oemp" className="space-y-4">
-      <TabsList className="grid grid-cols-5 w-full">
-        <TabsTrigger value="oemp" className="text-xs">OEMP OI</TabsTrigger>
-        <TabsTrigger value="mam" className="text-xs">MAM/SCT</TabsTrigger>
-        <TabsTrigger value="wt" className="text-xs">WT Telecom</TabsTrigger>
-        <TabsTrigger value="ativa" className="text-xs">ATIVA</TabsTrigger>
-        <TabsTrigger value="enc" className="text-xs">Encerramento</TabsTrigger>
-      </TabsList>
+    <>
+    <KnowledgeBaseReferenceDialog
+      open={knowledgeOpen}
+      onOpenChange={setKnowledgeOpen}
+      context="Mascara"
+      keywords={knowledgeKeywords}
+      title={`Base de conhecimento - ${maskLabelByValue[activeMask] || "Mascara"}`}
+    />
+
+    <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <AberturaGuidePanel />
+
+      <Tabs value={activeMask} onValueChange={setActiveMask} className="min-w-0 space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="oemp" className="text-xs">OEMP OI</TabsTrigger>
+          <TabsTrigger value="mam" className="text-xs">MAM/SCT</TabsTrigger>
+          <TabsTrigger value="wt" className="text-xs">WT Telecom</TabsTrigger>
+          <TabsTrigger value="ativa" className="text-xs">ATIVA</TabsTrigger>
+          <TabsTrigger value="enc" className="text-xs">Encerramento</TabsTrigger>
+        </TabsList>
 
       <TabsContent value="oemp">
         <Card>
@@ -720,7 +910,9 @@ Contato de Autorizacao: ${contatoEnc}`;
           </CardContent>
         </Card>
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
+    </>
   );
 };
 

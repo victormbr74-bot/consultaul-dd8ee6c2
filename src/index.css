@@ -248,6 +248,48 @@
     --sidebar-border: 142 22% 18%;
     --sidebar-ring: 48 98% 56%;
   }
+
+  :root[data-color="brazil"] {
+    --primary: 142 72% 30%;
+    --ring: 142 72% 30%;
+    --accent: 48 98% 50%;
+    --accent-foreground: 215 80% 18%;
+    --sidebar-background: 142 70% 18%;
+    --sidebar-accent: 214 76% 38%;
+    --sidebar-border: 142 55% 28%;
+    --sidebar-ring: 48 98% 50%;
+  }
+  .dark[data-color="brazil"] {
+    --primary: 142 78% 48%;
+    --ring: 142 78% 48%;
+    --accent: 48 98% 56%;
+    --accent-foreground: 215 80% 14%;
+    --sidebar-background: 142 38% 8%;
+    --sidebar-accent: 214 54% 18%;
+    --sidebar-border: 142 22% 18%;
+    --sidebar-ring: 48 98% 56%;
+  }
+
+  :root[data-color="brasileirao"] {
+    --primary: 0 76% 42%;
+    --ring: 0 76% 42%;
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 100%;
+    --sidebar-background: 0 58% 18%;
+    --sidebar-accent: 0 48% 26%;
+    --sidebar-border: 0 40% 28%;
+    --sidebar-ring: 0 76% 52%;
+  }
+  .dark[data-color="brasileirao"] {
+    --primary: 0 76% 56%;
+    --ring: 0 76% 56%;
+    --accent: 0 0% 86%;
+    --accent-foreground: 0 0% 10%;
+    --sidebar-background: 0 30% 8%;
+    --sidebar-accent: 0 24% 14%;
+    --sidebar-border: 0 20% 18%;
+    --sidebar-ring: 0 76% 56%;
+  }
 }
 
 @layer base {
@@ -273,6 +315,22 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    background-image: var(--theme-background-image, none);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: var(--theme-background-size, contain);
+    opacity: var(--theme-background-opacity, 0);
+    mix-blend-mode: multiply;
+  }
+  .dark body::before {
+    mix-blend-mode: screen;
   }
   .font-mono {
     font-family: var(--font-mono);

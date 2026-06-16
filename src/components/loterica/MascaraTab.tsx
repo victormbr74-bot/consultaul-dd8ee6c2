@@ -642,71 +642,6 @@ Contato de Autorizacao: ${contatoEnc}`;
     defeitoAtiva,
   ].filter(Boolean);
 
-  const fallbackGuides = [
-    {
-      enabled: hasOemp,
-      scope: "principal" as const,
-      title: "Principal / OEMP",
-      icon: Route,
-      badge: empresaOemp || operadora || "Empresa OEMP",
-      reference: circuitoOemp,
-      steps: [
-        "Confirme Empresa OEMP, CCTO OEMP, contato local e endereco.",
-        "Use a mascara OEMP OI para chamado principal; use WT Telecom quando o provedor exigir.",
-        "Selecione o defeito reclamado e mantenha atualizacao por voz a cada 1 hora.",
-        "Copie a mascara e registre o protocolo retornado pela operadora.",
-      ],
-    },
-    {
-      enabled: hasVsat,
-      scope: "backup" as const,
-      title: "Backup VSAT",
-      icon: Satellite,
-      badge: respBackup || "VSAT",
-      reference: circuitoBackup || vsat,
-      steps: [
-        "Valide se o backup esta marcado como VSAT ou Sencinet.",
-        "Use a abertura MAM/SCT com COD UL, endereco, contato e horario de acesso.",
-        "Informe circuito backup/VSAT e modelo do roteador quando existir.",
-        "Acompanhe retorno da operadora e atualize o chamado interno.",
-      ],
-    },
-    {
-      enabled: has4g,
-      scope: "backup" as const,
-      title: "Backup 4G",
-      icon: RadioTower,
-      badge: operadora4g || "Operadora 4G",
-      reference: simCard || circuitoBackup,
-      steps: [
-        "Confirme operadora 4G, SIM Card ou circuito backup.",
-        "Use a abertura MAM/SCT para tratar falha de chip, sinal, inoperancia ou intermitencia.",
-        "Inclua modelo do roteador, contato de validacao e horario de acesso.",
-        "Se a operadora devolver protocolo, registre no chamado antes de encerrar.",
-      ],
-    },
-  ].filter((guide) => guide.enabled);
-
-  const fallbackGuide =
-    fallbackGuides.find((guide) => guide.scope === guideScope) ||
-    fallbackGuides[0] ||
-    ([
-        {
-          enabled: true,
-          scope: guideScope,
-          title: "Orientacao geral",
-          icon: BookOpen,
-          badge: "Sem backup identificado",
-          reference: designacaoOi || circuitoOemp || "-",
-          steps: [
-            "Confirme os dados editaveis da loterica antes de abrir chamado.",
-            "Use a mascara ATIVA para circuito principal quando nao houver OEMP/backup identificado.",
-            "Preencha defeito reclamado, contato local e horario de funcionamento.",
-            "Registre o protocolo da operadora no acompanhamento.",
-          ],
-        },
-      ][0]);
-
   const selectedKnowledgeGuide = useMemo(() => {
     if (!knowledgeRows.length) return null;
 
@@ -754,16 +689,11 @@ Contato de Autorizacao: ${contatoEnc}`;
             : circuitoBackup || simCard || vsat,
         summary: selectedKnowledgeGuide.summary || "",
         steps: extractProcedureLines(selectedKnowledgeGuide.content),
-        source: "base" as const,
       }
-    : {
-        ...fallbackGuide,
-        summary: "",
-        source: "fallback" as const,
-      };
+    : null;
 
   const AberturaGuidePanel = () => {
-    const Icon = activeGuide.icon;
+    const Icon = activeGuide?.icon || BookOpen;
     return (
     <Card className="lg:sticky lg:top-4">
       <CardHeader className="space-y-2">
@@ -808,47 +738,39 @@ Contato de Autorizacao: ${contatoEnc}`;
           <div className="text-xs text-muted-foreground">Carregando base de conhecimento...</div>
         ) : null}
 
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">{activeGuide.title}</h3>
-              {activeGuide.source === "base" ? <Badge variant="secondary" className="text-[10px]">Base</Badge> : null}
-            </div>
-            {activeGuide.summary ? (
-              <p className="rounded-md bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">{activeGuide.summary}</p>
-            ) : null}
-            <div className="grid gap-1 text-xs">
-              <span className="text-muted-foreground">Responsavel/operadora</span>
-              <span className="font-medium">{activeGuide.badge}</span>
-              <span className="text-muted-foreground">Referencia</span>
-              <span className="font-mono text-[11px]">{activeGuide.reference || "-"}</span>
-              {knowledgeLoadError ? (
-                <span className="text-[11px] text-warning">{knowledgeLoadError}</span>
+        {activeGuide ? (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">{activeGuide.title}</h3>
+                <Badge variant="secondary" className="text-[10px]">Base</Badge>
+              </div>
+              {activeGuide.summary ? (
+                <p className="rounded-md bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">{activeGuide.summary}</p>
               ) : null}
-              {activeGuide.source === "fallback" && !knowledgeLoading && !knowledgeLoadError ? (
-                <span className="text-[11px] text-muted-foreground">
-                  Nenhum procedimento correspondente encontrado na base.
-                </span>
-              ) : null}
+              <div className="grid gap-1 text-xs">
+                <span className="text-muted-foreground">Responsavel/operadora</span>
+                <span className="font-medium">{activeGuide.badge}</span>
+                <span className="text-muted-foreground">Referencia</span>
+                <span className="font-mono text-[11px]">{activeGuide.reference || "-"}</span>
+              </div>
             </div>
+            <Separator />
+            <ol className="space-y-2">
+              {activeGuide.steps.map((step, index) => (
+                <li key={`${step}-${index}`} className="flex gap-2 text-xs leading-5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <span>{step.replace(/^\d+[\).\s-]+/, "")}</span>
+                </li>
+              ))}
+            </ol>
           </div>
-          <Separator />
-          <ol className="space-y-2">
-            {activeGuide.steps.map((step, index) => (
-              <li key={`${step}-${index}`} className="flex gap-2 text-xs leading-5">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                  {index + 1}
-                </span>
-                <span>{step.replace(/^\d+[\).\s-]+/, "")}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        {guideScope === "backup" && !hasVsat && !has4g ? (
-          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-            Backup sem tecnologia identificada. Confira VSAT, SIM Card 4G, Circuito Backup e Operadora 4G na base da loterica.
+        ) : !knowledgeLoading ? (
+          <div className="rounded-md border border-dashed p-4 text-xs leading-5 text-muted-foreground">
+            {knowledgeLoadError || "Nenhuma orientacao cadastrada na base para esta opcao."}
           </div>
         ) : null}
 

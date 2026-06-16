@@ -7,10 +7,16 @@ import {
   WORLD_CUP_2026_TEAM_BY_ID,
   type WorldCupTeam,
 } from "@/data/worldCup2026Teams";
+import {
+  BRASILEIRAO_SERIE_A_TEAMS,
+  BRASILEIRAO_SERIE_A_TEAM_BY_ID,
+  type BrasileiraoSerieATeam,
+} from "@/data/brasileiraoSerieATeams";
 import { useTheme, type ThemeColor } from "@/contexts/ThemeContext";
 import { Moon, Sun } from "lucide-react";
 
 const TEAM_OPTIONS = [...WORLD_CUP_2026_TEAMS].sort((a, b) => a.label.localeCompare(b.label));
+const BRASILEIRAO_TEAM_OPTIONS = [...BRASILEIRAO_SERIE_A_TEAMS].sort((a, b) => a.label.localeCompare(b.label));
 
 const PALETTES: Array<{ id: ThemeColor; label: string; preview: string }> = [
   { id: "blue", label: "Azul", preview: "215 80% 45%" },
@@ -21,17 +27,38 @@ const PALETTES: Array<{ id: ThemeColor; label: string; preview: string }> = [
   { id: "sky", label: "Azul Claro", preview: "198 90% 50%" },
   { id: "orange", label: "Laranja", preview: "24 95% 52%" },
   { id: "gray", label: "Cinza", preview: "220 10% 55%" },
+  { id: "brazil", label: "Brasileiro", preview: "142 72% 30%" },
   { id: "world-cup", label: "Copa Campeas", preview: "142 72% 34%" },
+  { id: "brasileirao", label: "Brasileirao Serie A", preview: "0 76% 42%" },
 ];
 
 const Appearance = () => {
-  const { mode, setMode, color, setColor, worldCupTeam, setWorldCupTeam } = useTheme();
+  const {
+    mode,
+    setMode,
+    color,
+    setColor,
+    worldCupTeam,
+    setWorldCupTeam,
+    brasileiraoTeam,
+    setBrasileiraoTeam,
+  } = useTheme();
 
   const palettesWithDynamicWorldCupColor = PALETTES.map((palette) => {
-    if (palette.id !== "world-cup") return palette;
+    if (palette.id === "world-cup") {
+      return {
+        ...palette,
+        preview: WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].primary,
+      };
+    }
+    if (palette.id === "brasileirao") {
+      return {
+        ...palette,
+        preview: BRASILEIRAO_SERIE_A_TEAM_BY_ID[brasileiraoTeam].primary,
+      };
+    }
     return {
       ...palette,
-      preview: WORLD_CUP_2026_TEAM_BY_ID[worldCupTeam].primary,
     };
   });
 
@@ -102,6 +129,34 @@ const Appearance = () => {
                 <div className="text-xs text-muted-foreground">
                   As cores sao aplicadas conforme a selecao escolhida entre as 6 maiores campeas mundiais.
                 </div>
+              </div>
+            )}
+
+            {color === "brasileirao" && (
+              <div className="space-y-2">
+                <Label htmlFor="brasileirao-team">Tema Brasileirao Serie A</Label>
+                <Select value={brasileiraoTeam} onValueChange={(value) => setBrasileiraoTeam(value as BrasileiraoSerieATeam)}>
+                  <SelectTrigger id="brasileirao-team" className="w-full sm:w-[320px]">
+                    <SelectValue placeholder="Selecione um time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRASILEIRAO_TEAM_OPTIONS.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        <img src={team.imageUrl} alt={team.label} className="inline-block w-5 h-5 object-contain mr-1.5 align-middle" />{" "}
+                        {team.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  As cores e a imagem real do time sao aplicadas conforme o time selecionado da Serie A 2026.
+                </div>
+              </div>
+            )}
+
+            {color === "brazil" && (
+              <div className="text-xs text-muted-foreground">
+                O tema Brasileiro aplica as cores e a bandeira da selecao brasileira ao fundo do sistema.
               </div>
             )}
 

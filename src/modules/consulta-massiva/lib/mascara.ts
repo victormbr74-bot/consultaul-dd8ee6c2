@@ -57,7 +57,7 @@ export function buildMascaraFromMassiva(
     inc_massiva: resolveInc(participants),
     chamado_interno: "",
     caso_pai: resolveCasoPai(participants[0]),
-    tipo_label: m.tipo_link === "SECUNDARIO" ? "SECUNDARIO" : "PRINCIPAL",
+    tipo_label: m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRINCIPAL",
     uf_label: m.uf,
     qtd_total: m.qtd_circuitos,
     qtd_isoladas: m.qtd_lotericas_isoladas ?? 0,

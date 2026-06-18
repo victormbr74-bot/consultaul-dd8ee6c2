@@ -78,13 +78,13 @@ function esc(s: string): string {
 }
 
 function isolatedPlainRows(d: MascaraInput): string[] {
-  if (!d.lotericas_isoladas.length) return ["Nenhuma loterica isolada identificada."];
+  if (!d.lotericas_isoladas.length) return ["Nenhuma lotérica isolada identificada."];
   return d.lotericas_isoladas.map((l) => `${l.codigo}\t${l.loterica}`);
 }
 
 function isolatedHtmlRows(d: MascaraInput): string {
   if (!d.lotericas_isoladas.length) {
-    return `<tr><td colspan="2" style="padding:6px 8px;border:1px solid #ccc">Nenhuma loterica isolada identificada.</td></tr>`;
+    return `<tr><td colspan="2" style="padding:6px 8px;border:1px solid #ccc">Nenhuma lotérica isolada identificada.</td></tr>`;
   }
   return d.lotericas_isoladas
     .map(
@@ -98,7 +98,7 @@ function isolatedHtmlRows(d: MascaraInput): string {
 export function buildMascaraHtml(d: MascaraInput): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Evento Massivo - ${esc(d.inc_massiva)}</title></head>
 <body style="font-family:Arial,sans-serif;color:#222;max-width:820px;margin:24px auto;padding:16px">
-  <h2 style="margin:0 0 4px 0;color:#0b3a82">CONSORCIO LOTERICAS</h2>
+  <h2 style="margin:0 0 4px 0;color:#0b3a82">CONSÓRCIO LOTÉRICAS</h2>
   <h3 style="margin:0 0 16px 0">Evento Massivo - Chamado Aberto</h3>
   <div style="font-family:monospace;margin-bottom:14px">===============================</div>
   <table style="border-collapse:collapse;width:100%;font-size:13px">
@@ -111,17 +111,17 @@ export function buildMascaraHtml(d: MascaraInput): string {
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>UF</b></td><td style="padding:4px 8px">${esc(d.uf_label)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade total</b></td><td style="padding:4px 8px">${d.qtd_total}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade isoladas</b></td><td style="padding:4px 8px">${d.qtd_isoladas}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horario da falha</b></td><td style="padding:4px 8px">${esc(d.horario_falha)}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horario de normalizacao</b></td><td style="padding:4px 8px">${esc(d.horario_normalizacao)}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Causa/Solucao</b></td><td style="padding:4px 8px">${esc(d.causa_solucao)}</td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horário da falha</b></td><td style="padding:4px 8px">${esc(d.horario_falha)}</td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horário de normalização</b></td><td style="padding:4px 8px">${esc(d.horario_normalizacao)}</td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Causa/Solução</b></td><td style="padding:4px 8px">${esc(d.causa_solucao)}</td></tr>
     </tbody>
   </table>
   <p style="white-space:pre-line;margin:16px 0 0 0;font-size:13px"><b>Status:</b> ${esc(d.status_texto)}</p>
-  <h4 style="margin:16px 0 4px 0">Lotericas isoladas (${d.qtd_isoladas})</h4>
+  <h4 style="margin:16px 0 4px 0">Lotéricas isoladas (${d.qtd_isoladas})</h4>
   <table style="border-collapse:collapse;width:100%;font-size:12px">
     <thead><tr style="background:#0b3a82;color:#fff">
       <th style="padding:6px 8px;text-align:left">Codigo</th>
-      <th style="padding:6px 8px;text-align:left">Loterica</th>
+      <th style="padding:6px 8px;text-align:left">Lotérica</th>
     </tr></thead>
     <tbody>${isolatedHtmlRows(d)}</tbody>
   </table>
@@ -164,7 +164,7 @@ export async function copyMascaraToClipboard(d: MascaraInput): Promise<void> {
 
 function htmlToPlain(d: MascaraInput): string {
   return [
-    "CONSORCIO LOTERICAS",
+    "CONSÓRCIO LOTÉRICAS",
     "",
     "Evento Massivo - Chamado Aberto",
     "",
@@ -178,13 +178,13 @@ function htmlToPlain(d: MascaraInput): string {
     `UF: ${d.uf_label}`,
     `Quantidade total: ${d.qtd_total}`,
     `Quantidade isoladas: ${d.qtd_isoladas}`,
-    `Horario da falha: ${d.horario_falha}`,
-    `Horario de normalizacao: ${d.horario_normalizacao}`,
-    `Causa/Solucao: ${d.causa_solucao}`,
+    `Horário da falha: ${d.horario_falha}`,
+    `Horário de normalização: ${d.horario_normalizacao}`,
+    `Causa/Solução: ${d.causa_solucao}`,
     "",
     `Status: ${d.status_texto}`,
     "",
-    `Lotericas isoladas (${d.qtd_isoladas}):`,
+    `Lotéricas isoladas (${d.qtd_isoladas}):`,
     ...isolatedPlainRows(d),
   ].join("\n");
 }
@@ -195,7 +195,7 @@ export function exportMascaraPdf(d: MascaraInput) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(11, 58, 130);
-  doc.text("CONSORCIO LOTERICAS", 40, 40);
+  doc.text("CONSÓRCIO LOTÉRICAS", 40, 40);
   doc.setFontSize(11);
   doc.setTextColor(40, 40, 40);
   doc.text("Evento Massivo - Chamado Aberto", 40, 58);
@@ -211,9 +211,9 @@ export function exportMascaraPdf(d: MascaraInput) {
     ["UF", d.uf_label],
     ["Quantidade total", String(d.qtd_total)],
     ["Quantidade isoladas", String(d.qtd_isoladas)],
-    ["Horario da falha", d.horario_falha],
-    ["Horario de normalizacao", d.horario_normalizacao],
-    ["Causa/Solucao", d.causa_solucao],
+    ["Horário da falha", d.horario_falha],
+    ["Horário de normalização", d.horario_normalizacao],
+    ["Causa/Solução", d.causa_solucao],
   ];
   autoTable(doc, {
     startY: 76,
@@ -236,10 +236,10 @@ export function exportMascaraPdf(d: MascaraInput) {
   const cursor = afterMeta + 14 + statusLines.length * 11 + 8;
   autoTable(doc, {
     startY: cursor,
-    head: [["Codigo", "Loterica"]],
+    head: [["Código", "Lotérica"]],
     body: d.lotericas_isoladas.length
       ? d.lotericas_isoladas.map((l) => [l.codigo, l.loterica])
-      : [["", "Nenhuma loterica isolada identificada."]],
+      : [["", "Nenhuma lotérica isolada identificada."]],
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [11, 58, 130], textColor: 255 },
     margin: { left: 40, right: 40 },

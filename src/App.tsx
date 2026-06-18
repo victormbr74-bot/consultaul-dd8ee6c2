@@ -42,6 +42,7 @@ import Desempenho from "@/pages/alarmes/Desempenho";
 import ImportNatIps from "./pages/ImportNatIps";
 import RouterConfigsReport from "./pages/RouterConfigsReport";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import ProjectModuleFrame from "./pages/ProjectModuleFrame";
 
 
 const queryClient = new QueryClient();
@@ -141,6 +142,7 @@ const App = () => (
                   <Route path="/admin/import-nat" element={<ImportNatIps />} />
                   <Route path="/relatorio-roteador" element={<RouterConfigsReport />} />
                   <Route path="/base-conhecimento" element={<KnowledgeBase />} />
+                  <Route path="/projetos/:projectId/:itemId" element={<ProjectModuleFrame />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

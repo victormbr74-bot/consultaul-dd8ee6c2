@@ -20,15 +20,19 @@ import {
   BookOpen,
   PlusCircle,
   Wrench,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSidebarActions } from "@/contexts/SidebarActionsContext";
+import { projectModules } from "@/lib/projectModules";
 import { WORLD_CUP_2026_TEAM_BY_ID } from "@/data/worldCup2026Teams";
 import { BRASILEIRAO_SERIE_A_TEAM_BY_ID } from "@/data/brasileiraoSerieATeams";
 import { supabase } from "@/integrations/supabase/client";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +44,9 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
@@ -74,6 +81,7 @@ export function AppSidebar() {
     (isLotericaRoute && lotericaTab === "consulta");
   const isScriptRouterActive =
     lotericaTab === "script-router-sct" && (location.pathname === "/" || isLotericaRoute);
+  const isProjectRoute = (projectId: string) => location.pathname.startsWith(`/projetos/${projectId}/`);
   const hasPendingChanges = pendingChangeCount > 0;
   const codUlSegment = isLotericaRoute
     ? location.pathname.replace("/loterica/", "").split("/")[0] || ""
@@ -360,6 +368,46 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Projetos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {projectModules.map((project) => (
+                <Collapsible key={project.id} asChild defaultOpen={isProjectRoute(project.id)}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        tooltip={project.label}
+                        className={isProjectRoute(project.id) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                      >
+                        <Layers className="mr-2 h-4 w-4" />
+                        <span>{project.label}</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/menu-item:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {project.items.map((item) => (
+                          <SidebarMenuSubItem key={item.id}>
+                            <SidebarMenuSubButton asChild size="sm">
+                              <NavLink
+                                to={`/projetos/${project.id}/${item.id}`}
+                                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                              >
+                                <span>{item.label}</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

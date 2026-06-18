@@ -1,0 +1,545 @@
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Activity, AlertOctagon, AlertTriangle, Building2, CheckCircle2, Download, FileSignature, FileText, Flame, Globe2,
+  HelpCircle, MapPin, Network, Play, Radar, RadioTower, Shield, ShieldOff, Trash2, XCircle, SlidersHorizontal,
+} from "lucide-react";
+import { UploadCard } from "@/modules/consulta-massiva/components/UploadCard";
+import { StatCard } from "@/modules/consulta-massiva/components/StatCard";
+import { MassivaBadge } from "@/modules/consulta-massiva/components/MassivaBadge";
+import { SituacaoBadge } from "@/modules/consulta-massiva/components/SituacaoBadge";
+import { DrillDownModal } from "@/modules/consulta-massiva/components/DrillDownModal";
+import { MascaraOcorrenciaDialog } from "@/modules/consulta-massiva/components/MascaraOcorrenciaDialog";
+import { FiltersBar, emptyFilters, type Filters } from "@/modules/consulta-massiva/components/FiltersBar";
+import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { processGis, type ProcessResult } from "@/modules/consulta-massiva/lib/massiva-processor";
+import { exportToCsv, exportToPdf, exportToXlsx, processedRowsForExport, readGisFile } from "@/modules/consulta-massiva/lib/excel";
+import { buildEscalonamentoMap } from "@/modules/consulta-massiva/lib/operadoras";
+import type { GisRow, Massiva } from "@/modules/consulta-massiva/lib/gis-types";
+import type { DbOperadora, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
+import { supabase } from "@/integrations/supabase/client";
+import { logAudit } from "@/modules/consulta-massiva/lib/audit";
+import { loadCidadesLookup } from "@/modules/consulta-massiva/lib/base-cidades";
+import { SINALIZACAO_LABEL } from "@/modules/consulta-massiva/lib/geo";
+import { Sinalizacao60kmBadge } from "@/modules/consulta-massiva/components/Sinalizacao60kmBadge";
+import { toast } from "sonner";
+
+type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
+
+async function fetchAllOperadoras(): Promise<DbOperadora[]> {
+  const out: DbOperadora[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("operadoras")
+      .select("*")
+      .eq("ativo", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbOperadora[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
+async function fetchEscalonamentos(): Promise<DbEscalonamento[]> {
+  const { data, error } = await supabase.from("escalonamentos").select("*").eq("ativo", true);
+  if (error) throw error;
+  return (data ?? []) as DbEscalonamento[];
+}
+
+export default function Page() {
+  const [file1, setFile1] = useState<LoadedFile>(null);
+  const [file2, setFile2] = useState<LoadedFile>(null);
+  const [result, setResult] = useState<ProcessResult | null>(null);
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [drill, setDrill] = useState<Massiva | null>(null);
+  const [mascara, setMascara] = useState<Massiva | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const opQ = useQuery({ queryKey: ["operadoras-all"], queryFn: fetchAllOperadoras, staleTime: 60_000 });
+  const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
+  const cidadesQ = useQuery({ queryKey: ["base_cidades-lookup"], queryFn: loadCidadesLookup, staleTime: 5 * 60_000 });
+
+  const escMap = useMemo(() => buildEscalonamentoMap(escQ.data ?? []), [escQ.data]);
+
+  const onUploadGis = async (origem: "1_LINK" | "2_LINKS", file: File) => {
+    try {
+      const rows = await readGisFile(file, origem);
+      const loaded = { name: file.name, count: rows.length, rows };
+      if (origem === "1_LINK") setFile1(loaded); else setFile2(loaded);
+      await logAudit("UPLOAD_GIS", origem, { arquivo: file.name, linhas: rows.length });
+      toast.success(`${file.name}: ${rows.length} linhas`);
+    } catch (e) {
+      toast.error("Falha ao ler GIS: " + (e as Error).message);
+    }
+  };
+
+  const runAnalysis = async () => {
+    if (!file1 && !file2) { toast.error("Carregue pelo menos um arquivo GIS."); return; }
+    if (!opQ.data) { toast.error("Base de operadoras ainda carregando."); return; }
+    setProcessing(true);
+    setTimeout(async () => {
+      const all: GisRow[] = [...(file1?.rows ?? []), ...(file2?.rows ?? [])];
+      const t0 = performance.now();
+      const r = processGis(all, opQ.data ?? [], cidadesQ.data);
+      const dt = Math.round(performance.now() - t0);
+      setResult(r);
+      setProcessing(false);
+
+      // Persist analise + massivas (best-effort)
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: analise } = await supabase.from("analises").insert({
+          executado_por: userData.user?.id ?? null,
+          total_registros: r.stats.totalRegistros,
+          qtd_principal_vtal: r.stats.principalVtal,
+          qtd_principal_oemp: r.stats.principalOemp,
+          qtd_secundario_uf: r.stats.secundarioUf,
+          qtd_secundario_nacional: r.stats.secundarioNacional,
+          circuitos_impactados: r.stats.circuitosImpactados,
+          ufs_impactadas: r.stats.ufsImpactadas,
+          arquivo_1link: file1?.name ?? null,
+          arquivo_2links: file2?.name ?? null,
+        }).select("id").single();
+        if (analise && r.massivas.length) {
+          await supabase.from("massivas").insert(r.massivas.map((m) => ({
+            analise_id: analise.id,
+            id_massiva: m.id_massiva,
+            tipo_massiva: m.tipo_massiva,
+            operadora: m.operadora,
+            uf: m.uf,
+            qtd_circuitos: m.qtd_circuitos,
+            primeiro_alarme: new Date(m.primeiro_ts).toISOString(),
+            ultimo_alarme: new Date(m.ultimo_ts).toISOString(),
+          })));
+        }
+        await logAudit("EXECUTAR_ANALISE", "analises", {
+          massivas: r.massivas.length,
+          registros: r.stats.totalRegistros,
+          lotericas_isoladas: r.stats.lotericasIsoladas,
+          geo: r.stats.geo,
+        });
+        for (const det of r.lotericasIsoladasDetalhe) {
+          await logAudit("LOTERICA_ISOLADA_DETECTADA", "massivas", det);
+        }
+      } catch (e) {
+        console.error("persist failed", e);
+      }
+
+      toast.success(`Análise em ${dt}ms — ${r.massivas.length} massivas detectadas`);
+    }, 30);
+  };
+
+  const filterOptions = useMemo(() => {
+    const rows = result?.rows ?? [];
+    const uniq = (fn: (r: (typeof rows)[number]) => string) =>
+      [...new Set(rows.map(fn).filter(Boolean))].sort();
+    return {
+      ufs: uniq((r) => r.__uf),
+      operadoras: uniq((r) => r.__operadora),
+      parceiras: uniq((r) => r.__parceira),
+      empresas: uniq((r) => String(r["Empresa"] ?? "")),
+      tecnologias: uniq((r) => String(r["Tecnologia"] ?? "")),
+      siteOwners: uniq((r) => String(r["Site Owner"] ?? "")),
+    };
+  }, [result]);
+
+  const filteredRows = useMemo(() => {
+    if (!result) return [];
+    const di = filters.dataInicial ? new Date(filters.dataInicial).getTime() : null;
+    const df = filters.dataFinal ? new Date(filters.dataFinal).getTime() : null;
+    const cidadeQ = filters.cidade.toLowerCase().trim();
+    return result.rows.filter((r) => {
+      if (filters.uf && r.__uf !== filters.uf) return false;
+      if (cidadeQ && !String(r["Cidade"] ?? "").toLowerCase().includes(cidadeQ)) return false;
+      if (filters.tipoLink && r.__tipoLink !== filters.tipoLink) return false;
+      if (filters.tipoMassiva) {
+        if (filters.tipoMassiva === "__nao") {
+          if (r["Status Massiva"] !== "NAO_MASSIVA") return false;
+        } else if (!String(r["Tipo Massiva"] ?? "").includes(filters.tipoMassiva)) return false;
+      }
+      if (filters.operadora && r.__operadora !== filters.operadora) return false;
+      if (filters.parceira && r.__parceira !== filters.parceira) return false;
+      if (filters.empresa && String(r["Empresa"] ?? "") !== filters.empresa) return false;
+      if (filters.tecnologia && String(r["Tecnologia"] ?? "") !== filters.tecnologia) return false;
+      if (filters.siteOwner && String(r["Site Owner"] ?? "") !== filters.siteOwner) return false;
+      if (di != null && r.__ts < di) return false;
+      if (df != null && r.__ts > df) return false;
+      return true;
+    });
+  }, [result, filters]);
+
+  const filteredMassivas = useMemo(() => {
+    if (!result) return [];
+    const ids = new Set(filteredRows.map((r) => r.__rowId));
+    return result.massivas.filter((m) => m.rowIds.some((id) => ids.has(id)));
+  }, [result, filteredRows]);
+
+  // Extended dashboard stats (V13)
+  const extStats = useMemo(() => {
+    if (!result) {
+      return {
+        vtal: 0, oemp: 0, semChamado: 0, comChamado: 0,
+        operadorasAfetadas: 0, parceirasAfetadas: 0,
+        escDisponiveis: 0, escAusentes: 0,
+      };
+    }
+    const impactRows = result.rows.filter((r) => r["Status Massiva"] === "MASSIVA");
+    let sem = 0, com = 0;
+    for (const r of impactRows) {
+      const c = String(r["Chamado"] ?? "").trim();
+      if (c) com++; else sem++;
+    }
+    const ops = new Set(impactRows.map((r) => r.__operadora).filter((v) => v && v !== "NAO_IDENTIFICADO"));
+    const parc = new Set(result.massivas.map((m) => m.parceira).filter((v) => v && v !== "-" && v !== "VTAL"));
+    let escDisp = 0;
+    for (const m of result.massivas) {
+      if (m.parceira && m.parceira !== "-" && escMap.get(m.parceira.toUpperCase())) escDisp++;
+    }
+    return {
+      vtal: result.stats.principalVtal,
+      oemp: result.stats.principalOemp,
+      semChamado: sem,
+      comChamado: com,
+      operadorasAfetadas: ops.size,
+      parceirasAfetadas: parc.size,
+      escDisponiveis: escDisp,
+      escAusentes: result.massivas.length - escDisp,
+    };
+  }, [result, escMap]);
+
+  const massivasExport = useMemo(
+    () => filteredMassivas.map((m) => {
+      const esc = m.parceira ? escMap.get(m.parceira.toUpperCase()) : null;
+      return {
+        "ID Massiva": m.id_massiva, "Tipo Massiva": m.tipo_massiva,
+        UF: m.uf, Operadora: m.operadora, Parceira: m.parceira,
+        "Qtde Circuitos": m.qtd_circuitos,
+        "Primeiro Alarme": m.primeiro_alarme, "Último Alarme": m.ultimo_alarme,
+        "Janela (min)": m.janela_minutos,
+        "Possui Escalonamento": esc ? "Sim" : "Não",
+        "Responsável N1": esc?.n1_nome ?? "",
+        "Sinalização 60 KM": m.sinalizacao_60km ? SINALIZACAO_LABEL[m.sinalizacao_60km] : "",
+        "Cidade Epicentro": m.cidade_epicentro ?? "",
+        "UF Epicentro": m.uf_epicentro ?? "",
+        "Raio Máximo (km)": m.raio_maximo_km ?? 0,
+        "Percentual Dentro 60 KM": (m.percentual_dentro_60km ?? 0) + "%",
+        "Qtd Circuitos Dentro 60 KM": m.qtd_circuitos_dentro_60km ?? 0,
+        "Qtd Circuitos Fora 60 KM": m.qtd_circuitos_fora_60km ?? 0,
+        "Qtd Cidades Afetadas": m.qtd_cidades_afetadas ?? 0,
+        "Cidades Afetadas": (m.cidades_afetadas ?? []).map((c) => `${c.cidade}/${c.uf} (${c.qtd})`).join(" | "),
+      };
+    }), [filteredMassivas, escMap]);
+
+  const reset = () => { setFile1(null); setFile2(null); setResult(null); setFilters(emptyFilters); };
+
+  const opsCount = opQ.data?.length ?? 0;
+  const escCount = escQ.data?.length ?? 0;
+
+  return (
+    <div className="mx-auto max-w-[1600px] space-y-6 px-6 py-6">
+      <h1 className="sr-only">Análise de Eventos de Alarme GIS — Correlação VTAL e OEMP</h1>
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Activity className="h-3 w-3 text-noc-blue" />
+        <span>Painel</span>
+        <span aria-hidden>›</span>
+        <span className="text-foreground">Análises</span>
+        {result && (
+          <>
+            <span aria-hidden>›</span>
+            <span className="font-mono">{result.stats.ultimaAtualizacao}</span>
+          </>
+        )}
+      </nav>
+
+      {/* Base status strip */}
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
+        <span className="rounded-md border border-border bg-card px-2 py-1">
+          <Network className="mr-1 inline h-3 w-3 text-noc-blue" />
+          Operadoras: <span className="font-mono font-semibold">{opQ.isLoading ? "…" : opsCount}</span>
+        </span>
+        <span className="rounded-md border border-border bg-card px-2 py-1">
+          <Shield className="mr-1 inline h-3 w-3 text-noc-green" />
+          Escalonamentos: <span className="font-mono font-semibold">{escQ.isLoading ? "…" : escCount}</span>
+        </span>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setHelpOpen(true)}>
+          <HelpCircle className="h-3.5 w-3.5" /> Regras de detecção
+        </Button>
+        {(file1 || file2 || result) && (
+          <Button variant="outline" size="sm" className="ml-auto" onClick={reset}>
+            <Trash2 className="h-4 w-4" /> Nova análise
+          </Button>
+        )}
+      </div>
+
+      {/* Uploads + processar */}
+      <section className="grid gap-4 md:grid-cols-3">
+        <UploadCard
+          label="GIS 1 LINK" sublabel="Alarmes 1 link fora"
+          loaded={file1 && { name: file1.name, count: file1.count }}
+          accent="red" onFile={(f) => onUploadGis("1_LINK", f)}
+        />
+        <UploadCard
+          label="GIS 2 LINKS" sublabel="Alarmes 2 links fora"
+          loaded={file2 && { name: file2.name, count: file2.count }}
+          accent="yellow" onFile={(f) => onUploadGis("2_LINKS", f)}
+        />
+        <div className="flex flex-col gap-3 rounded-xl border border-noc-blue/40 bg-card p-5 shadow-[0_0_24px_-12px_var(--noc-blue)]">
+          <div className="text-sm font-semibold uppercase tracking-wide">Processar</div>
+          <div className="text-xs text-muted-foreground">
+            PRINCIPAL VTAL ≥5/UF · PRINCIPAL OEMP ≥5/UF/operadora · SECUNDARIO ≥15/UF · ≥50/Nacional · Janela 15 min
+          </div>
+          <Button onClick={runAnalysis} disabled={processing || (!file1 && !file2) || opQ.isLoading} className="mt-auto">
+            <Play className="h-4 w-4" />
+            {processing ? "Processando..." : "Executar análise"}
+          </Button>
+        </div>
+      </section>
+
+      {result && (
+        <>
+          <Accordion type="multiple" defaultValue={["massivas", "circuitos", "geo"]} className="space-y-2">
+            <AccordionItem value="massivas" className="rounded-xl border border-border bg-card px-4">
+              <AccordionTrigger className="text-xs font-semibold uppercase tracking-wider hover:no-underline">
+                <span className="flex items-center gap-2"><Flame className="h-4 w-4 text-noc-red" /> Massivas</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="grid gap-3 pb-2 md:grid-cols-2 lg:grid-cols-4">
+                  <StatCard label="Principal VTAL" value={extStats.vtal} icon={Flame} tone="red" />
+                  <StatCard label="Principal OEMP" value={extStats.oemp} icon={AlertTriangle} tone="yellow" />
+                  <StatCard label="Sec. UF" value={result.stats.secundarioUf} icon={Network} tone="yellow" />
+                  <StatCard label="Sec. Nacional" value={result.stats.secundarioNacional} icon={Globe2} tone="blue" />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="circuitos" className="rounded-xl border border-border bg-card px-4">
+              <AccordionTrigger className="text-xs font-semibold uppercase tracking-wider hover:no-underline">
+                <span className="flex items-center gap-2"><RadioTower className="h-4 w-4 text-noc-blue" /> Circuitos</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="grid gap-3 pb-2 md:grid-cols-2 lg:grid-cols-4">
+                  <StatCard label="Circuitos Impactados" value={result.stats.circuitosImpactados} icon={RadioTower} tone="muted" sub={`de ${result.stats.totalRegistros} registros`} />
+                  <StatCard label="UFs Impactadas" value={result.stats.ufsImpactadas} icon={MapPin} tone="muted" />
+                  <StatCard label="Não Identificados" value={result.stats.naoIdentificados} icon={HelpCircle} tone="muted" sub="circuitos sem operadora" />
+                  <StatCard label="Sem Chamado" value={extStats.semChamado} icon={XCircle} tone="red" sub="circuitos impactados" />
+                  <StatCard label="Com Chamado" value={extStats.comChamado} icon={CheckCircle2} tone="blue" sub="circuitos impactados" />
+                  <StatCard label="Lotéricas Isoladas" value={result.stats.lotericasIsoladas} icon={AlertOctagon} tone="yellow" sub="dentro de massivas" />
+                  <StatCard label="Circuitos Isolados" value={result.stats.circuitosIsolados} icon={RadioTower} tone="muted" sub="fora de massivas" />
+                  <StatCard label="Operadoras Afetadas" value={extStats.operadorasAfetadas} icon={Building2} tone="muted" />
+                  <StatCard label="Parceiras Afetadas" value={extStats.parceirasAfetadas} icon={Network} tone="muted" />
+                  <StatCard label="Escalon. Disponíveis" value={extStats.escDisponiveis} icon={Shield} tone="blue" sub="massivas com matriz" />
+                  <StatCard label="Escalon. Ausentes" value={extStats.escAusentes} icon={ShieldOff} tone="yellow" sub="massivas sem matriz" />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="geo" className="rounded-xl border border-border bg-card px-4">
+              <AccordionTrigger className="text-xs font-semibold uppercase tracking-wider hover:no-underline">
+                <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-noc-green" /> Geolocalização (raio de 60 km)</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="grid gap-3 pb-2 md:grid-cols-2 lg:grid-cols-4">
+                  <StatCard label="Dentro 60 KM" value={result.stats.geo.dentro60km} icon={MapPin} tone="blue" sub="concentração geográfica" />
+                  <StatCard label="Parcialmente" value={result.stats.geo.parcial60km} icon={MapPin} tone="yellow" sub="50% a 79% no raio" />
+                  <StatCard label="Fora 60 KM" value={result.stats.geo.fora60km} icon={MapPin} tone="red" sub="circuitos dispersos" />
+                  <StatCard label="Sem Geo" value={result.stats.geo.semGeo} icon={MapPin} tone="muted" sub={result.stats.geo.baseUsada ? `${result.stats.geo.cidadesNaoEncontradas} cidades sem coord.` : "Base de cidades não carregada"} />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <SlidersHorizontal className="h-4 w-4" />
+                {filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <FiltersBar filters={filters} setFilters={setFilters} options={filterOptions} />
+            </CollapsibleContent>
+          </Collapsible>
+
+          <section className="grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-3 rounded-xl border border-border bg-card">
+              <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-noc-blue" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide">Massivas ({filteredMassivas.length})</h2>
+                </div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => exportToCsv(massivasExport, "massivas.csv")}>CSV</Button>
+                  <Button size="sm" variant="outline" onClick={() => exportToXlsx(massivasExport, "massivas.xlsx")}><Download className="h-3.5 w-3.5" /> XLSX</Button>
+                  <Button size="sm" variant="outline" onClick={() => exportToPdf(massivasExport, "massivas.pdf", "Massivas Detectadas")}><FileText className="h-3.5 w-3.5" /> PDF</Button>
+                </div>
+              </div>
+              <div className="max-h-[560px] overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-card">
+                    <tr className="border-b border-border text-left">
+                      <th className="px-3 py-2 font-semibold">ID</th>
+                      <th className="px-3 py-2 font-semibold">Tipo</th>
+                      <th className="px-3 py-2 font-semibold">UF</th>
+                      <th className="px-3 py-2 font-semibold">Operadora</th>
+                      <th className="px-3 py-2 font-semibold text-right">Qtd</th>
+                      <th className="px-3 py-2 font-semibold">Sinalização 60 KM</th>
+                      <th className="px-3 py-2 font-semibold">Epicentro</th>
+                      <th className="px-3 py-2 font-semibold text-right">Raio</th>
+                      <th className="px-3 py-2 font-semibold text-right">% 60 KM</th>
+                      <th className="px-3 py-2 font-semibold">Primeiro</th>
+                      <th className="px-3 py-2 font-semibold">Último</th>
+                      <th className="px-3 py-2 font-semibold text-right">Janela</th>
+                      <th className="px-3 py-2 font-semibold text-right">Máscara</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMassivas.length === 0 && (
+                      <tr><td colSpan={13} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva detectada.</td></tr>
+                    )}
+                    {filteredMassivas.map((m) => (
+                      <tr key={m.id_massiva} onClick={() => setDrill(m)} className="cursor-pointer border-b border-border/50 hover:bg-accent/40">
+                        <td className="px-3 py-2 font-mono">{m.id_massiva}</td>
+                        <td className="px-3 py-2"><MassivaBadge tipo={m.tipo_massiva} /></td>
+                        <td className="px-3 py-2 font-mono font-semibold">{m.uf}</td>
+                        <td className="px-3 py-2 font-mono">{m.operadora}</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          <div>{m.qtd_circuitos}</div>
+                          {m.qtd_lotericas_isoladas ? (
+                            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-noc-yellow/15 px-1 py-0.5 text-[10px] font-semibold text-noc-yellow">
+                              <AlertOctagon className="h-3 w-3" />{m.qtd_lotericas_isoladas} isolada{m.qtd_lotericas_isoladas > 1 ? "s" : ""}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2"><Sinalizacao60kmBadge sinalizacao={m.sinalizacao_60km} /></td>
+                        <td className="px-3 py-2 font-mono text-[11px]">{m.cidade_epicentro ? `${m.cidade_epicentro}/${m.uf_epicentro}` : "-"}</td>
+                        <td className="px-3 py-2 text-right font-mono">{m.sinalizacao_60km === "SEM_GEO" ? "-" : `${m.raio_maximo_km ?? 0} km`}</td>
+                        <td className="px-3 py-2 text-right font-mono">{m.sinalizacao_60km === "SEM_GEO" ? "-" : `${m.percentual_dentro_60km ?? 0}%`}</td>
+                        <td className="px-3 py-2 font-mono text-muted-foreground">{m.primeiro_alarme}</td>
+                        <td className="px-3 py-2 font-mono text-muted-foreground">{m.ultimo_alarme}</td>
+                        <td className="px-3 py-2 text-right font-mono">{m.janela_minutos}m</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); setMascara(m); }}>
+                            <FileSignature className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 rounded-xl border border-border bg-card">
+              <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-noc-green" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide">Registros ({filteredRows.length})</h2>
+                </div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => exportToCsv(processedRowsForExport(filteredRows), "registros.csv")}>CSV</Button>
+                  <Button size="sm" variant="outline" onClick={() => exportToXlsx(processedRowsForExport(filteredRows), "registros.xlsx")}><Download className="h-3.5 w-3.5" /> XLSX</Button>
+                </div>
+              </div>
+              <div className="max-h-[560px] overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-card">
+                    <tr className="border-b border-border text-left">
+                      <th className="px-3 py-2 font-semibold">Designação</th>
+                      <th className="px-3 py-2 font-semibold">UF</th>
+                      <th className="px-3 py-2 font-semibold">Operadora</th>
+                      <th className="px-3 py-2 font-semibold">Link</th>
+                      <th className="px-3 py-2 font-semibold">Chamado</th>
+                      <th className="px-3 py-2 font-semibold">Situação</th>
+                      <th className="px-3 py-2 font-semibold">Tipo Massiva</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.slice(0, 500).map((r) => {
+                      const ch = String(r["Chamado"] ?? "").trim();
+                      return (
+                        <tr key={r.__rowId} className="border-b border-border/50">
+                          <td className="px-3 py-2 font-mono truncate max-w-[140px]">{String(r["Designação"] ?? "")}</td>
+                          <td className="px-3 py-2 font-mono">{r.__uf}</td>
+                          <td className="px-3 py-2 font-mono">{r.__operadora}</td>
+                          <td className="px-3 py-2 font-mono">{r.__tipoLink}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {ch ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-noc-green/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-green">🟢 <span className="font-mono">{ch}</span></span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded bg-noc-red/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-red">🔴 SEM</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2"><SituacaoBadge situacao={r.__situacao} /></td>
+                          <td className="px-3 py-2"><MassivaBadge tipo={r["Tipo Massiva"]} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {filteredRows.length > 500 && (
+                  <div className="border-t border-border p-2 text-center text-[11px] text-muted-foreground">
+                    Mostrando 500 de {filteredRows.length} — use filtros ou exporte para ver tudo.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {!result && (
+        <section className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+          <Radar className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide">Aguardando dados de entrada</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Carregue os arquivos GIS e execute a análise. Bases de Operadoras e Escalonamentos já estão carregadas do banco.
+          </p>
+        </section>
+      )}
+
+      <DrillDownModal
+        open={!!drill} onClose={() => setDrill(null)} massiva={drill}
+        rows={result?.rows ?? []}
+        escalonamento={drill?.parceira ? escMap.get(drill.parceira.toUpperCase()) ?? null : null}
+      />
+
+      <MascaraOcorrenciaDialog
+        open={!!mascara}
+        onClose={() => setMascara(null)}
+        massiva={mascara}
+        rows={result?.rows ?? []}
+      />
+
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Regras de detecção de massiva</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p><b>Janela de correlação:</b> 15 minutos (deslizante).</p>
+            <ul className="list-disc space-y-1 pl-5 text-xs">
+              <li><b>PRINCIPAL VTAL</b> — ≥ 5 alarmes PRINCIPAL na mesma UF e operadora VTAL.</li>
+              <li><b>PRINCIPAL OEMP</b> — ≥ 5 alarmes PRINCIPAL na mesma UF e mesma parceira (≠ VTAL).</li>
+              <li><b>SECUNDÁRIO UF</b> — ≥ 15 alarmes SECUNDARIO na mesma UF.</li>
+              <li><b>SECUNDÁRIO NACIONAL</b> — ≥ 50 alarmes SECUNDARIO em qualquer UF.</li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              O raio de 60 km é sinalização <b>informativa</b> e nunca altera o status MASSIVA/NÃO_MASSIVA.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -318,6 +318,7 @@ export type Database = {
           status_normalizacao: string
           status_planilha: string | null
           status_zabbix: string | null
+          tem_os_reparo: boolean
           tipo_link: string | null
           uf: string | null
           ultimo_comentario: string | null
@@ -357,6 +358,7 @@ export type Database = {
           status_normalizacao?: string
           status_planilha?: string | null
           status_zabbix?: string | null
+          tem_os_reparo?: boolean
           tipo_link?: string | null
           uf?: string | null
           ultimo_comentario?: string | null
@@ -396,6 +398,7 @@ export type Database = {
           status_normalizacao?: string
           status_planilha?: string | null
           status_zabbix?: string | null
+          tem_os_reparo?: boolean
           tipo_link?: string | null
           uf?: string | null
           ultimo_comentario?: string | null

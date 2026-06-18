@@ -7,7 +7,7 @@ export interface MascaraInput {
   inc_massiva: string;
   chamado_interno: string;
   caso_pai: string;
-  tipo_label: "PRINCIPAL" | "SECUNDARIO";
+  tipo_label: "PRINCIPAL" | "SECUNDÁRIO";
   uf_label: string;
   qtd_total: number;
   qtd_isoladas: number;
@@ -19,9 +19,9 @@ export interface MascaraInput {
 }
 
 export const STATUS_PADRAO =
-  "A equipe de campo foi mobilizada para diagnosticar a causa raiz da interrupcao no meio de transmissao.\n" +
-  "Prazo estimado de 2 horas para diagnostico da falha e deslocamento da equipe de campo.\n" +
-  "Acompanhamento continuo pelo NOC ate a normalizacao total dos circuitos afetados.";
+  "A equipe de campo foi mobilizada para diagnosticar a causa raiz da interrupção no meio de transmissão.\n" +
+  "Prazo estimado de 2 horas para diagnóstico da falha e deslocamento da equipe de campo.\n" +
+  "Acompanhamento contínuo pelo NOC até a normalização total dos circuitos afetados.";
 
 const clean = (value: unknown) => String(value ?? "").trim();
 

@@ -36,6 +36,10 @@ DO $$
 BEGIN
   -- Consulta UL already owns app_role. Extend it for migrated modules instead
   -- of replacing it. Enum labels are case-sensitive in Postgres.
+  ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'admin';
+  ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'user';
+  ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'operacao';
+  ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'leitura';
   ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'ADMIN';
   ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'OPERADOR';
   ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'administrador';
@@ -158,7 +162,7 @@ AS $$
     SELECT 1
     FROM public.user_roles
     WHERE user_id = _user_id
-      AND role::text IN ('administrador_master', 'administrador', 'admin', 'ADMIN', 'operacao', 'OPERADOR')
+      AND role::text IN ('administrador_master', 'administrador', 'admin', 'ADMIN', 'operacao', 'OPERADOR', 'user')
   )
 $$;
 
@@ -434,6 +438,70 @@ ALTER TABLE public.controle_diario
   DROP CONSTRAINT IF EXISTS controle_diario_data_chave_versao_key;
 
 DO $$
+DECLARE
+  item record;
+BEGIN
+  FOR item IN
+    SELECT c.conname
+    FROM pg_constraint c
+    WHERE c.conrelid = 'public.controle_diario'::regclass
+      AND c.contype = 'u'
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(c.conkey) k
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k
+        WHERE a.attname = 'data_referencia'
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(c.conkey) k
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k
+        WHERE a.attname = 'chave'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(c.conkey) k
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k
+        WHERE a.attname = 'versao'
+      )
+  LOOP
+    EXECUTE format('ALTER TABLE public.controle_diario DROP CONSTRAINT IF EXISTS %I', item.conname);
+  END LOOP;
+
+  FOR item IN
+    SELECT i.indexrelid::regclass AS index_name
+    FROM pg_index i
+    WHERE i.indrelid = 'public.controle_diario'::regclass
+      AND i.indisunique
+      AND NOT i.indisprimary
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(i.indkey) k
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k
+        WHERE a.attname = 'data_referencia'
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(i.indkey) k
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k
+        WHERE a.attname = 'chave'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(i.indkey) k
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k
+        WHERE a.attname = 'versao'
+      )
+  LOOP
+    EXECUTE format('DROP INDEX IF EXISTS %s', item.index_name);
+  END LOOP;
+END;
+$$;
+
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -466,6 +534,14 @@ CREATE TABLE IF NOT EXISTS public.historico_tratativas (
   data_hora timestamptz NOT NULL DEFAULT now(),
   recorded_by uuid DEFAULT auth.uid()
 );
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS controle_id uuid REFERENCES public.controle_diario(id) ON DELETE SET NULL;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS codigo_loterica text;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS usuario text;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS campo text;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS valor_anterior text;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS valor_novo text;
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS data_hora timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.historico_tratativas ADD COLUMN IF NOT EXISTS recorded_by uuid DEFAULT auth.uid();
 CREATE INDEX IF NOT EXISTS idx_hist_codigo ON public.historico_tratativas (codigo_loterica);
 
 CREATE TABLE IF NOT EXISTS public.implantacoes (
@@ -594,15 +670,15 @@ BEGIN
       ('base_cidades', 'compat_base_cidades_read', 'SELECT', 'true', NULL),
       ('base_cidades', 'compat_base_cidades_write', 'ALL', 'public.is_admin(auth.uid())', 'public.is_admin(auth.uid())'),
       ('importacoes', 'compat_importacoes_read', 'SELECT', 'true', NULL),
-      ('importacoes', 'compat_importacoes_write', 'ALL', 'public.is_admin(auth.uid())', 'public.is_admin(auth.uid())'),
+      ('importacoes', 'compat_importacoes_write', 'ALL', 'public.can_write(auth.uid())', 'public.can_write(auth.uid())'),
       ('staging_bases', 'compat_staging_read', 'SELECT', 'true', NULL),
-      ('staging_bases', 'compat_staging_write', 'ALL', 'public.is_admin(auth.uid())', 'public.is_admin(auth.uid())'),
+      ('staging_bases', 'compat_staging_write', 'ALL', 'public.can_write(auth.uid())', 'public.can_write(auth.uid())'),
       ('controle_diario', 'compat_controle_read', 'SELECT', 'true', NULL),
       ('controle_diario', 'compat_controle_write', 'ALL', 'public.can_write(auth.uid())', 'public.can_write(auth.uid())'),
       ('historico_tratativas', 'compat_historico_read', 'SELECT', 'true', NULL),
       ('historico_tratativas', 'compat_historico_insert', 'INSERT', NULL, 'public.can_write(auth.uid())'),
       ('implantacoes', 'compat_implantacoes_read', 'SELECT', 'true', NULL),
-      ('implantacoes', 'compat_implantacoes_write', 'ALL', 'public.is_admin(auth.uid())', 'public.is_admin(auth.uid())')
+      ('implantacoes', 'compat_implantacoes_write', 'ALL', 'public.can_write(auth.uid())', 'public.can_write(auth.uid())')
     ) AS v(table_name, policy_name, command_name, using_expr, check_expr)
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policy_name, r.table_name);
@@ -626,3 +702,5 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+NOTIFY pgrst, 'reload schema';

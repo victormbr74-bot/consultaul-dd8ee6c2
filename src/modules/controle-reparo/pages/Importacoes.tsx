@@ -87,7 +87,7 @@ function formatProcessingReport(report: ProcessReport): string {
 }
 
 export default function ImportacoesPage() {
-  const { isAdmin, user, nome } = useAuth();
+  const { canWrite, user, nome } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [uploading, setUploading] = useState<string | null>(null);
@@ -124,8 +124,8 @@ export default function ImportacoesPage() {
   });
 
   const handleFile = async (tipo: TipoBase, file: File) => {
-    if (!isAdmin) {
-      toast.error("Sem permissão", { description: "Apenas administradores podem subir as bases." });
+    if (!canWrite) {
+      toast.error("Sem permissão", { description: "Seu usuário não pode subir bases." });
       return;
     }
     setUploading(tipo);
@@ -173,10 +173,10 @@ export default function ImportacoesPage() {
     }
   };
 
-  // item 16 — excluir base carregada (somente admin)
+  // item 16 — excluir base carregada
   const handleDelete = async (tipo: TipoBase) => {
-    if (!isAdmin) {
-      toast.error("Sem permissão", { description: "Apenas administradores podem excluir bases." });
+    if (!canWrite) {
+      toast.error("Sem permissão", { description: "Seu usuário não pode excluir bases." });
       return;
     }
     setDeleting(tipo);
@@ -277,7 +277,7 @@ export default function ImportacoesPage() {
           <Button
             size="sm"
             className="flex-1 sm:flex-none"
-            disabled={!isAdmin || processMut.isPending}
+            disabled={!canWrite || processMut.isPending}
             onClick={() => processMut.mutate()}
           >
             {processMut.isPending ? (
@@ -291,9 +291,9 @@ export default function ImportacoesPage() {
         </div>
       </div>
 
-      {!isAdmin && (
+      {!canWrite && (
         <div className="mb-6 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-          Apenas administradores podem subir as bases e gerar o controle diário. Você pode
+          Seu usuário não pode subir bases nem gerar o controle diário. Você pode
           visualizar o histórico abaixo.
         </div>
       )}
@@ -348,7 +348,7 @@ export default function ImportacoesPage() {
                 variant="outline"
                 size="sm"
                 className="mt-3 w-full"
-                disabled={!isAdmin || uploading === t.tipo}
+                disabled={!canWrite || uploading === t.tipo}
                 onClick={() => inputs.current[t.tipo]?.click()}
               >
                 {uploading === t.tipo ? (
@@ -367,7 +367,7 @@ export default function ImportacoesPage() {
                     variant="ghost"
                     size="sm"
                     className="text-faixa-critico hover:text-faixa-critico"
-                    disabled={!isAdmin || deleting === t.tipo}
+                    disabled={!canWrite || deleting === t.tipo}
                     onClick={() => handleDelete(t.tipo)}
                   >
                     {deleting === t.tipo ? (

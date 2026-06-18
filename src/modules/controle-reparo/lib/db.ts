@@ -23,6 +23,17 @@ function isMissingVersaoColumnError(error: { code?: string; message?: string } |
   );
 }
 
+function isMissingHistoricoSchemaError(error: { code?: string; message?: string } | null): boolean {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    message.includes("could not find") ||
+    (message.includes("schema cache") &&
+      (message.includes("historico_tratativas") || message.includes("campo")))
+  );
+}
+
 export async function hasControleVersaoColumn(): Promise<boolean> {
   if (controleVersaoSupported !== null) return controleVersaoSupported;
   const { error } = await supabase.from("controle_diario").select("versao").limit(1);
@@ -155,7 +166,13 @@ async function fetchManualEditFieldsByChave(
       .from("historico_tratativas")
       .select("controle_id, campo")
       .in("controle_id", slice);
-    if (error) throw error;
+    if (error) {
+      if (isMissingHistoricoSchemaError(error)) {
+        console.warn("Histórico de tratativas indisponível; processamento seguirá sem preservar edições manuais por histórico.", error);
+        return {};
+      }
+      throw error;
+    }
     for (const item of data ?? []) {
       if (!item.controle_id) continue;
       const chave = idToChave.get(item.controle_id);
@@ -208,6 +225,13 @@ async function nextControleVersao(dataReferencia: string): Promise<number> {
   if (!(await hasControleVersaoColumn())) return 1;
   const latest = await fetchLatestControleVersao(dataReferencia);
   return (latest ?? 0) + 1;
+}
+
+async function requireControleVersaoColumn(): Promise<void> {
+  if (await hasControleVersaoColumn()) return;
+  throw new Error(
+    "A coluna controle_diario.versao ainda não está disponível no Supabase. Aplique o SQL de versão/constraint e recarregue o cache do PostgREST antes de processar novamente.",
+  );
 }
 
 type Tipo = "gis1" | "gis2" | "controle_d1" | "jira" | "grafana" | "planta";
@@ -274,9 +298,9 @@ export async function runDailyProcessing(): Promise<{
     throw new Error("Importe ao menos uma base GIS antes de processar.");
   }
 
+  await requireControleVersaoColumn();
   const { prior, manualEditFieldsByChave } = await fetchProcessingContext(dataExecucao);
-  const supportsVersao = await hasControleVersaoColumn();
-  const versao = supportsVersao ? await nextControleVersao(dataExecucao) : 1;
+  const versao = await nextControleVersao(dataExecucao);
 
   const result = processControle({
     gis1,
@@ -298,14 +322,22 @@ export async function runDailyProcessing(): Promise<{
   // insert in chunks
   let inserted = 0;
   for (let i = 0; i < result.controle.length; i += 500) {
-    const chunk = result.controle.slice(i, i + 500).map((row) => {
-      if (supportsVersao) return row;
-      const legacyRow = { ...row } as Omit<ControleRow, "versao"> & { versao?: number };
-      delete legacyRow.versao;
-      return legacyRow;
-    });
+    const chunk = result.controle.slice(i, i + 500);
     const { error } = await supabase.from("controle_diario").insert(chunk as never);
-    if (error) throw error;
+    if (error) {
+      throw new Error(
+        [
+          "Falha ao gravar controle_diario",
+          `versao=${versao}`,
+          error.code,
+          error.message,
+          error.details,
+          error.hint,
+        ]
+          .filter(Boolean)
+          .join(" - "),
+      );
+    }
     inserted += chunk.length;
   }
 

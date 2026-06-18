@@ -359,6 +359,11 @@ function sameEditableValue(field: string, oldValue: unknown, newValue: EditableV
   return (oldValue ?? "") === (newValue ?? "");
 }
 
+function historyValue(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value);
+}
+
 function editDisplayValue(row: RowT, col: ColumnDef): string {
   if (col.id === "inicio") return formatDataHora(row.data_hora_inicial);
   if (col.id === "previsao") return formatDataHora(row.previsao_atendimento);
@@ -718,6 +723,30 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         description: [error.code, error.message].filter(Boolean).join(" - "),
       });
       return;
+    }
+
+    const { error: historyError } = await supabase.from("historico_tratativas").insert({
+      controle_id: row.id,
+      codigo_loterica: row.codigo_loterica,
+      usuario: nome,
+      campo: dbField,
+      valor_anterior: historyValue(oldVal),
+      valor_novo: historyValue(newVal),
+    } as never);
+    if (historyError) {
+      console.warn("Falha ao gravar histórico da edição", {
+        endpoint: "historico_tratativas",
+        method: "POST",
+        table: "historico_tratativas",
+        controleId: row.id,
+        codigoLoterica: row.codigo_loterica,
+        field,
+        dbField,
+        code: historyError.code,
+        message: historyError.message,
+        details: historyError.details,
+        hint: historyError.hint,
+      });
     }
   };
 

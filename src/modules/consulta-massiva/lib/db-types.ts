@@ -1,14 +1,30 @@
 // DB row shapes (mirror Supabase tables)
 export interface DbOperadora {
   id: string;
+  codigo_loterica?: string;
   designacao: string;
   ip_loopback: string;
   ip_loopback_secundario: string;
   operadora: string;
+  operadora_4g?: string;
   tipo_empresa: "VTAL" | "OEMP";
   ativo: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface DbLoterica {
+  cod_ul: string;
+  nome_loterica: string | null;
+  ccto_oi: string | null;
+  ccto_oemp: string | null;
+  operadora: string | null;
+  loopback_wan: string | null;
+  loopback_lan: string | null;
+  cidade: string | null;
+  uf: string | null;
+  designacao_nova: string | null;
+  raw_data?: Record<string, unknown> | null;
 }
 
 export interface DbEscalonamento {

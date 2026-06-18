@@ -169,7 +169,7 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
                     <td className="px-3 py-2 font-mono whitespace-nowrap">{String(r["IP Loopback"] ?? "")}</td>
                     <td className="px-3 py-2 font-mono">{r.__tipoLink}</td>
                     <td className="px-3 py-2 font-mono">{r.__operadora}</td>
-                    <td className="px-3 py-2 font-mono">{r.__classificacao}</td>
+                    <td className="px-3 py-2 font-mono">{r.__tipoEmp || r.__classificacao}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {chamado ? (
                         <span className="inline-flex items-center gap-1 rounded bg-noc-green/15 px-1.5 py-0.5 text-[11px] font-semibold text-noc-green">

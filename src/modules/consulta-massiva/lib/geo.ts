@@ -24,6 +24,7 @@ export function normalizeCidade(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -71,7 +72,7 @@ export function classifySinalizacao(
 ): Sinalizacao60km {
   if (totalCircuitos === 0 || totalComCoord === 0) return "SEM_GEO";
   const pct = (totalDentro / totalCircuitos) * 100;
-  if (pct >= 80) return "DENTRO_60KM";
+  if (totalDentro === totalComCoord && totalComCoord === totalCircuitos) return "DENTRO_60KM";
   if (pct >= 50) return "PARCIAL_60KM";
   return "FORA_60KM";
 }

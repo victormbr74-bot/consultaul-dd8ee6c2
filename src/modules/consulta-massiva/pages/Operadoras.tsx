@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, Trash2, Upload, Download } from "lucide-react";
+import { Database, Pencil, Plus, RefreshCw, Search, Trash2, Upload, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,103 @@ import { logAudit } from "@/modules/consulta-massiva/lib/audit";
 import { AdminGuard } from "@/modules/consulta-massiva/components/AdminGuard";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import type { DbOperadora } from "@/modules/consulta-massiva/lib/db-types";
+import type { DbLoterica, DbOperadora } from "@/modules/consulta-massiva/lib/db-types";
 
 const PAGE = 50;
+type OperadoraPayload = ReturnType<typeof operadoraRecordFromLoterica>;
+
+const norm = (v: unknown) => String(v ?? "").trim();
+const upper = (v: unknown) => norm(v).toUpperCase();
+const rawValue = (row: DbLoterica, ...keys: string[]) => {
+  const raw = row.raw_data;
+  if (!raw || typeof raw !== "object") return "";
+  const normalizeKey = (v: string) =>
+    v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  const entries = Object.entries(raw);
+  for (const key of keys) {
+    const target = normalizeKey(key);
+    const found = entries.find(([k, v]) => normalizeKey(k) === target && norm(v));
+    if (found) return norm(found[1]);
+  }
+  return "";
+};
+
+async function fetchAllLotericasForOperadoras(): Promise<DbLoterica[]> {
+  const out: DbLoterica[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("lotericas")
+      .select("cod_ul,nome_loterica,ccto_oi,ccto_oemp,operadora,loopback_wan,loopback_lan,cidade,uf,designacao_nova,raw_data")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbLoterica[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
+async function fetchAllOperadorasForSync(): Promise<DbOperadora[]> {
+  const out: DbOperadora[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("operadoras")
+      .select("*")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbOperadora[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
+function operadoraRecordFromLoterica(row: DbLoterica) {
+  const empresaOemp = upper(rawValue(row, "EMPRESA OEMP", "EMPRESA PRINCIPAL", "OPERADORA PRINCIPAL"));
+  const operadora4g = upper(row.operadora || rawValue(row, "OPERADORA 4G", "OPERADORA", "RESP BACKUP"));
+  const operadoraPrincipal = empresaOemp || "VTAL";
+  const designacao =
+    upper(row.designacao_nova) ||
+    upper(row.ccto_oi) ||
+    upper(rawValue(row, "DESIGNACAO NOVA", "DESIGNAÇÃO NOVA", "DESIGINACAO NOVA"));
+  const ipLoopback = norm(row.loopback_wan || rawValue(row, "LOOPBACK PRINCIPAL"));
+  const ipLoopbackSec = norm(row.loopback_lan || rawValue(row, "LOOPBACK SECUNDARIO", "LOOPBACK SECUNDÁRIO"));
+
+  return {
+    codigo_loterica: norm(row.cod_ul),
+    designacao,
+    ip_loopback: ipLoopback,
+    ip_loopback_secundario: ipLoopbackSec,
+    operadora: operadoraPrincipal,
+    operadora_4g: operadora4g,
+    tipo_empresa: (operadoraPrincipal === "VTAL" ? "VTAL" : "OEMP") as "VTAL" | "OEMP",
+    ativo: true,
+  };
+}
+
+function legacyOperadoraPayload(payload: OperadoraPayload) {
+  return {
+    designacao: payload.designacao,
+    ip_loopback: payload.ip_loopback,
+    ip_loopback_secundario: payload.ip_loopback_secundario,
+    operadora: payload.operadora,
+    tipo_empresa: payload.tipo_empresa,
+    ativo: payload.ativo,
+  };
+}
 
 export default function Page() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [edit, setEdit] = useState<Partial<DbOperadora> | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const q = useQuery({
@@ -31,7 +119,7 @@ export default function Page() {
         .range(page * PAGE, page * PAGE + PAGE - 1);
       if (search.trim()) {
         const s = search.trim();
-        qb = qb.or(`designacao.ilike.%${s}%,ip_loopback.ilike.%${s}%,operadora.ilike.%${s}%`);
+        qb = qb.or(`designacao.ilike.%${s}%,ip_loopback.ilike.%${s}%,ip_loopback_secundario.ilike.%${s}%,operadora.ilike.%${s}%`);
       }
       const { data, count, error } = await qb;
       if (error) throw error;
@@ -42,20 +130,22 @@ export default function Page() {
   const save = async () => {
     if (!edit) return;
     const payload = {
+      codigo_loterica: edit.codigo_loterica ?? "",
       designacao: edit.designacao ?? "",
       ip_loopback: edit.ip_loopback ?? "",
       ip_loopback_secundario: edit.ip_loopback_secundario ?? "",
       operadora: edit.operadora ?? "",
+      operadora_4g: edit.operadora_4g ?? "",
       tipo_empresa: (edit.tipo_empresa ?? "VTAL") as "VTAL"|"OEMP",
       ativo: edit.ativo ?? true,
     };
     if (!payload.operadora) { toast.error("Operadora é obrigatória"); return; }
     let err;
     if (edit.id) {
-      ({ error: err } = await supabase.from("operadoras").update(payload).eq("id", edit.id));
+      ({ error: err } = await supabase.from("operadoras").update(legacyOperadoraPayload(payload)).eq("id", edit.id));
       await logAudit("UPDATE_OPERADORA", "operadoras", { id: edit.id });
     } else {
-      ({ error: err } = await supabase.from("operadoras").insert(payload));
+      ({ error: err } = await supabase.from("operadoras").insert(legacyOperadoraPayload(payload)));
       await logAudit("INSERT_OPERADORA", "operadoras", payload);
     }
     if (err) { toast.error(err.message); return; }
@@ -77,9 +167,68 @@ export default function Page() {
   const exportAll = async () => {
     const { data } = await supabase.from("operadoras").select("*").order("designacao");
     exportToXlsx((data ?? []).map((r) => ({
-      Designação: r.designacao, "IP Loopback": r.ip_loopback, "IP Loopback Sec": r.ip_loopback_secundario,
-      Operadora: r.operadora, "Tipo Empresa": r.tipo_empresa, Ativo: r.ativo,
+      "Código UL": r.codigo_loterica, Designação: r.designacao, "IP Loopback": r.ip_loopback, "IP Loopback Sec": r.ip_loopback_secundario,
+      Operadora: r.operadora, "OPERADORA 4G": r.operadora_4g, "Tipo Empresa": r.tipo_empresa, Ativo: r.ativo,
     })), "operadoras.xlsx");
+  };
+
+  const syncFromLotericas = async () => {
+    setSyncing(true);
+    try {
+      const [lotericas, existentes] = await Promise.all([
+        fetchAllLotericasForOperadoras(),
+        fetchAllOperadorasForSync(),
+      ]);
+      const byKey = new Map<string, DbOperadora>();
+      const addExistingKey = (key: string, row: DbOperadora) => {
+        if (key && !byKey.has(key)) byKey.set(key, row);
+      };
+      for (const row of existentes) {
+        addExistingKey(`cod:${norm(row.codigo_loterica)}`, row);
+        addExistingKey(`des:${upper(row.designacao)}`, row);
+        addExistingKey(`ipp:${norm(row.ip_loopback)}`, row);
+        addExistingKey(`ips:${norm(row.ip_loopback_secundario)}`, row);
+      }
+
+      const updates: Array<{ id: string; payload: OperadoraPayload }> = [];
+      const inserts: OperadoraPayload[] = [];
+      for (const lot of lotericas) {
+        const payload = operadoraRecordFromLoterica(lot);
+        if (!payload.codigo_loterica || (!payload.designacao && !payload.ip_loopback && !payload.ip_loopback_secundario)) continue;
+        const hit =
+          byKey.get(`cod:${payload.codigo_loterica}`) ||
+          byKey.get(`des:${payload.designacao}`) ||
+          byKey.get(`ipp:${payload.ip_loopback}`) ||
+          byKey.get(`ips:${payload.ip_loopback_secundario}`);
+        if (hit) updates.push({ id: hit.id, payload });
+        else inserts.push(payload);
+      }
+
+      for (let i = 0; i < inserts.length; i += 500) {
+        const { error } = await supabase.from("operadoras").insert(inserts.slice(i, i + 500).map(legacyOperadoraPayload));
+        if (error) throw error;
+      }
+      for (const item of updates) {
+        const { error } = await supabase.from("operadoras").update(legacyOperadoraPayload(item.payload)).eq("id", item.id);
+        if (error) throw error;
+      }
+
+      await logAudit("SYNC_OPERADORAS_LOTERICAS", "operadoras", {
+        lotericas: lotericas.length,
+        inseridas: inserts.length,
+        atualizadas: updates.length,
+      });
+      toast.success("Operadoras sincronizadas com a base de lotéricas", {
+        description: `${inserts.length} inseridas, ${updates.length} atualizadas.`,
+      });
+      qc.invalidateQueries({ queryKey: ["operadoras"] });
+      qc.invalidateQueries({ queryKey: ["operadoras-all"] });
+      qc.invalidateQueries({ queryKey: ["lotericas-massiva-ref"] });
+    } catch (e) {
+      toast.error("Falha ao sincronizar lotéricas: " + (e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const importXlsx = async (file: File) => {
@@ -88,20 +237,31 @@ export default function Page() {
       const wb = XLSX.read(buf, { type: "array" });
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
       const norm = (v: unknown) => String(v ?? "").trim();
+      const get = (r: Record<string, unknown>, ...keys: string[]) => {
+        for (const key of keys) {
+          const direct = r[key];
+          if (direct != null && String(direct).trim() !== "") return direct;
+          const found = Object.keys(r).find((k) => k.trim().toUpperCase() === key.trim().toUpperCase());
+          if (found && String(r[found] ?? "").trim() !== "") return r[found];
+        }
+        return "";
+      };
       const records = rows.map((r) => {
-        const tipo = norm(r["Tipo Empresa"] ?? r["tipo_empresa"]).toUpperCase();
+        const tipo = norm(get(r, "Tipo Empresa", "tipo_empresa")).toUpperCase();
         return {
-          designacao: norm(r["Designação"] ?? r["designacao"]).toUpperCase(),
-          ip_loopback: norm(r["IP Loopback"] ?? r["ip_loopback"]),
-          ip_loopback_secundario: norm(r["IP Loopback Sec"] ?? r["ip_loopback_secundario"]),
-          operadora: norm(r["Operadora"] ?? r["operadora"]).toUpperCase(),
+          codigo_loterica: norm(get(r, "Código UL", "Codigo UL", "Código da Lotérica", "Codigo da Loterica", "Cód. da Lotérica", "Cod. da Loterica", "cod_ul", "codigo_loterica")),
+          designacao: norm(get(r, "Designação", "Designacao", "designacao")).toUpperCase(),
+          ip_loopback: norm(get(r, "IP Loopback", "Loopback Principal", "IP Loopback Principal", "ip_loopback")),
+          ip_loopback_secundario: norm(get(r, "IP Loopback Sec", "IP Loopback Secundário", "IP Loopback Secundario", "Loopback Secundário", "Loopback Secundario", "ip_loopback_secundario")),
+          operadora: norm(get(r, "Operadora", "operadora")).toUpperCase(),
+          operadora_4g: norm(get(r, "OPERADORA 4G", "Operadora 4G", "operadora_4g")).toUpperCase(),
           tipo_empresa: (tipo === "OEMP" ? "OEMP" : "VTAL") as "VTAL"|"OEMP",
           ativo: true,
         };
       }).filter((r) => r.operadora);
       // Batch insert
       for (let i = 0; i < records.length; i += 500) {
-        const { error } = await supabase.from("operadoras").insert(records.slice(i, i + 500));
+        const { error } = await supabase.from("operadoras").insert(records.slice(i, i + 500).map(legacyOperadoraPayload));
         if (error) throw error;
       }
       await logAudit("IMPORT_OPERADORAS", "operadoras", { total: records.length, arquivo: file.name });
@@ -122,6 +282,10 @@ export default function Page() {
         <span className="rounded-md border border-border bg-card px-2 py-1 text-[11px] font-mono">{q.data?.total ?? 0} registros</span>
         <div className="ml-auto flex flex-wrap gap-2">
           <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importXlsx(f); e.currentTarget.value = ""; }} />
+          <Button size="sm" variant="outline" onClick={syncFromLotericas} disabled={syncing}>
+            {syncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+            Sincronizar Lotéricas
+          </Button>
           <Button size="sm" variant="outline" onClick={() => importRef.current?.click()}><Upload className="h-4 w-4" /> Importar</Button>
           <Button size="sm" variant="outline" onClick={exportAll}><Download className="h-4 w-4" /> Exportar</Button>
           <Button size="sm" onClick={() => setEdit({ tipo_empresa: "VTAL", ativo: true })}><Plus className="h-4 w-4" /> Novo</Button>
@@ -140,9 +304,11 @@ export default function Page() {
             <thead className="sticky top-0 bg-card">
               <tr className="border-b border-border text-left">
                 <th className="px-3 py-2">Designação</th>
+                <th className="px-3 py-2">Código UL</th>
                 <th className="px-3 py-2">IP Loopback</th>
                 <th className="px-3 py-2">IP Loopback Sec</th>
                 <th className="px-3 py-2">Operadora</th>
+                <th className="px-3 py-2">OPERADORA 4G</th>
                 <th className="px-3 py-2">Tipo</th>
                 <th className="px-3 py-2">Ativo</th>
                 <th className="px-3 py-2 text-right">Ações</th>
@@ -152,9 +318,11 @@ export default function Page() {
               {q.data?.rows.map((r) => (
                 <tr key={r.id} className="border-b border-border/50 hover:bg-accent/30">
                   <td className="px-3 py-2 font-mono">{r.designacao}</td>
+                  <td className="px-3 py-2 font-mono">{r.codigo_loterica}</td>
                   <td className="px-3 py-2 font-mono">{r.ip_loopback}</td>
                   <td className="px-3 py-2 font-mono">{r.ip_loopback_secundario}</td>
                   <td className="px-3 py-2 font-mono">{r.operadora}</td>
+                  <td className="px-3 py-2 font-mono">{r.operadora_4g}</td>
                   <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${r.tipo_empresa === "VTAL" ? "bg-noc-blue/15 text-noc-blue" : "bg-noc-yellow/15 text-noc-yellow"}`}>{r.tipo_empresa}</span></td>
                   <td className="px-3 py-2">{r.ativo ? "✓" : "—"}</td>
                   <td className="px-3 py-2 text-right">
@@ -163,8 +331,8 @@ export default function Page() {
                   </td>
                 </tr>
               ))}
-              {q.isLoading && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Carregando...</td></tr>}
-              {!q.isLoading && (q.data?.rows.length ?? 0) === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Sem resultados.</td></tr>}
+              {q.isLoading && <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">Carregando...</td></tr>}
+              {!q.isLoading && (q.data?.rows.length ?? 0) === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">Sem resultados.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -181,12 +349,14 @@ export default function Page() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{edit?.id ? "Editar Operadora" : "Nova Operadora"}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-1 gap-3">
+            <div><Label>Código UL</Label><Input value={edit?.codigo_loterica ?? ""} onChange={(e) => setEdit({ ...edit!, codigo_loterica: e.target.value })} /></div>
             <div><Label>Designação</Label><Input value={edit?.designacao ?? ""} onChange={(e) => setEdit({ ...edit!, designacao: e.target.value.toUpperCase() })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>IP Loopback</Label><Input value={edit?.ip_loopback ?? ""} onChange={(e) => setEdit({ ...edit!, ip_loopback: e.target.value })} /></div>
               <div><Label>IP Loopback Sec.</Label><Input value={edit?.ip_loopback_secundario ?? ""} onChange={(e) => setEdit({ ...edit!, ip_loopback_secundario: e.target.value })} /></div>
             </div>
             <div><Label>Operadora *</Label><Input value={edit?.operadora ?? ""} onChange={(e) => setEdit({ ...edit!, operadora: e.target.value.toUpperCase() })} /></div>
+            <div><Label>OPERADORA 4G</Label><Input value={edit?.operadora_4g ?? ""} onChange={(e) => setEdit({ ...edit!, operadora_4g: e.target.value.toUpperCase() })} /></div>
             <div><Label>Tipo Empresa</Label>
               <Select value={edit?.tipo_empresa ?? "VTAL"} onValueChange={(v) => setEdit({ ...edit!, tipo_empresa: v as "VTAL"|"OEMP" })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

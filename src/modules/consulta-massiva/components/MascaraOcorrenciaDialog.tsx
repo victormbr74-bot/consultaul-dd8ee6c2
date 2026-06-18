@@ -35,19 +35,15 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
     () => (massiva ? buildMascaraFromMassiva(massiva, rows) : null),
     [massiva, rows],
   );
-  const [chamadoExterno, setChamadoExterno] = useState("");
   const [normalizacao, setNormalizacao] = useState("PENDENTE");
   const [causa, setCausa] = useState("PENDENTE");
   const [statusTxt, setStatusTxt] = useState(STATUS_PADRAO);
-  const [observacoes, setObservacoes] = useState("");
 
   useEffect(() => {
     if (open) {
-      setChamadoExterno("");
       setNormalizacao("PENDENTE");
       setCausa("PENDENTE");
       setStatusTxt(STATUS_PADRAO);
-      setObservacoes("");
     }
   }, [open, massiva?.id_massiva]);
 
@@ -55,17 +51,15 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
 
   const data = {
     ...base,
-    chamado_externo: chamadoExterno,
     horario_normalizacao: normalizacao || "PENDENTE",
     causa_solucao: causa || "PENDENTE",
     status_texto: statusTxt,
-    observacoes,
   };
 
   const handleCopy = async () => {
     await copyMascaraToClipboard(data);
     await logAudit("MASCARA_COPIADA", "massivas", { id: massiva.id_massiva });
-    toast.success("Máscara copiada para a área de transferência");
+    toast.success("Mascara copiada para a area de transferencia");
   };
   const handleHtml = () => {
     downloadMascaraHtml(data);
@@ -82,50 +76,44 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-noc-blue" />
-            Máscara de Evento Massivo — {massiva.id_massiva}
+            Mascara de Evento Massivo - {massiva.id_massiva}
           </DialogTitle>
-          <DialogDescription>Dados editáveis para geração da máscara do evento massivo.</DialogDescription>
+          <DialogDescription>
+            Dados da mascara do evento massivo sem alterar a massiva detectada.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3 text-xs">
           <Info label="Cliente" value={base.cliente ?? ""} />
+          <Info label="INC da Massiva" value={base.inc_massiva} mono />
           <Info label="Chamado interno" value={base.chamado_interno} mono />
-          <Info label="Caso" value={base.caso} mono />
+          <Info label="Caso Pai" value={base.caso_pai} mono />
           <Info label="Tipo" value={base.tipo_label} />
-          <Info label="UF / Abrangência" value={base.uf_label} />
-          <Info label="Operadora" value={base.operadora} />
+          <Info label="UF" value={base.uf_label} />
           <Info label="Qtd. total" value={String(base.qtd_total)} mono />
           <Info label="Qtd. isoladas" value={String(base.qtd_isoladas)} mono />
-          <Info label="Horário da falha" value={base.horario_falha} mono />
+          <Info label="Horario da falha" value={base.horario_falha} mono />
         </div>
 
         <div className="space-y-3">
-          <div>
-            <Label className="text-xs">Chamado externo (parceiro)</Label>
-            <Input value={chamadoExterno} onChange={(e) => setChamadoExterno(e.target.value)} placeholder="Ex.: 182655" />
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Horário de normalização</Label>
+              <Label className="text-xs">Horario de normalizacao</Label>
               <Input value={normalizacao} onChange={(e) => setNormalizacao(e.target.value)} placeholder="PENDENTE ou dd/mm/aaaa hh:mm" />
             </div>
             <div>
-              <Label className="text-xs">Causa / Solução</Label>
-              <Input value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="PENDENTE ou descrição" />
+              <Label className="text-xs">Causa / Solucao</Label>
+              <Input value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="PENDENTE ou descricao" />
             </div>
           </div>
           <div>
-            <Label className="text-xs">Status (texto padrão NOC, editável)</Label>
-            <Textarea rows={3} value={statusTxt} onChange={(e) => setStatusTxt(e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Observações</Label>
-            <Textarea rows={2} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Opcional" />
+            <Label className="text-xs">Status</Label>
+            <Textarea rows={4} value={statusTxt} onChange={(e) => setStatusTxt(e.target.value)} />
           </div>
         </div>
 
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-          {base.circuitos.length} circuito{base.circuitos.length > 1 ? "s" : ""} serão incluído{base.circuitos.length > 1 ? "s" : ""} na máscara (Designação, IP Loopback, Cidade/UF e Data/Hora).
+          Lotericas isoladas na mascara: {base.qtd_isoladas}. A lista exportada mostra somente Codigo e Loterica.
         </div>
 
         <DialogFooter className="gap-2">

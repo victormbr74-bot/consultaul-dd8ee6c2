@@ -489,26 +489,32 @@ function FaixaPanel({
 
   return (
     <Panel title={title} subtitle={`Filtro: ${subtitle}`}>
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-h-[320px] min-w-0 rounded-md border bg-background/35 p-3">
-          <ResponsiveContainer width="100%" height={292}>
-            <BarChart data={chartData} margin={{ top: 14, right: 12, left: 0, bottom: 8 }}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_254px]">
+        <div className="min-h-[350px] min-w-0 rounded-md border bg-background px-3 pb-3 pt-4">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={chartData} margin={{ top: 8, right: 14, left: 0, bottom: 22 }}>
+              <CartesianGrid
+                stroke="var(--border)"
+                strokeDasharray="3 3"
+                vertical={false}
+                opacity={0.75}
+              />
               <XAxis
                 dataKey="shortLabel"
                 tickLine={false}
-                axisLine={{ stroke: "var(--border)" }}
-                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                interval={0}
+                axisLine={false}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
               />
               <YAxis
                 allowDecimals={false}
-                width={36}
+                width={38}
                 tickLine={false}
-                axisLine={{ stroke: "var(--border)" }}
-                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                axisLine={false}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
               />
               <Tooltip
-                cursor={{ fill: "var(--muted)" }}
+                cursor={{ fill: "var(--muted)", opacity: 0.45 }}
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const item = payload[0].payload as FaixaChartRow;
@@ -522,7 +528,7 @@ function FaixaPanel({
                   );
                 }}
               />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={56}>
                 {chartData.map((entry) => (
                   <Cell key={entry.key} fill={entry.color} />
                 ))}
@@ -531,26 +537,26 @@ function FaixaPanel({
           </ResponsiveContainer>
         </div>
 
-        <div className="min-w-0 rounded-md border bg-background/35">
-          <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0 rounded-md border bg-background">
+          <div className="border-b px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Distribuição
           </div>
-          <div className="divide-y">
+          <div className="px-3 py-3">
             {chartData.map((item) => (
               <button
                 key={item.key}
                 onClick={() => onOpen(`${title} · ${subtitle} · ${item.label}`, item.rows)}
-                className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_64px] items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50"
+                className="mb-3 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_54px] items-start gap-3 rounded-sm text-left outline-none last:mb-0 hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                      className="h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="truncate text-sm font-medium">{item.label}</span>
+                    <span className="truncate text-xs font-semibold">{item.label}</span>
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="ml-4 mt-2 h-1 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${item.pct}%`, backgroundColor: item.color }}
@@ -558,8 +564,8 @@ function FaixaPanel({
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-semibold tabular-nums">{item.value}</div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">
+                  <div className="text-xs font-semibold tabular-nums">{item.value}</div>
+                  <div className="text-[10px] text-muted-foreground tabular-nums">
                     {item.pct.toFixed(0)}%
                   </div>
                 </div>
@@ -573,13 +579,13 @@ function FaixaPanel({
 }
 
 const FAIXA_COLORS: Record<string, string> = {
-  critico: "var(--faixa-critico)",
-  alto: "var(--faixa-alto)",
-  medio: "var(--faixa-medio)",
-  atencao: "var(--faixa-atencao)",
-  moderado: "var(--faixa-moderado)",
-  baixo: "var(--faixa-baixo)",
-  ok: "var(--faixa-ok)",
+  critico: "#e60019",
+  alto: "#f35b04",
+  medio: "#f39c12",
+  atencao: "#f4c430",
+  moderado: "#9bd66f",
+  baixo: "#22c4d6",
+  ok: "#2fbf71",
 };
 
 function buildFaixaRows(rows: ControleRow[]): FaixaChartRow[] {

@@ -175,16 +175,22 @@ $$;
 
 CREATE TABLE IF NOT EXISTS public.operadoras (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo_loterica text NOT NULL DEFAULT '',
   designacao text NOT NULL DEFAULT '',
   ip_loopback text NOT NULL DEFAULT '',
   ip_loopback_secundario text NOT NULL DEFAULT '',
   operadora text NOT NULL,
+  operadora_4g text NOT NULL DEFAULT '',
   tipo_empresa public.tipo_empresa_enum NOT NULL,
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.operadoras ADD COLUMN IF NOT EXISTS codigo_loterica text NOT NULL DEFAULT '';
+ALTER TABLE public.operadoras ADD COLUMN IF NOT EXISTS operadora_4g text NOT NULL DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_operadoras_codigo_loterica ON public.operadoras(codigo_loterica) WHERE codigo_loterica <> '';
 CREATE INDEX IF NOT EXISTS idx_operadoras_designacao ON public.operadoras(designacao) WHERE designacao <> '';
 CREATE INDEX IF NOT EXISTS idx_operadoras_loopback ON public.operadoras(ip_loopback) WHERE ip_loopback <> '';
 CREATE INDEX IF NOT EXISTS idx_operadoras_loopback_sec ON public.operadoras(ip_loopback_secundario) WHERE ip_loopback_secundario <> '';

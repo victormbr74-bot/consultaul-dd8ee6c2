@@ -53,6 +53,7 @@ export interface ProcessedRow extends GisRow {
   __operadora: string;
   __classificacao: Classificacao;
   __parceira: string;
+  __tipoEmp: string;
   __situacao: Situacao;
   /** Distance from epicenter city in km (geo analysis). Null = no coord. */
   __distanciaEpicentroKm?: number | null;

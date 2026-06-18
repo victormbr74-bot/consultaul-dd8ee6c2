@@ -19,7 +19,7 @@ import { processGis, type ProcessResult } from "@/modules/consulta-massiva/lib/m
 import { exportToCsv, exportToPdf, exportToXlsx, processedRowsForExport, readGisFile } from "@/modules/consulta-massiva/lib/excel";
 import { buildEscalonamentoMap } from "@/modules/consulta-massiva/lib/operadoras";
 import type { GisRow, Massiva } from "@/modules/consulta-massiva/lib/gis-types";
-import type { DbOperadora, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
+import type { DbLoterica, DbOperadora, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/modules/consulta-massiva/lib/audit";
 import { loadCidadesLookup } from "@/modules/consulta-massiva/lib/base-cidades";
@@ -54,6 +54,24 @@ async function fetchEscalonamentos(): Promise<DbEscalonamento[]> {
   return (data ?? []) as DbEscalonamento[];
 }
 
+async function fetchAllLotericas(): Promise<DbLoterica[]> {
+  const out: DbLoterica[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("lotericas")
+      .select("cod_ul,nome_loterica,ccto_oi,ccto_oemp,operadora,loopback_wan,loopback_lan,cidade,uf,designacao_nova,raw_data")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbLoterica[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 export default function Page() {
   const [file1, setFile1] = useState<LoadedFile>(null);
   const [file2, setFile2] = useState<LoadedFile>(null);
@@ -66,6 +84,7 @@ export default function Page() {
   const [processing, setProcessing] = useState(false);
 
   const opQ = useQuery({ queryKey: ["operadoras-all"], queryFn: fetchAllOperadoras, staleTime: 60_000 });
+  const lotQ = useQuery({ queryKey: ["lotericas-massiva-ref"], queryFn: fetchAllLotericas, staleTime: 5 * 60_000 });
   const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
   const cidadesQ = useQuery({ queryKey: ["base_cidades-lookup"], queryFn: loadCidadesLookup, staleTime: 5 * 60_000 });
 
@@ -86,11 +105,12 @@ export default function Page() {
   const runAnalysis = async () => {
     if (!file1 && !file2) { toast.error("Carregue pelo menos um arquivo GIS."); return; }
     if (!opQ.data) { toast.error("Base de operadoras ainda carregando."); return; }
+    if (!lotQ.data) { toast.error("Base de lotéricas ainda carregando."); return; }
     setProcessing(true);
     setTimeout(async () => {
       const all: GisRow[] = [...(file1?.rows ?? []), ...(file2?.rows ?? [])];
       const t0 = performance.now();
-      const r = processGis(all, opQ.data ?? [], cidadesQ.data);
+      const r = processGis(all, opQ.data ?? [], lotQ.data ?? [], cidadesQ.data);
       const dt = Math.round(performance.now() - t0);
       setResult(r);
       setProcessing(false);
@@ -243,6 +263,7 @@ export default function Page() {
   const reset = () => { setFile1(null); setFile2(null); setResult(null); setFilters(emptyFilters); };
 
   const opsCount = opQ.data?.length ?? 0;
+  const lotCount = lotQ.data?.length ?? 0;
   const escCount = escQ.data?.length ?? 0;
 
   return (
@@ -267,6 +288,10 @@ export default function Page() {
         <span className="rounded-md border border-border bg-card px-2 py-1">
           <Network className="mr-1 inline h-3 w-3 text-noc-blue" />
           Operadoras: <span className="font-mono font-semibold">{opQ.isLoading ? "…" : opsCount}</span>
+        </span>
+        <span className="rounded-md border border-border bg-card px-2 py-1">
+          <Building2 className="mr-1 inline h-3 w-3 text-noc-blue" />
+          Lotéricas: <span className="font-mono font-semibold">{lotQ.isLoading ? "…" : lotCount}</span>
         </span>
         <span className="rounded-md border border-border bg-card px-2 py-1">
           <Shield className="mr-1 inline h-3 w-3 text-noc-green" />
@@ -299,7 +324,7 @@ export default function Page() {
           <div className="text-xs text-muted-foreground">
             PRINCIPAL VTAL ≥5/UF · PRINCIPAL OEMP ≥5/UF/operadora · SECUNDARIO ≥15/UF · ≥50/Nacional · Janela 15 min
           </div>
-          <Button onClick={runAnalysis} disabled={processing || (!file1 && !file2) || opQ.isLoading} className="mt-auto">
+          <Button onClick={runAnalysis} disabled={processing || (!file1 && !file2) || opQ.isLoading || lotQ.isLoading} className="mt-auto">
             <Play className="h-4 w-4" />
             {processing ? "Processando..." : "Executar análise"}
           </Button>

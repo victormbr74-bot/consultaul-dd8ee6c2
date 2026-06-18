@@ -1367,34 +1367,40 @@ export type Database = {
       operadoras: {
         Row: {
           ativo: boolean
+          codigo_loterica: string
           created_at: string
           designacao: string
           id: string
           ip_loopback: string
           ip_loopback_secundario: string
           operadora: string
+          operadora_4g: string
           tipo_empresa: Database["public"]["Enums"]["tipo_empresa_enum"]
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          codigo_loterica?: string
           created_at?: string
           designacao?: string
           id?: string
           ip_loopback?: string
           ip_loopback_secundario?: string
           operadora: string
+          operadora_4g?: string
           tipo_empresa: Database["public"]["Enums"]["tipo_empresa_enum"]
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          codigo_loterica?: string
           created_at?: string
           designacao?: string
           id?: string
           ip_loopback?: string
           ip_loopback_secundario?: string
           operadora?: string
+          operadora_4g?: string
           tipo_empresa?: Database["public"]["Enums"]["tipo_empresa_enum"]
           updated_at?: string
         }

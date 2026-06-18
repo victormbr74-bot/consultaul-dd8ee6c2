@@ -4,7 +4,7 @@ import {
   identifyOperadora,
   type OperadoraLookup,
 } from "./operadoras";
-import type { DbOperadora } from "./db-types";
+import type { DbLoterica, DbOperadora } from "./db-types";
 import {
   classifySinalizacao,
   haversineKm,
@@ -23,6 +23,110 @@ const WINDOW_MS = 15 * 60 * 1000;
 
 interface InputRow extends GisRow {
   __origem?: Origem;
+}
+
+interface LotericasLookup {
+  byCodigo: Map<string, DbLoterica>;
+  byCircuito: Map<string, DbLoterica>;
+  byLoopback: Map<string, DbLoterica>;
+}
+
+function getCell(row: GisRow, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value != null && String(value).trim() !== "") return String(value);
+  }
+  return "";
+}
+
+function normalizeLookup(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function normalizeCircuito(value: unknown): string {
+  return normalizeLookup(value).replace(/[^A-Z0-9]/g, "");
+}
+
+function rawValue(row: DbLoterica, ...keys: string[]): string {
+  const raw = row.raw_data;
+  if (!raw || typeof raw !== "object") return "";
+  const entries = Object.entries(raw);
+  for (const key of keys) {
+    const target = normalizeCircuito(key);
+    const found = entries.find(([k, v]) => normalizeCircuito(k) === target && String(v ?? "").trim() !== "");
+    if (found) return String(found[1]).trim();
+  }
+  return "";
+}
+
+function buildLotericasLookup(rows: DbLoterica[] = []): LotericasLookup {
+  const byCodigo = new Map<string, DbLoterica>();
+  const byCircuito = new Map<string, DbLoterica>();
+  const byLoopback = new Map<string, DbLoterica>();
+  const addCircuito = (value: unknown, row: DbLoterica) => {
+    const key = normalizeCircuito(value);
+    if (key && !byCircuito.has(key)) byCircuito.set(key, row);
+  };
+  const addLoopback = (value: unknown, row: DbLoterica) => {
+    const key = String(value ?? "").trim();
+    if (key && !byLoopback.has(key)) byLoopback.set(key, row);
+  };
+  for (const row of rows) {
+    const cod = normalizeLookup(row.cod_ul);
+    if (cod && !byCodigo.has(cod)) byCodigo.set(cod, row);
+    addCircuito(row.designacao_nova, row);
+    addCircuito(row.ccto_oi, row);
+    addCircuito(row.ccto_oemp, row);
+    addCircuito(rawValue(row, "CIRCUITO OEMP", "CIRCUITO BACKUP", "CIRCUITO SECUNDARIO", "CIRCUITO SECUNDÁRIO"), row);
+    addCircuito(rawValue(row, "DESIGNACAO NOVA", "DESIGNAÇÃO NOVA", "DESIGINACAO NOVA"), row);
+    addLoopback(row.loopback_wan, row);
+    addLoopback(row.loopback_lan, row);
+    addLoopback(rawValue(row, "LOOPBACK PRINCIPAL"), row);
+    addLoopback(rawValue(row, "LOOPBACK SECUNDARIO", "LOOPBACK SECUNDÁRIO"), row);
+  }
+  return { byCodigo, byCircuito, byLoopback };
+}
+
+function identifyFromLotericas(
+  tipoLink: string,
+  codigo: string,
+  circuito: string,
+  ipLoopback: string,
+  lookup: LotericasLookup,
+) {
+  const hit =
+    lookup.byCircuito.get(normalizeCircuito(circuito)) ||
+    lookup.byCodigo.get(normalizeLookup(codigo)) ||
+    lookup.byLoopback.get(String(ipLoopback ?? "").trim());
+  if (!hit) return null;
+
+  const isSecundario = normalizeLookup(tipoLink) === "SECUNDARIO";
+  const operadora4g = normalizeLookup(
+    hit.operadora ||
+      rawValue(hit, "OPERADORA 4G", "OPERADORA", "RESP BACKUP", "OWNER"),
+  );
+  const empresaOemp = normalizeLookup(rawValue(hit, "EMPRESA OEMP", "EMPRESA", "SITE OWNER"));
+  const operadora = isSecundario ? operadora4g : (empresaOemp || operadora4g);
+  if (!operadora) return null;
+  const classificacao = !isSecundario && operadora === "VTAL" ? "VTAL" : "OEMP";
+  return {
+    operadora,
+    tipoEmp: isSecundario ? operadora4g || operadora : classificacao === "VTAL" ? "VTAL" : "OEMP",
+    classificacao,
+    parceira: operadora,
+  } as const;
+}
+
+function fallbackOperadoraFromGis(row: GisRow, tipoLink: string) {
+  const operadora = (getCell(row, "Empresa") || getCell(row, "Site Owner")).trim().toUpperCase();
+  if (!operadora) return null;
+  const classificacao = tipoLink === "PRINCIPAL" && operadora === "VTAL" ? "VTAL" : "OEMP";
+  return {
+    operadora,
+    tipoEmp: operadora,
+    classificacao,
+    parceira: operadora,
+  } as const;
 }
 
 function detectWindows(
@@ -80,9 +184,11 @@ export interface ProcessResult {
 export function processGis(
   input: InputRow[],
   operadorasRows: DbOperadora[] = [],
+  lotericasRows: DbLoterica[] = [],
   cidadesLookup?: CidadesLookup,
 ): ProcessResult {
   const lookup: OperadoraLookup = buildOperadoraLookup(operadorasRows);
+  const lotericasLookup = buildLotericasLookup(lotericasRows);
 
   const rows: ProcessedRow[] = input.map((r, i) => {
     const tipoRaw = String(r["Tipo de Link"] ?? "").toUpperCase().trim();
@@ -90,18 +196,28 @@ export function processGis(
     const ts = parseDateBR(r["Data e Hora Incial"]);
     const desig = String(r["Designação"] ?? "");
     const ip = String(r["IP Loopback"] ?? "");
-    const id = identifyOperadora(desig, ip, lookup);
+    const codigo = String(r["CÃ³d. da LotÃ©rica"] ?? "");
+    const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial") || String(r["Data e Hora Incial"] ?? "");
+    const correctedTs = parseDateBR(dataHoraRaw);
+    const correctedDesig = getCell(r, "Designação", "DesignaÃ§Ã£o", "Designacao") || desig;
+    const correctedCodigo = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica") || codigo;
+    const identified = identifyOperadora(tipoRaw, correctedDesig, ip, correctedCodigo, lookup);
+    const fromLotericas = identifyFromLotericas(tipoRaw, correctedCodigo, correctedDesig, ip, lotericasLookup);
+    const id = identified.classificacao === "NAO_IDENTIFICADO"
+      ? (fromLotericas ?? fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
+      : identified;
     return {
       ...r,
       __rowId: `r${i}`,
       __origem: (r.__origem as Origem) ?? "1_LINK",
       __tipoLink: tipoRaw,
       __uf: uf,
-      __ts: ts,
-      __dataHora: isNaN(ts) ? String(r["Data e Hora Incial"] ?? "") : formatDateBR(ts),
+      __ts: correctedTs,
+      __dataHora: isNaN(correctedTs) ? dataHoraRaw : formatDateBR(correctedTs),
       __operadora: id.operadora,
       __classificacao: id.classificacao,
       __parceira: id.parceira,
+      __tipoEmp: id.tipoEmp,
       __situacao: "ISOLADO",
       "Status Massiva": "NAO_MASSIVA",
     } as ProcessedRow;
@@ -195,7 +311,7 @@ export function processGis(
   const codigosIn2Links = new Set<string>();
   for (const r of rows) {
     if (r.__origem === "2_LINKS") {
-      const cod = String(r["Cód. da Lotérica"] ?? "").trim();
+      const cod = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica").trim();
       if (cod) codigosIn2Links.add(cod);
     }
   }
@@ -208,7 +324,7 @@ export function processGis(
     const idsSet = new Set(m.rowIds);
     for (const r of rows) {
       if (!idsSet.has(r.__rowId)) continue;
-      const cod = String(r["Cód. da Lotérica"] ?? "").trim();
+      const cod = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica").trim();
       if (!cod) continue;
       codigosEmPrincipal.add(cod);
       let s = principalMassivasByCodigo.get(cod);
@@ -225,7 +341,7 @@ export function processGis(
 
   // Aplica __situacao em cada row
   for (const r of rows) {
-    const cod = String(r["Cód. da Lotérica"] ?? "").trim();
+    const cod = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica").trim();
     if (cod && codigosIsolados.has(cod)) r.__situacao = "LOTERICA_ISOLADA";
     else if (r["Status Massiva"] === "MASSIVA") r.__situacao = "MASSIVA";
     else r.__situacao = "ISOLADO";
@@ -236,7 +352,7 @@ export function processGis(
   const lotByMassiva = new Map<string, Map<string, string>>(); // id_massiva -> codigo -> loterica
   for (const r of rows) {
     if (r.__situacao !== "LOTERICA_ISOLADA") continue;
-    const cod = String(r["Cód. da Lotérica"] ?? "").trim();
+    const cod = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica").trim();
     if (!cod) continue;
     const ms = principalMassivasByCodigo.get(cod);
     if (!ms) continue;
@@ -341,8 +457,8 @@ function applyGeoAnalysis(
       continue;
     }
 
-    // Epicenter = city with most circuits that has coordinates available
-    let epicentro: { cidade: string; uf: string; lat: number; lon: number } | null = null;
+    // Epicenter = city with most circuits from GIS. Coordinates only enrich the result.
+    const epicentroCidade = cidades_afetadas[0];
     for (const c of cidades_afetadas) {
       const probeKey = `${c.cidade.toLowerCase()}|${c.uf}`;
       const coord = cidadesLookup!.get(c.cidade, c.uf);
@@ -351,13 +467,10 @@ function applyGeoAnalysis(
         if (coord) cidadesEncontradas++;
         else cidadesNaoEncontradas++;
       }
-      if (coord && !epicentro) {
-        epicentro = { cidade: c.cidade, uf: c.uf, lat: coord.latitude, lon: coord.longitude };
-        break;
-      }
     }
+    const epicentroCoord = epicentroCidade ? cidadesLookup!.get(epicentroCidade.cidade, epicentroCidade.uf) : undefined;
 
-    if (!epicentro) {
+    if (!epicentroCidade || !epicentroCoord) {
       m.sinalizacao_60km = "SEM_GEO";
       m.cidade_epicentro = cidades_afetadas[0]?.cidade ?? "";
       m.uf_epicentro = cidades_afetadas[0]?.uf ?? "";
@@ -386,7 +499,7 @@ function applyGeoAnalysis(
         r.__dentro60km = "SEM_GEO";
         continue;
       }
-      const d = haversineKm(epicentro.lat, epicentro.lon, coord.latitude, coord.longitude);
+      const d = haversineKm(epicentroCoord.latitude, epicentroCoord.longitude, coord.latitude, coord.longitude);
       r.__distanciaEpicentroKm = d;
       comCoord++;
       if (d > raioMax) raioMax = d;
@@ -397,8 +510,8 @@ function applyGeoAnalysis(
     const total = partRows.length;
     const sin = classifySinalizacao(comCoord, dentro, total);
     m.sinalizacao_60km = sin;
-    m.cidade_epicentro = epicentro.cidade;
-    m.uf_epicentro = epicentro.uf;
+    m.cidade_epicentro = epicentroCidade.cidade;
+    m.uf_epicentro = epicentroCidade.uf;
     m.raio_maximo_km = Math.round(raioMax * 10) / 10;
     m.percentual_dentro_60km = total > 0 ? Math.round((dentro / total) * 100) : 0;
     m.qtd_circuitos_dentro_60km = dentro;

@@ -108,6 +108,7 @@ export function processedRowsForExport(rows: ProcessedRow[]) {
     out["Data e Hora Incial"] = r.__dataHora ?? "";
     out["Operadora Responsável"] = r.__operadora;
     out["Classificação"] = r.__classificacao;
+    out["Tipo Emp."] = r.__tipoEmp;
     out["Parceira Responsável"] = r.__parceira;
     out["Situação"] = sitLabel[r.__situacao ?? "ISOLADO"] ?? "ISOLADO";
     out["ID Massiva"] = r["ID Massiva"] ?? "";

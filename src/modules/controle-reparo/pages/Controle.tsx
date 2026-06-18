@@ -36,9 +36,19 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type RowT = ControleRow & { id: string };
 
@@ -422,6 +432,7 @@ const QUICK_FILTERS: QuickFilter[] = [
 
 interface PersistedState {
   colFilters: Record<string, ColFilter>;
+  hiddenColumns: string[];
   sort: SortState;
   search: string;
   showNorm: boolean;
@@ -431,6 +442,7 @@ interface PersistedState {
 
 const DEFAULT_STATE: PersistedState = {
   colFilters: {},
+  hiddenColumns: [],
   sort: { col: "tempo", dir: "desc" },
   search: "",
   showNorm: false,
@@ -479,6 +491,14 @@ function persistState(state: PersistedState) {
   }
 }
 
+function normalizePersistedState(state: PersistedState): PersistedState {
+  const validIds = new Set(COLUMNS.map((c) => c.id));
+  return {
+    ...state,
+    hiddenColumns: (state.hiddenColumns ?? []).filter((id) => validIds.has(id)),
+  };
+}
+
 export default function ControlePage() {
   return <ControleView />;
 }
@@ -492,7 +512,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
   const [histLot, setHistLot] = useState<string | null>(null);
 
   // ---- estado persistido (item 5) ----
-  const [st, setSt] = useState<PersistedState>(loadState);
+  const [st, setSt] = useState<PersistedState>(() => normalizePersistedState(loadState()));
   useEffect(() => {
     persistState(st);
   }, [st]);
@@ -515,6 +535,14 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
       quick: s.quick.includes(id) ? s.quick.filter((q) => q !== id) : [...s.quick, id],
       page: 1,
     }));
+  const toggleColumn = (id: string) =>
+    updateState((s) => ({
+      ...s,
+      hiddenColumns: s.hiddenColumns.includes(id)
+        ? s.hiddenColumns.filter((colId) => colId !== id)
+        : [...s.hiddenColumns, id],
+    }));
+  const showAllColumns = () => updateState((s) => ({ ...s, hiddenColumns: [] }));
 
   const { data: datas } = useQuery({
     queryKey: ["controle-datas"],
@@ -587,6 +615,11 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
     }
     return map;
   }, [baseRows]);
+
+  const visibleColumns = useMemo(
+    () => COLUMNS.filter((c) => !st.hiddenColumns.includes(c.id)),
+    [st.hiddenColumns],
+  );
 
   const filteredRows = useMemo(() => {
     const colDefById = new Map(COLUMNS.map((c) => [c.id, c]));
@@ -700,6 +733,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
     (f) => f && (f.search.trim() || f.selected.length),
   ).length;
   const activeQuickCount = QUICK_FILTERS.filter((q) => st.quick.includes(q.id)).length;
+  const hiddenColumnCount = st.hiddenColumns.length;
   const hasSearchFilter = st.search.trim().length > 0;
   const activeFilterCount = columnFilterCount + activeQuickCount + (hasSearchFilter ? 1 : 0);
   const hasActiveFilters = activeFilterCount > 0;
@@ -713,8 +747,8 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
   );
 
   return (
-    <div className="flex h-screen min-w-0 flex-col">
-      <div className="border-b bg-card px-4 py-4 sm:px-6">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="shrink-0 border-b bg-card px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight">
@@ -798,6 +832,31 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
               <X className="mr-1 h-4 w-4" /> Limpar filtros ({activeFilterCount})
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Columns3 className="mr-1 h-4 w-4" />
+                Colunas
+                {hiddenColumnCount > 0 ? ` (${hiddenColumnCount} ocultas)` : ""}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-[70vh] w-64 overflow-y-auto">
+              <DropdownMenuLabel>Exibir colunas</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLUMNS.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.id}
+                  checked={!st.hiddenColumns.includes(c.id)}
+                  onCheckedChange={() => toggleColumn(c.id)}
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {c.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={showAllColumns}>Mostrar todas</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Filtros rápidos (item 19) */}
@@ -818,12 +877,12 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <table className="w-max min-w-full border-separate border-spacing-0 border border-border text-sm">
           <thead className="sticky top-0 z-10 bg-secondary text-secondary-foreground shadow-sm">
             <tr className="[&>th]:whitespace-nowrap [&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
               <th className="min-w-12 w-12"></th>
-              {COLUMNS.map((c) => (
+              {visibleColumns.map((c) => (
                 <th
                   key={c.id}
                   className={`${columnLayoutClass(c.id)} ${c.accent ? "bg-accent" : ""}`}
@@ -858,7 +917,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                     <History className="h-4 w-4" />
                   </button>
                 </td>
-                {COLUMNS.map((c) => (
+                {visibleColumns.map((c) => (
                   <Cell
                     key={c.id}
                     col={c}
@@ -872,7 +931,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
             {filteredRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={COLUMNS.length + 1}
+                  colSpan={visibleColumns.length + 1}
                   className="py-16 text-center text-muted-foreground"
                 >
                   {dataRef
@@ -887,7 +946,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
 
       {/* Paginação (item 5 — página atual persistida) */}
       {filteredRows.length > PAGE_SIZE && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-card px-4 py-2 text-sm sm:px-6">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t bg-card px-4 py-2 text-sm sm:px-6">
           <span className="text-muted-foreground">
             {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredRows.length)} de{" "}
             {filteredRows.length}

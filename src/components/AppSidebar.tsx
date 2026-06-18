@@ -215,6 +215,48 @@ export function AppSidebar() {
     };
   }, [fetchPendingChangeCount, isAdmin, profile?.user_code, navigate]);
 
+  const projectsGroup = (
+    <SidebarGroup>
+      <SidebarGroupLabel>Projetos</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {projectModules.map((project) => (
+            <Collapsible key={project.id} asChild defaultOpen={isProjectRoute(project.id)}>
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip={project.label}
+                    className={isProjectRoute(project.id) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
+                  >
+                    <Layers className="mr-2 h-4 w-4" />
+                    <span>{project.label}</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/menu-item:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {project.items.map((item) => (
+                      <SidebarMenuSubItem key={item.id}>
+                        <SidebarMenuSubButton asChild size="sm">
+                          <NavLink
+                            to={`/projetos/${project.id}/${item.id}`}
+                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          >
+                            <span>{item.label}</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
@@ -237,6 +279,8 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {projectsGroup}
+
         <SidebarGroup>
           <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -368,46 +412,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Projetos</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {projectModules.map((project) => (
-                <Collapsible key={project.id} asChild defaultOpen={isProjectRoute(project.id)}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={project.label}
-                        className={isProjectRoute(project.id) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}
-                      >
-                        <Layers className="mr-2 h-4 w-4" />
-                        <span>{project.label}</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/menu-item:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {project.items.map((item) => (
-                          <SidebarMenuSubItem key={item.id}>
-                            <SidebarMenuSubButton asChild size="sm">
-                              <NavLink
-                                to={`/projetos/${project.id}/${item.id}`}
-                                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                              >
-                                <span>{item.label}</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

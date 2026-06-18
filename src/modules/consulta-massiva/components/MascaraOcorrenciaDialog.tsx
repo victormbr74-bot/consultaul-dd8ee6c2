@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,6 +84,7 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
             <FileText className="h-5 w-5 text-noc-blue" />
             Máscara de Evento Massivo — {massiva.id_massiva}
           </DialogTitle>
+          <DialogDescription>Dados editáveis para geração da máscara do evento massivo.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3 text-xs">

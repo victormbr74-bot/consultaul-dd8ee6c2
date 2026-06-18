@@ -315,6 +315,14 @@ CREATE TABLE IF NOT EXISTS public.importacoes (
   status text NOT NULL DEFAULT 'carregado'
 );
 
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS arquivo text;
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS tipo public.tipo_importacao;
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS usuario_id uuid REFERENCES auth.users(id);
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS usuario_nome text;
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS data_importacao timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS registros integer NOT NULL DEFAULT 0;
+ALTER TABLE public.importacoes ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'carregado';
+
 CREATE TABLE IF NOT EXISTS public.staging_bases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tipo public.tipo_importacao NOT NULL,
@@ -322,6 +330,11 @@ CREATE TABLE IF NOT EXISTS public.staging_bases (
   linhas jsonb NOT NULL DEFAULT '[]'::jsonb,
   criado_em timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS tipo public.tipo_importacao;
+ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS importacao_id uuid REFERENCES public.importacoes(id) ON DELETE CASCADE;
+ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS linhas jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS criado_em timestamptz NOT NULL DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS public.controle_diario (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -355,6 +368,7 @@ CREATE TABLE IF NOT EXISTS public.controle_diario (
   status_normalizacao text NOT NULL DEFAULT 'ATIVO',
   normalizado_em timestamptz,
   pendente_enriquecimento boolean NOT NULL DEFAULT false,
+  tem_os_reparo boolean NOT NULL DEFAULT false,
   chave text,
   versao integer NOT NULL DEFAULT 1,
   responsavel_backup text,
@@ -363,12 +377,43 @@ CREATE TABLE IF NOT EXISTS public.controle_diario (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS data_referencia date;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS codigo_loterica text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS loterica text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS tipo_link text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS uf text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS cidade text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS designacao text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS ip_loopback text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS data_hora_inicial timestamptz;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS duracao_h numeric;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS chamado text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS previsao_atendimento timestamptz;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS ultimo_comentario text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS grafana text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS empresa text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS designacao_parceiro text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS fila_jira text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS inc_snow text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS incidente_mam text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS ordem text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS novo_circuito text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS situacao text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS status_planilha text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS status_jira text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS obs text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS responsavel text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS status_zabbix text;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS status_normalizacao text NOT NULL DEFAULT 'ATIVO';
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS normalizado_em timestamptz;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS pendente_enriquecimento boolean NOT NULL DEFAULT false;
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS tem_os_reparo boolean NOT NULL DEFAULT false;
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS chave text;
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS versao integer NOT NULL DEFAULT 1;
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS responsavel_backup text;
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS responsavel_chip text;
-ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS situacao text;
-ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS status_normalizacao text NOT NULL DEFAULT 'ATIVO';
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_controle_data ON public.controle_diario (data_referencia);
 CREATE INDEX IF NOT EXISTS idx_controle_codigo ON public.controle_diario (codigo_loterica);
@@ -432,6 +477,35 @@ CREATE TABLE IF NOT EXISTS public.implantacoes (
   atualizado_em timestamptz NOT NULL DEFAULT now(),
   UNIQUE (codigo_loterica)
 );
+
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS codigo_loterica text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS loterica text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS status_censitec text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS analise_tipo text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS parceira text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS fase text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS evento text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS data_atualizacao timestamptz;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS novo_circuito text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS nova_designacao text;
+ALTER TABLE public.implantacoes ADD COLUMN IF NOT EXISTS atualizado_em timestamptz NOT NULL DEFAULT now();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'implantacoes_codigo_loterica_key'
+      AND conrelid = 'public.implantacoes'::regclass
+  ) THEN
+    ALTER TABLE public.implantacoes
+      ADD CONSTRAINT implantacoes_codigo_loterica_key UNIQUE (codigo_loterica);
+  END IF;
+EXCEPTION
+  WHEN duplicate_table OR duplicate_object THEN
+    NULL;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.set_user_app_role(
   _target_user_id uuid,

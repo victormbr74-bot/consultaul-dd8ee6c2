@@ -12,7 +12,12 @@ import {
   YAxis,
 } from "recharts";
 import { fetchAllControle, fetchControleDatas, fetchControleVersoes } from "@/modules/controle-reparo/lib/db";
-import { formatDateBR, processingDate } from "@/modules/controle-reparo/lib/date";
+import {
+  CONTROL_DATE_SESSION_KEY,
+  CONTROL_VERSION_SESSION_KEY,
+  formatDateBR,
+  processingDate,
+} from "@/modules/controle-reparo/lib/date";
 import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { isLinkBackup } from "@/modules/controle-reparo/lib/processing";
 import { FAIXAS, getFaixa } from "@/modules/controle-reparo/lib/tempo";
@@ -60,8 +65,15 @@ type FaixaChartRow = {
 };
 
 export default function DashboardPage() {
-  const [dataRef] = useState(() => processingDate());
-  const [versao, setVersao] = useState<number | null>(null);
+  const [dataRef, setDataRef] = useState(() => {
+    if (typeof window === "undefined") return processingDate();
+    return window.sessionStorage.getItem(CONTROL_DATE_SESSION_KEY) || processingDate();
+  });
+  const [versao, setVersao] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = Number(window.sessionStorage.getItem(CONTROL_VERSION_SESSION_KEY));
+    return Number.isFinite(stored) && stored > 0 ? stored : null;
+  });
   const [drill, setDrill] = useState<DrillData | null>(null);
   const open = (title: string, rows: ControleRow[]) => setDrill({ title, rows });
 
@@ -77,10 +89,23 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
+    if (!datas?.length || datas.includes(dataRef)) return;
+    const stored =
+      typeof window === "undefined" ? null : window.sessionStorage.getItem(CONTROL_DATE_SESSION_KEY);
+    if (!stored || !datas.includes(stored)) setDataRef(datas[0]);
+  }, [dataRef, datas]);
+
+  useEffect(() => {
     if (versoes.length > 0 && (!versao || !versoes.includes(versao))) {
       setVersao(versoes[0]);
     }
   }, [versoes, versao]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (dataRef) window.sessionStorage.setItem(CONTROL_DATE_SESSION_KEY, dataRef);
+    if (versao) window.sessionStorage.setItem(CONTROL_VERSION_SESSION_KEY, String(versao));
+  }, [dataRef, versao]);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["controle-rows", dataRef, versao],

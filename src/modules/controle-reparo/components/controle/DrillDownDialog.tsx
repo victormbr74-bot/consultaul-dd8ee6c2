@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -116,6 +117,7 @@ export function DrillDownDialog({
               {rows.length} registros
             </Badge>
           </DialogTitle>
+          <DialogDescription>Detalhamento dos registros do indicador selecionado.</DialogDescription>
         </DialogHeader>
 
         <div className="mb-2 flex gap-2">

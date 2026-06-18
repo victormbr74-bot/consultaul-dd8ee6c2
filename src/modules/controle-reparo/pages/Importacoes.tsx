@@ -24,7 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Upload,
   FileSpreadsheet,
@@ -242,8 +248,11 @@ export default function ImportacoesPage() {
       toast.success("Controle diário gerado!", {
         description: `${res.inserted} circuitos down • ${res.stats.normalizados} normalizados • Jira: ${res.stats.comJira} • Grafana: ${res.stats.comGrafana}`,
       });
-      qc.invalidateQueries();
-      navigate("/projetos/controle-reparo/controle");
+      qc.invalidateQueries({ queryKey: ["controle-datas"] });
+      qc.invalidateQueries({ queryKey: ["controle-versoes", res.dataReferencia] });
+      qc.invalidateQueries({ queryKey: ["controle-rows"] });
+      qc.invalidateQueries({ queryKey: ["importacoes"] });
+      navigate("/projetos/controle-reparo/dashboard");
     },
     onError: (e) => {
       const msg = (e as Error).message || String(e);
@@ -421,10 +430,8 @@ export default function ImportacoesPage() {
         <DialogContent className="max-h-[85vh] max-w-5xl overflow-hidden">
           <DialogHeader>
             <DialogTitle>Visualizar base — {viewTipo ? TIPO_LABEL[viewTipo] : ""}</DialogTitle>
+            <DialogDescription>Exibindo as primeiras 50 linhas carregadas.</DialogDescription>
           </DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            Exibindo as primeiras 50 linhas carregadas.
-          </p>
           <div className="overflow-auto rounded border" style={{ maxHeight: "65vh" }}>
             {previewLoading ? (
               <div className="flex items-center justify-center p-10 text-muted-foreground">

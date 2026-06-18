@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Massiva, ProcessedRow } from "@/modules/consulta-massiva/lib/gis-types";
 import type { DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
 import { MassivaBadge } from "./MassivaBadge";
@@ -50,6 +56,7 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
               </Button>
             </div>
           </DialogTitle>
+          <DialogDescription>Detalhamento dos circuitos afetados pela massiva selecionada.</DialogDescription>
           <div className="text-xs text-muted-foreground space-y-0.5">
             <div>
               Massiva <span className="font-semibold text-foreground">{massiva.tipo_massiva.replace("_", " ")}</span> ·{" "}

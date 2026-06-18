@@ -25,10 +25,13 @@ function isMissingVersaoColumnError(error: { code?: string; message?: string } |
 
 export async function hasControleVersaoColumn(): Promise<boolean> {
   if (controleVersaoSupported !== null) return controleVersaoSupported;
-  const { data, error } = await supabase.from("controle_diario").select("*").limit(1);
+  const { error } = await supabase.from("controle_diario").select("versao").limit(1);
+  if (isMissingVersaoColumnError(error)) {
+    controleVersaoSupported = false;
+    return false;
+  }
   if (error) throw error;
-  if (!data?.[0]) return false;
-  controleVersaoSupported = "versao" in data[0];
+  controleVersaoSupported = true;
   return controleVersaoSupported;
 }
 

@@ -346,6 +346,45 @@ ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS importacao_id uuid REF
 ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS linhas jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE public.staging_bases ADD COLUMN IF NOT EXISTS criado_em timestamptz NOT NULL DEFAULT now();
 
+DO $$
+DECLARE
+  target_table text;
+  item record;
+BEGIN
+  FOREACH target_table IN ARRAY ARRAY['importacoes', 'staging_bases']
+  LOOP
+    FOR item IN
+      SELECT c.conname
+      FROM pg_constraint c
+      WHERE c.conrelid = format('public.%I', target_table)::regclass
+        AND c.contype = 'u'
+    LOOP
+      EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', target_table, item.conname);
+    END LOOP;
+
+    FOR item IN
+      SELECT i.indexrelid::regclass AS index_name
+      FROM pg_index i
+      WHERE i.indrelid = format('public.%I', target_table)::regclass
+        AND i.indisunique
+        AND NOT i.indisprimary
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid
+        )
+    LOOP
+      EXECUTE format('DROP INDEX IF EXISTS %s', item.index_name);
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+CREATE INDEX IF NOT EXISTS idx_importacoes_tipo_data
+  ON public.importacoes (tipo, data_importacao DESC);
+CREATE INDEX IF NOT EXISTS idx_staging_bases_tipo_criado
+  ON public.staging_bases (tipo, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_staging_bases_importacao
+  ON public.staging_bases (importacao_id);
+
 CREATE TABLE IF NOT EXISTS public.controle_diario (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   data_referencia date NOT NULL,
@@ -424,6 +463,20 @@ ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS responsavel_backup t
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS responsavel_chip text;
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE public.controle_diario ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.controle_diario ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.controle_diario ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE public.controle_diario ALTER COLUMN updated_at SET DEFAULT now();
+
+UPDATE public.controle_diario
+SET
+  id = COALESCE(id, gen_random_uuid()),
+  created_at = COALESCE(created_at, now()),
+  updated_at = COALESCE(updated_at, now())
+WHERE id IS NULL OR created_at IS NULL OR updated_at IS NULL;
+
+ALTER TABLE public.controle_diario ALTER COLUMN id SET NOT NULL;
+ALTER TABLE public.controle_diario ALTER COLUMN created_at SET NOT NULL;
+ALTER TABLE public.controle_diario ALTER COLUMN updated_at SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_controle_data ON public.controle_diario (data_referencia);
 CREATE INDEX IF NOT EXISTS idx_controle_codigo ON public.controle_diario (codigo_loterica);

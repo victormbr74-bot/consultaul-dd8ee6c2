@@ -47,6 +47,29 @@ const TIPO_LABEL: Record<string, string> = Object.fromEntries(
   TIPOS_BASE.map((t) => [t.tipo, t.label]),
 );
 
+type DbErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+function describeDbError(error: unknown): string {
+  const e = error as DbErrorLike;
+  return [e.code, e.message, e.details, e.hint].filter(Boolean).join(" - ") || String(error);
+}
+
+function isUniqueConflict(error: unknown): boolean {
+  const e = error as DbErrorLike;
+  const text = describeDbError(error).toLowerCase();
+  return (
+    e.code === "23505" ||
+    text.includes("duplicate key") ||
+    text.includes("unique constraint") ||
+    text.includes("violates unique")
+  );
+}
+
 function formatProcessingReport(report: ProcessReport): string {
   const jiraColumns = report.jira.colunasDetectadas.length
     ? report.jira.colunasDetectadas.join(", ")
@@ -123,6 +146,56 @@ export default function ImportacoesPage() {
     },
   });
 
+  const clearBase = async (tipo: TipoBase) => {
+    const { error: stErr } = await supabase.from("staging_bases").delete().eq("tipo", tipo);
+    if (stErr) throw stErr;
+    const { error: impErr } = await supabase.from("importacoes").delete().eq("tipo", tipo);
+    if (impErr) throw impErr;
+  };
+
+  const insertStagingRows = async (
+    tipo: TipoBase,
+    rows: Record<string, unknown>[],
+    importacaoId: string | null,
+  ) => {
+    // Same timestamp keeps fallback chunks grouped when importacao_id is unavailable.
+    const criadoEm = new Date().toISOString();
+    const CHUNK = 2000;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const slice = rows.slice(i, i + CHUNK);
+      const { error } = await supabase.from("staging_bases").insert({
+        tipo,
+        importacao_id: importacaoId,
+        linhas: slice as never,
+        criado_em: criadoEm,
+      } as never);
+      if (error) throw error;
+    }
+  };
+
+  const persistBase = async (tipo: TipoBase, fileName: string, rows: Record<string, unknown>[]) => {
+    const { data: imp, error: impErr } = await supabase
+      .from("importacoes")
+      .insert({
+        arquivo: fileName,
+        tipo,
+        usuario_id: user?.id,
+        usuario_nome: nome,
+        registros: rows.length,
+        status: "carregado",
+      })
+      .select("id")
+      .single();
+
+    if (impErr) {
+      if (!isUniqueConflict(impErr)) throw impErr;
+      await insertStagingRows(tipo, rows, null);
+      return;
+    }
+
+    await insertStagingRows(tipo, rows, imp.id);
+  };
+
   const handleFile = async (tipo: TipoBase, file: File) => {
     if (!canWrite) {
       toast.error("Sem permissão", { description: "Seu usuário não pode subir bases." });
@@ -133,31 +206,18 @@ export default function ImportacoesPage() {
       const { rows } = await parseFile(file, tipo);
       if (rows.length === 0) throw new Error("Nenhum registro encontrado no arquivo.");
 
-      const { data: imp, error: impErr } = await supabase
-        .from("importacoes")
-        .insert({
-          arquivo: file.name,
-          tipo,
-          usuario_id: user?.id,
-          usuario_nome: nome,
-          registros: rows.length,
-          status: "carregado",
-        })
-        .select()
-        .single();
-      if (impErr) throw impErr;
+      const replaceExisting = Boolean(counts?.[tipo]);
+      if (replaceExisting) await clearBase(tipo);
 
-      // Mantem historico de importacoes; o processamento usa a ultima importacao deste tipo.
-      // Store in chunks to avoid huge single-row JSONB writes (statement timeout).
-      const CHUNK = 2000;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const slice = rows.slice(i, i + CHUNK);
-        const { error: stErr } = await supabase.from("staging_bases").insert({
-          tipo,
-          importacao_id: imp.id,
-          linhas: slice as never,
-        });
-        if (stErr) throw stErr;
+      try {
+        await persistBase(tipo, file.name, rows);
+      } catch (error) {
+        if (!replaceExisting && isUniqueConflict(error)) {
+          await clearBase(tipo);
+          await persistBase(tipo, file.name, rows);
+        } else {
+          throw error;
+        }
       }
 
       toast.success(`${TIPO_LABEL[tipo]} importado`, {
@@ -166,7 +226,7 @@ export default function ImportacoesPage() {
       qc.invalidateQueries({ queryKey: ["importacoes"] });
       qc.invalidateQueries({ queryKey: ["staging-counts"] });
     } catch (e) {
-      toast.error("Erro ao importar", { description: (e as Error).message });
+      toast.error("Erro ao importar", { description: describeDbError(e) });
     } finally {
       setUploading(null);
       if (inputs.current[tipo]) inputs.current[tipo]!.value = "";
@@ -181,17 +241,14 @@ export default function ImportacoesPage() {
     }
     setDeleting(tipo);
     try {
-      const { error: stErr } = await supabase.from("staging_bases").delete().eq("tipo", tipo);
-      if (stErr) throw stErr;
-      const { error: impErr } = await supabase.from("importacoes").delete().eq("tipo", tipo);
-      if (impErr) throw impErr;
+      await clearBase(tipo);
       toast.success(`${TIPO_LABEL[tipo]} removido`, {
         description: "Arquivo e dados temporários excluídos. Você pode importar novamente.",
       });
       qc.invalidateQueries({ queryKey: ["importacoes"] });
       qc.invalidateQueries({ queryKey: ["staging-counts"] });
     } catch (e) {
-      toast.error("Erro ao excluir", { description: (e as Error).message });
+      toast.error("Erro ao excluir", { description: describeDbError(e) });
     } finally {
       setDeleting(null);
     }
@@ -255,7 +312,7 @@ export default function ImportacoesPage() {
       navigate("/projetos/controle-reparo/dashboard");
     },
     onError: (e) => {
-      const msg = (e as Error).message || String(e);
+      const msg = describeDbError(e);
       setProcessingLog(`Erro: ${msg}`);
       toast.error("Falha no processamento", { description: msg });
     },

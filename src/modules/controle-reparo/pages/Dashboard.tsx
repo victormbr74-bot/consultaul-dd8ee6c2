@@ -667,9 +667,13 @@ function isInstalacaoRoteador(r: ControleRow): boolean {
   return INSTALACAO_ROTEADOR_KEYS.has(ordemKey(r.ordem));
 }
 
+function isNormalizado(r: ControleRow): boolean {
+  return r.status_normalizacao === "NORMALIZADO" || normTxt(r.status_planilha) === "NORMALIZADO";
+}
+
 function computeGroups(rows: ControleRow[], fullRows: ControleRow[]) {
-  const ativos = rows.filter((r) => r.status_normalizacao === "ATIVO");
-  const normalizados = rows.filter((r) => r.status_normalizacao === "NORMALIZADO");
+  const ativos = rows.filter((r) => !isNormalizado(r));
+  const normalizados = rows.filter(isNormalizado);
 
   const principalAll = fullRows.filter((r) => !isLinkBackup(r.tipo_link));
   const backupAll = fullRows.filter((r) => isLinkBackup(r.tipo_link));
@@ -683,9 +687,9 @@ function computeGroups(rows: ControleRow[], fullRows: ControleRow[]) {
     instalacaoRoteador: ativos.filter((r) => isInstalacaoRoteador(r)),
     principalAll,
     backupAll,
-    principalFora: principalAll.filter((r) => r.status_normalizacao === "ATIVO"),
-    backupFora: backupAll.filter((r) => r.status_normalizacao === "ATIVO"),
-    principalNorm: principalAll.filter((r) => r.status_normalizacao === "NORMALIZADO"),
-    backupNorm: backupAll.filter((r) => r.status_normalizacao === "NORMALIZADO"),
+    principalFora: principalAll.filter((r) => !isNormalizado(r)),
+    backupFora: backupAll.filter((r) => !isNormalizado(r)),
+    principalNorm: principalAll.filter(isNormalizado),
+    backupNorm: backupAll.filter(isNormalizado),
   };
 }

@@ -6,11 +6,13 @@ import { PROCESSING_TIMEZONE, processingDate, processingTimestamp } from "./date
 
 const PAGE = 1000;
 let controleVersaoSupported: boolean | null = null;
+const PRESERVE_MANUAL_EDITS_FROM_HISTORY = false;
 
 interface FetchControleOptions {
   dataReferencia?: string;
   versao?: number;
   responsavel?: string;
+  allVersions?: boolean;
 }
 
 function isMissingVersaoColumnError(error: { code?: string; message?: string } | null): boolean {
@@ -53,10 +55,11 @@ export async function fetchAllControle(
   const options: FetchControleOptions =
     typeof input === "string" ? { dataReferencia: input } : (input ?? {});
   const supportsVersao = await hasControleVersaoColumn();
+  const shouldFilterVersao = supportsVersao && !options.allVersions;
   const resolvedVersao =
-    supportsVersao && options.dataReferencia && !options.versao
+    shouldFilterVersao && options.dataReferencia && !options.versao
       ? await fetchLatestControleVersao(options.dataReferencia)
-      : supportsVersao
+      : shouldFilterVersao
         ? options.versao
         : null;
   const out: ControleRow[] = [];
@@ -69,7 +72,7 @@ export async function fetchAllControle(
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (options.dataReferencia) q = q.eq("data_referencia", options.dataReferencia);
-    if (resolvedVersao) q = q.eq("versao", resolvedVersao);
+    if (shouldFilterVersao && resolvedVersao) q = q.eq("versao", resolvedVersao);
     if (options.responsavel) q = q.eq("responsavel", options.responsavel);
     const { data, error } = await q;
     if (error) throw error;
@@ -152,6 +155,8 @@ export async function fetchControleDatas(): Promise<string[]> {
 async function fetchManualEditFieldsByChave(
   current: ControleRow[],
 ): Promise<Record<string, string[]>> {
+  if (!PRESERVE_MANUAL_EDITS_FROM_HISTORY) return {};
+
   const idToChave = new Map<string, string>();
   for (const row of current) {
     if (row.id && row.chave) idToChave.set(row.id, row.chave);
@@ -167,11 +172,17 @@ async function fetchManualEditFieldsByChave(
       .select("controle_id, campo")
       .in("controle_id", slice);
     if (error) {
-      if (isMissingHistoricoSchemaError(error)) {
-        console.warn("Histórico de tratativas indisponível; processamento seguirá sem preservar edições manuais por histórico.", error);
-        return {};
-      }
-      throw error;
+      console.warn(
+        "Histórico de tratativas indisponível; processamento seguirá sem preservar edições manuais por histórico.",
+        {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          optionalSchemaIssue: isMissingHistoricoSchemaError(error),
+        },
+      );
+      return {};
     }
     for (const item of data ?? []) {
       if (!item.controle_id) continue;
@@ -198,7 +209,7 @@ async function fetchProcessingContext(dataReferencia: string): Promise<{
 }> {
   const currentVersion = await fetchLatestControleVersao(dataReferencia);
   const current = currentVersion
-    ? await fetchAllControle({ dataReferencia, versao: currentVersion })
+    ? await fetchAllControle({ dataReferencia, allVersions: true })
     : [];
   const manualEditFieldsByChave = await fetchManualEditFieldsByChave(current);
 
@@ -235,6 +246,23 @@ async function requireControleVersaoColumn(): Promise<void> {
 }
 
 type Tipo = "gis1" | "gis2" | "controle_d1" | "jira" | "grafana" | "planta";
+
+function toControleInsertPayload(row: ControleRow): Omit<ControleRow, "id"> {
+  const payload = { ...(row as unknown as Record<string, unknown>) };
+  delete payload.id;
+  delete payload.created_at;
+  delete payload.updated_at;
+  return payload as unknown as Omit<ControleRow, "id">;
+}
+
+async function clearControleVersion(dataReferencia: string, versao: number): Promise<void> {
+  const { error } = await supabase
+    .from("controle_diario")
+    .delete()
+    .eq("data_referencia", dataReferencia)
+    .eq("versao", versao);
+  if (error) throw error;
+}
 
 async function getLatestStaging(tipo: Tipo): Promise<Row[]> {
   const { data: latest, error: latestError } = await supabase
@@ -320,11 +348,17 @@ export async function runDailyProcessing(): Promise<{
   });
 
   // insert in chunks
+  await clearControleVersion(dataExecucao, versao);
   let inserted = 0;
   for (let i = 0; i < result.controle.length; i += 500) {
-    const chunk = result.controle.slice(i, i + 500);
+    const chunk = result.controle.slice(i, i + 500).map(toControleInsertPayload);
     const { error } = await supabase.from("controle_diario").insert(chunk as never);
     if (error) {
+      try {
+        await clearControleVersion(dataExecucao, versao);
+      } catch (cleanupError) {
+        console.warn("Falha ao limpar versão parcial do controle_diario", cleanupError);
+      }
       throw new Error(
         [
           "Falha ao gravar controle_diario",

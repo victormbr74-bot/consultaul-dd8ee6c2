@@ -1058,7 +1058,11 @@ export function processControle(input: ProcessInput): ProcessResult {
     addCount(d1CodeTypeCounts, id.codeTypeKey);
   }
 
-  const priorSorted = [...prior].sort((a, b) => (a.data_referencia < b.data_referencia ? -1 : 1));
+  const priorSorted = [...prior].sort((a, b) => {
+    const byDate = a.data_referencia.localeCompare(b.data_referencia);
+    if (byDate !== 0) return byDate;
+    return (a.versao ?? 1) - (b.versao ?? 1);
+  });
   const currentByChave = new Map<string, ControleRow>();
   for (const p of priorSorted) {
     if (p.data_referencia === dataReferencia && p.chave) currentByChave.set(p.chave, p);
@@ -1157,7 +1161,13 @@ export function processControle(input: ProcessInput): ProcessResult {
 
     // Etapa 3: edicoes manuais do dia atual + Controle D-1 por Codigo + Tipo.
     const inheritedCurrent = currentByChave.get(key);
-    const manualFields = new Set(manualEditFieldsByChave[key] ?? []);
+    const manualFields = new Set(
+      manualEditFieldsByChave[key]?.length
+        ? manualEditFieldsByChave[key]
+        : inheritedCurrent
+          ? MANUAIS_PRESERVAVEIS
+          : [],
+    );
     const inheritedD1 =
       gid.codeTypeKey && d1CodeTypeCounts.get(gid.codeTypeKey) === 1
         ? d1ByCodeType.get(gid.codeTypeKey)
@@ -1378,30 +1388,51 @@ export function processControle(input: ProcessInput): ProcessResult {
   const latestActivePrior = new Map<string, ControleRow>();
   for (const p of priorSorted) {
     const id = operationalId(p as unknown as Row);
-    const priorKey = id.key || p.chave;
+    const priorKey = p.chave || id.key || id.codeTypeKey || id.codeKey;
     if (p.status_normalizacao === "ATIVO" && priorKey) latestActivePrior.set(priorKey, p);
   }
   const nowIso = new Date().toISOString();
+  const outputKeys = new Set(controle.map((row) => row.chave).filter(Boolean));
   for (const [pkey, p] of latestActivePrior) {
-    if (!seenKeys.has(pkey)) {
-      const priorId = operationalId(p as unknown as Row);
-      const priorD1 =
-        priorId.codeTypeKey && d1CodeTypeCounts.get(priorId.codeTypeKey) === 1
-          ? d1ByCodeType.get(priorId.codeTypeKey)
-          : undefined;
-      const statusPlanilha = priorD1?.status_planilha ?? STATUS_PLANILHA_PADRAO;
+    const priorId = operationalId(p as unknown as Row);
+    const equivalentKeys = [p.chave, pkey, priorId.key, priorId.codeTypeKey, priorId.codeKey].filter(
+      Boolean,
+    ) as string[];
+    const alreadyActive = equivalentKeys.some((key) => seenKeys.has(key) || outputKeys.has(key));
+    if (!alreadyActive) {
+      const statusPlanilha = "NORMALIZADO";
       normalizados++;
-      if (statusPlanilha === STATUS_PLANILHA_PADRAO) statusPlanilhaCec++;
       controle.push({
         ...p,
         data_referencia: dataReferencia,
         versao,
+        chave: p.chave || pkey,
         status_normalizacao: "NORMALIZADO",
         status_planilha: statusPlanilha,
         normalizado_em: nowIso,
         tem_os_reparo: p.tem_os_reparo ?? false,
       });
+      outputKeys.add(p.chave || pkey);
     }
+  }
+
+  const uniqueByChave = new Map<string, ControleRow>();
+  for (const row of controle) {
+    const existing = uniqueByChave.get(row.chave);
+    if (!existing) {
+      uniqueByChave.set(row.chave, row);
+      continue;
+    }
+    if (
+      existing.status_normalizacao === "NORMALIZADO" &&
+      row.status_normalizacao === "ATIVO"
+    ) {
+      uniqueByChave.set(row.chave, row);
+    }
+  }
+  if (uniqueByChave.size !== controle.length) {
+    controle.splice(0, controle.length, ...uniqueByChave.values());
+    normalizados = controle.filter((row) => row.status_normalizacao === "NORMALIZADO").length;
   }
 
   // OS/Reparo foi removida do fluxo ativo; implantacoes ficam legadas.

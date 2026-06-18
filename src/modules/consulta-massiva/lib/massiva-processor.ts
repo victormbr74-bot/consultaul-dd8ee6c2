@@ -101,17 +101,34 @@ function identifyFromLotericas(
   if (!hit) return null;
 
   const isSecundario = normalizeLookup(tipoLink) === "SECUNDARIO";
-  const operadora4g = normalizeLookup(
-    hit.operadora ||
-      rawValue(hit, "OPERADORA 4G", "OPERADORA", "RESP BACKUP", "OWNER"),
-  );
+  if (isSecundario) {
+    // Regra item 9: Secundário usa Operadora (col E) como Operadora
+    // e OPERADORA 4G (col AJ) como Tipo Emp.
+    const operadora = normalizeLookup(
+      hit.operadora || rawValue(hit, "OPERADORA"),
+    );
+    const operadora4g = normalizeLookup(
+      rawValue(hit, "OPERADORA 4G") || hit.operadora,
+    );
+    if (!operadora && !operadora4g) return null;
+    const op = operadora || operadora4g;
+    return {
+      operadora: op,
+      tipoEmp: operadora4g || op,
+      classificacao: "OEMP" as const,
+      parceira: op,
+    } as const;
+  }
   const empresaOemp = normalizeLookup(rawValue(hit, "EMPRESA OEMP", "EMPRESA", "SITE OWNER"));
-  const operadora = isSecundario ? operadora4g : (empresaOemp || operadora4g);
+  const operadoraPri = normalizeLookup(
+    hit.operadora || rawValue(hit, "OPERADORA", "RESP BACKUP", "OWNER"),
+  );
+  const operadora = empresaOemp || operadoraPri;
   if (!operadora) return null;
-  const classificacao = !isSecundario && operadora === "VTAL" ? "VTAL" : "OEMP";
+  const classificacao = operadora === "VTAL" ? "VTAL" : "OEMP";
   return {
     operadora,
-    tipoEmp: isSecundario ? operadora4g || operadora : classificacao === "VTAL" ? "VTAL" : "OEMP",
+    tipoEmp: classificacao === "VTAL" ? "VTAL" : "OEMP",
     classificacao,
     parceira: operadora,
   } as const;

@@ -208,18 +208,20 @@ export function processGis(
   const lotericasLookup = buildLotericasLookup(lotericasRows);
 
   const rows: ProcessedRow[] = input.map((r, i) => {
-    const tipoRaw = String(r["Tipo de Link"] ?? "").toUpperCase().trim();
-    const uf = String(r["UF"] ?? "").toUpperCase().trim();
-    const ts = parseDateBR(r["Data e Hora Incial"]);
-    const desig = String(r["Designação"] ?? "");
-    const ip = String(r["IP Loopback"] ?? "");
-    const codigo = String(r["CÃ³d. da LotÃ©rica"] ?? "");
-    const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial") || String(r["Data e Hora Incial"] ?? "");
+    const tipoRawOrig = getCell(r, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo");
+    const tipoUpper = tipoRawOrig.toUpperCase().trim();
+    // Normaliza variações: PRINCIPAL/PRI/MAIN, SECUNDARIO/SEC/BACKUP/BKP
+    let tipoRaw = tipoUpper;
+    if (/^(PRINC|PRI|MAIN|PRIMARIO|PRIMÁRIO)/.test(tipoUpper)) tipoRaw = "PRINCIPAL";
+    else if (/^(SEC|BACKUP|BKP|BKO|BK\b)/.test(tipoUpper)) tipoRaw = "SECUNDARIO";
+    const uf = getCell(r, "UF", "Uf", "ESTADO", "Estado").toUpperCase().trim();
+    const desig = getCell(r, "Designação", "DesignaÃ§Ã£o", "Designacao", "DESIGNACAO");
+    const ip = getCell(r, "IP Loopback", "IP LOOPBACK", "IP_LOOPBACK", "Loopback");
+    const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial", "Data e Hora", "Data/Hora", "DataHora");
     const correctedTs = parseDateBR(dataHoraRaw);
-    const correctedDesig = getCell(r, "Designação", "DesignaÃ§Ã£o", "Designacao") || desig;
-    const correctedCodigo = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica") || codigo;
-    const identified = identifyOperadora(tipoRaw, correctedDesig, ip, correctedCodigo, lookup);
-    const fromLotericas = identifyFromLotericas(tipoRaw, correctedCodigo, correctedDesig, ip, lotericasLookup);
+    const correctedCodigo = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica", "Codigo da Loterica", "Codigo");
+    const identified = identifyOperadora(tipoRaw, desig, ip, correctedCodigo, lookup);
+    const fromLotericas = identifyFromLotericas(tipoRaw, correctedCodigo, desig, ip, lotericasLookup);
     const id = identified.classificacao === "NAO_IDENTIFICADO"
       ? (fromLotericas ?? fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
       : identified;
@@ -239,6 +241,21 @@ export function processGis(
       "Status Massiva": "NAO_MASSIVA",
     } as ProcessedRow;
   });
+
+  // Diagnóstico para investigar dashboards zerados
+  if (typeof console !== "undefined" && rows.length) {
+    const tipoCounts: Record<string, number> = {};
+    let invalidTs = 0;
+    let semUf = 0;
+    for (const r of rows) {
+      const k = r.__tipoLink || "(vazio)";
+      tipoCounts[k] = (tipoCounts[k] ?? 0) + 1;
+      if (isNaN(r.__ts)) invalidTs++;
+      if (!r.__uf) semUf++;
+    }
+    console.info("[massiva] colunas:", Object.keys(input[0] ?? {}));
+    console.info("[massiva] tipoLink:", tipoCounts, "| ts inválidos:", invalidTs, "| sem UF:", semUf, "| total:", rows.length);
+  }
 
   const ts = rows.map((r) => r.__ts);
   const valid = (i: number) => !isNaN(rows[i].__ts);

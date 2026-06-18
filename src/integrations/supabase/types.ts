@@ -119,6 +119,51 @@ export type Database = {
         }
         Relationships: []
       }
+      analises: {
+        Row: {
+          arquivo_1link: string | null
+          arquivo_2links: string | null
+          circuitos_impactados: number
+          created_at: string
+          executado_por: string | null
+          id: string
+          qtd_principal_oemp: number
+          qtd_principal_vtal: number
+          qtd_secundario_nacional: number
+          qtd_secundario_uf: number
+          total_registros: number
+          ufs_impactadas: number
+        }
+        Insert: {
+          arquivo_1link?: string | null
+          arquivo_2links?: string | null
+          circuitos_impactados?: number
+          created_at?: string
+          executado_por?: string | null
+          id?: string
+          qtd_principal_oemp?: number
+          qtd_principal_vtal?: number
+          qtd_secundario_nacional?: number
+          qtd_secundario_uf?: number
+          total_registros?: number
+          ufs_impactadas?: number
+        }
+        Update: {
+          arquivo_1link?: string | null
+          arquivo_2links?: string | null
+          circuitos_impactados?: number
+          created_at?: string
+          executado_por?: string | null
+          id?: string
+          qtd_principal_oemp?: number
+          qtd_principal_vtal?: number
+          qtd_secundario_nacional?: number
+          qtd_secundario_uf?: number
+          total_registros?: number
+          ufs_impactadas?: number
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -140,6 +185,69 @@ export type Database = {
           updated_by?: string | null
           value_boolean?: boolean
           value_text?: string | null
+        }
+        Relationships: []
+      }
+      auditoria: {
+        Row: {
+          acao: string
+          created_at: string
+          detalhes: Json | null
+          entidade: string | null
+          id: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          detalhes?: Json | null
+          entidade?: string | null
+          id?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          detalhes?: Json | null
+          entidade?: string | null
+          id?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      base_cidades: {
+        Row: {
+          cidade: string
+          cidade_normalizada: string
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          cidade: string
+          cidade_normalizada: string
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          cidade?: string
+          cidade_normalizada?: string
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          uf?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -172,6 +280,189 @@ export type Database = {
           n2?: string
           n3?: string
           quando_utilizar?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      controle_diario: {
+        Row: {
+          chamado: string | null
+          chave: string | null
+          cidade: string | null
+          codigo_loterica: string
+          created_at: string
+          data_hora_inicial: string | null
+          data_referencia: string
+          designacao: string | null
+          designacao_parceiro: string | null
+          duracao_h: number | null
+          empresa: string | null
+          fila_jira: string | null
+          grafana: string | null
+          id: string
+          inc_snow: string | null
+          incidente_mam: string | null
+          ip_loopback: string | null
+          loterica: string | null
+          normalizado_em: string | null
+          novo_circuito: string | null
+          obs: string | null
+          ordem: string | null
+          pendente_enriquecimento: boolean
+          previsao_atendimento: string | null
+          responsavel: string | null
+          responsavel_backup: string | null
+          responsavel_chip: string | null
+          situacao: string | null
+          status_jira: string | null
+          status_normalizacao: string
+          status_planilha: string | null
+          status_zabbix: string | null
+          tipo_link: string | null
+          uf: string | null
+          ultimo_comentario: string | null
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          chamado?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_loterica: string
+          created_at?: string
+          data_hora_inicial?: string | null
+          data_referencia: string
+          designacao?: string | null
+          designacao_parceiro?: string | null
+          duracao_h?: number | null
+          empresa?: string | null
+          fila_jira?: string | null
+          grafana?: string | null
+          id?: string
+          inc_snow?: string | null
+          incidente_mam?: string | null
+          ip_loopback?: string | null
+          loterica?: string | null
+          normalizado_em?: string | null
+          novo_circuito?: string | null
+          obs?: string | null
+          ordem?: string | null
+          pendente_enriquecimento?: boolean
+          previsao_atendimento?: string | null
+          responsavel?: string | null
+          responsavel_backup?: string | null
+          responsavel_chip?: string | null
+          situacao?: string | null
+          status_jira?: string | null
+          status_normalizacao?: string
+          status_planilha?: string | null
+          status_zabbix?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+          ultimo_comentario?: string | null
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          chamado?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_loterica?: string
+          created_at?: string
+          data_hora_inicial?: string | null
+          data_referencia?: string
+          designacao?: string | null
+          designacao_parceiro?: string | null
+          duracao_h?: number | null
+          empresa?: string | null
+          fila_jira?: string | null
+          grafana?: string | null
+          id?: string
+          inc_snow?: string | null
+          incidente_mam?: string | null
+          ip_loopback?: string | null
+          loterica?: string | null
+          normalizado_em?: string | null
+          novo_circuito?: string | null
+          obs?: string | null
+          ordem?: string | null
+          pendente_enriquecimento?: boolean
+          previsao_atendimento?: string | null
+          responsavel?: string | null
+          responsavel_backup?: string | null
+          responsavel_chip?: string | null
+          situacao?: string | null
+          status_jira?: string | null
+          status_normalizacao?: string
+          status_planilha?: string | null
+          status_zabbix?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+          ultimo_comentario?: string | null
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: []
+      }
+      escalonamentos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          n1_email: string | null
+          n1_nome: string | null
+          n1_telefone: string | null
+          n2_email: string | null
+          n2_nome: string | null
+          n2_telefone: string | null
+          n3_email: string | null
+          n3_nome: string | null
+          n3_telefone: string | null
+          n4_email: string | null
+          n4_nome: string | null
+          n4_telefone: string | null
+          observacao: string | null
+          operadora: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          n1_email?: string | null
+          n1_nome?: string | null
+          n1_telefone?: string | null
+          n2_email?: string | null
+          n2_nome?: string | null
+          n2_telefone?: string | null
+          n3_email?: string | null
+          n3_nome?: string | null
+          n3_telefone?: string | null
+          n4_email?: string | null
+          n4_nome?: string | null
+          n4_telefone?: string | null
+          observacao?: string | null
+          operadora: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          n1_email?: string | null
+          n1_nome?: string | null
+          n1_telefone?: string | null
+          n2_email?: string | null
+          n2_nome?: string | null
+          n2_telefone?: string | null
+          n3_email?: string | null
+          n3_nome?: string | null
+          n3_telefone?: string | null
+          n4_email?: string | null
+          n4_nome?: string | null
+          n4_telefone?: string | null
+          observacao?: string | null
+          operadora?: string
           updated_at?: string
         }
         Relationships: []
@@ -272,6 +563,95 @@ export type Database = {
         }
         Relationships: []
       }
+      historico_tratativas: {
+        Row: {
+          campo: string
+          codigo_loterica: string
+          controle_id: string | null
+          data_hora: string
+          id: string
+          recorded_by: string | null
+          usuario: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          campo: string
+          codigo_loterica: string
+          controle_id?: string | null
+          data_hora?: string
+          id?: string
+          recorded_by?: string | null
+          usuario?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          campo?: string
+          codigo_loterica?: string
+          controle_id?: string | null
+          data_hora?: string
+          id?: string
+          recorded_by?: string | null
+          usuario?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_tratativas_controle_id_fkey"
+            columns: ["controle_id"]
+            isOneToOne: false
+            referencedRelation: "controle_diario"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      implantacoes: {
+        Row: {
+          analise_tipo: string | null
+          atualizado_em: string
+          codigo_loterica: string
+          data_atualizacao: string | null
+          evento: string | null
+          fase: string | null
+          id: string
+          loterica: string | null
+          nova_designacao: string | null
+          novo_circuito: string | null
+          parceira: string | null
+          status_censitec: string | null
+        }
+        Insert: {
+          analise_tipo?: string | null
+          atualizado_em?: string
+          codigo_loterica: string
+          data_atualizacao?: string | null
+          evento?: string | null
+          fase?: string | null
+          id?: string
+          loterica?: string | null
+          nova_designacao?: string | null
+          novo_circuito?: string | null
+          parceira?: string | null
+          status_censitec?: string | null
+        }
+        Update: {
+          analise_tipo?: string | null
+          atualizado_em?: string
+          codigo_loterica?: string
+          data_atualizacao?: string | null
+          evento?: string | null
+          fase?: string | null
+          id?: string
+          loterica?: string | null
+          nova_designacao?: string | null
+          novo_circuito?: string | null
+          parceira?: string | null
+          status_censitec?: string | null
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           arquivo: string
@@ -296,6 +676,39 @@ export type Database = {
           registros?: number
           tipo?: string
           usuario?: string
+        }
+        Relationships: []
+      }
+      importacoes: {
+        Row: {
+          arquivo: string
+          data_importacao: string
+          id: string
+          registros: number
+          status: string
+          tipo: Database["public"]["Enums"]["tipo_importacao"]
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Insert: {
+          arquivo: string
+          data_importacao?: string
+          id?: string
+          registros?: number
+          status?: string
+          tipo: Database["public"]["Enums"]["tipo_importacao"]
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Update: {
+          arquivo?: string
+          data_importacao?: string
+          id?: string
+          registros?: number
+          status?: string
+          tipo?: Database["public"]["Enums"]["tipo_importacao"]
+          usuario_id?: string | null
+          usuario_nome?: string | null
         }
         Relationships: []
       }
@@ -797,6 +1210,130 @@ export type Database = {
         }
         Relationships: []
       }
+      massiva_circuitos: {
+        Row: {
+          alarme_id: string | null
+          cidade: string | null
+          codigo_loterica: string | null
+          data_hora: string | null
+          designacao: string | null
+          empresa: string | null
+          id: string
+          ip_loopback: string | null
+          loterica: string | null
+          massiva_id: string
+          mensagem: string | null
+          operadora: string | null
+          regional: string | null
+          status: string | null
+          tecnologia: string | null
+          telefone: string | null
+          tipo_empresa: string | null
+          tipo_link: string | null
+          uf: string | null
+        }
+        Insert: {
+          alarme_id?: string | null
+          cidade?: string | null
+          codigo_loterica?: string | null
+          data_hora?: string | null
+          designacao?: string | null
+          empresa?: string | null
+          id?: string
+          ip_loopback?: string | null
+          loterica?: string | null
+          massiva_id: string
+          mensagem?: string | null
+          operadora?: string | null
+          regional?: string | null
+          status?: string | null
+          tecnologia?: string | null
+          telefone?: string | null
+          tipo_empresa?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+        }
+        Update: {
+          alarme_id?: string | null
+          cidade?: string | null
+          codigo_loterica?: string | null
+          data_hora?: string | null
+          designacao?: string | null
+          empresa?: string | null
+          id?: string
+          ip_loopback?: string | null
+          loterica?: string | null
+          massiva_id?: string
+          mensagem?: string | null
+          operadora?: string | null
+          regional?: string | null
+          status?: string | null
+          tecnologia?: string | null
+          telefone?: string | null
+          tipo_empresa?: string | null
+          tipo_link?: string | null
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "massiva_circuitos_massiva_id_fkey"
+            columns: ["massiva_id"]
+            isOneToOne: false
+            referencedRelation: "massivas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      massivas: {
+        Row: {
+          analise_id: string | null
+          created_at: string
+          id: string
+          id_massiva: string
+          operadora: string
+          primeiro_alarme: string | null
+          qtd_circuitos: number
+          status: string
+          tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
+          uf: string
+          ultimo_alarme: string | null
+        }
+        Insert: {
+          analise_id?: string | null
+          created_at?: string
+          id?: string
+          id_massiva: string
+          operadora?: string
+          primeiro_alarme?: string | null
+          qtd_circuitos: number
+          status?: string
+          tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
+          uf?: string
+          ultimo_alarme?: string | null
+        }
+        Update: {
+          analise_id?: string | null
+          created_at?: string
+          id?: string
+          id_massiva?: string
+          operadora?: string
+          primeiro_alarme?: string | null
+          qtd_circuitos?: number
+          status?: string
+          tipo_massiva?: Database["public"]["Enums"]["tipo_massiva_enum"]
+          uf?: string
+          ultimo_alarme?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "massivas_analise_id_fkey"
+            columns: ["analise_id"]
+            isOneToOne: false
+            referencedRelation: "analises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meus_casos: {
         Row: {
           criado_em: string
@@ -824,6 +1361,42 @@ export type Database = {
           status_caso?: string
           updated_at?: string
           usuario_nome?: string
+        }
+        Relationships: []
+      }
+      operadoras: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          designacao: string
+          id: string
+          ip_loopback: string
+          ip_loopback_secundario: string
+          operadora: string
+          tipo_empresa: Database["public"]["Enums"]["tipo_empresa_enum"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          designacao?: string
+          id?: string
+          ip_loopback?: string
+          ip_loopback_secundario?: string
+          operadora: string
+          tipo_empresa: Database["public"]["Enums"]["tipo_empresa_enum"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          designacao?: string
+          id?: string
+          ip_loopback?: string
+          ip_loopback_secundario?: string
+          operadora?: string
+          tipo_empresa?: Database["public"]["Enums"]["tipo_empresa_enum"]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -934,39 +1507,51 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          ativo: boolean
           created_at: string
+          criado_em: string
           email: string | null
           employee_id: string | null
           full_name: string | null
           id: string
           is_active: boolean | null
           name: string
+          nome: string | null
+          updated_at: string
           user_code: string | null
           user_id: string | null
           username: string | null
         }
         Insert: {
           active?: boolean
+          ativo?: boolean
           created_at?: string
+          criado_em?: string
           email?: string | null
           employee_id?: string | null
           full_name?: string | null
           id: string
           is_active?: boolean | null
           name: string
+          nome?: string | null
+          updated_at?: string
           user_code?: string | null
           user_id?: string | null
           username?: string | null
         }
         Update: {
           active?: boolean
+          ativo?: boolean
           created_at?: string
+          criado_em?: string
           email?: string | null
           employee_id?: string | null
           full_name?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
+          nome?: string | null
+          updated_at?: string
           user_code?: string | null
           user_id?: string | null
           username?: string | null
@@ -1029,6 +1614,38 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      staging_bases: {
+        Row: {
+          criado_em: string
+          id: string
+          importacao_id: string | null
+          linhas: Json
+          tipo: Database["public"]["Enums"]["tipo_importacao"]
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          importacao_id?: string | null
+          linhas?: Json
+          tipo: Database["public"]["Enums"]["tipo_importacao"]
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          importacao_id?: string | null
+          linhas?: Json
+          tipo?: Database["public"]["Enums"]["tipo_importacao"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staging_bases_importacao_id_fkey"
+            columns: ["importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       topologia: {
         Row: {
@@ -1104,6 +1721,9 @@ export type Database = {
       apply_principal_updates: { Args: { payload: Json }; Returns: number }
       can_manage_app_data: { Args: { _user_id: string }; Returns: boolean }
       can_manage_app_settings: { Args: never; Returns: boolean }
+      can_write: { Args: { _user_id: string }; Returns: boolean }
+      compat_role_text: { Args: { _user_id: string }; Returns: string }
+      current_user_is_admin_master: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1111,6 +1731,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_master: { Args: { _user_id: string }; Returns: boolean }
       normalize_mac_text: { Args: { value: string }; Returns: string }
       search_lotericas_by_mac: {
         Args: { page_offset?: number; page_size?: number; search_mac: string }
@@ -1130,9 +1752,39 @@ export type Database = {
           uf: string
         }[]
       }
+      set_user_app_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      app_role: "admin" | "user" | "operacao" | "leitura"
+      app_role:
+        | "admin"
+        | "user"
+        | "operacao"
+        | "leitura"
+        | "ADMIN"
+        | "OPERADOR"
+        | "administrador"
+        | "administrador_master"
+        | "consulta"
+      tipo_empresa_enum: "VTAL" | "OEMP"
+      tipo_importacao:
+        | "gis1"
+        | "gis2"
+        | "controle_d1"
+        | "jira"
+        | "grafana"
+        | "planta"
+        | "os_reparo"
+      tipo_massiva_enum:
+        | "PRINCIPAL_VTAL"
+        | "PRINCIPAL_OEMP"
+        | "SECUNDARIO_UF"
+        | "SECUNDARIO_NACIONAL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1260,7 +1912,33 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "operacao", "leitura"],
+      app_role: [
+        "admin",
+        "user",
+        "operacao",
+        "leitura",
+        "ADMIN",
+        "OPERADOR",
+        "administrador",
+        "administrador_master",
+        "consulta",
+      ],
+      tipo_empresa_enum: ["VTAL", "OEMP"],
+      tipo_importacao: [
+        "gis1",
+        "gis2",
+        "controle_d1",
+        "jira",
+        "grafana",
+        "planta",
+        "os_reparo",
+      ],
+      tipo_massiva_enum: [
+        "PRINCIPAL_VTAL",
+        "PRINCIPAL_OEMP",
+        "SECUNDARIO_UF",
+        "SECUNDARIO_NACIONAL",
+      ],
     },
   },
 } as const

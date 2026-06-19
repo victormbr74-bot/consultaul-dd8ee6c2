@@ -491,13 +491,21 @@ function resolveResponsaveis(profileNames: string[]): ResolvedResponsaveis {
   const oi = RESPONSAVEL_ALIASES.oi.map((aliases) =>
     uniqueProfileMatch(cleanProfiles, aliases[0], aliases),
   );
-  const oempSp = uniqueProfileMatch(cleanProfiles, "Carol", RESPONSAVEL_ALIASES.oemp.sp);
+  const oempSp = uniqueProfileMatch(
+    cleanProfiles,
+    "Caroline Victoria Marques de Oliveira",
+    RESPONSAVEL_ALIASES.oemp.sp,
+  );
   const oempNordeste = uniqueProfileMatch(
     cleanProfiles,
-    "Anabelly",
+    "Anabelly Cris Silva",
     RESPONSAVEL_ALIASES.oemp.nordeste,
   );
-  const oempDemais = uniqueProfileMatch(cleanProfiles, "Samara", RESPONSAVEL_ALIASES.oemp.demais);
+  const oempDemais = uniqueProfileMatch(
+    cleanProfiles,
+    "Samara De Paiva Pontes",
+    RESPONSAVEL_ALIASES.oemp.demais,
+  );
   return {
     secundario,
     oi,

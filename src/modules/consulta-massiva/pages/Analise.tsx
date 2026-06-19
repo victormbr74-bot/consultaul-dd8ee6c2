@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { processGis, type ProcessResult } from "@/modules/consulta-massiva/lib/massiva-processor";
 import { exportToCsv, exportToPdf, exportToXlsx, processedRowsForExport, readGisFile } from "@/modules/consulta-massiva/lib/excel";
 import { buildEscalonamentoMap } from "@/modules/consulta-massiva/lib/operadoras";
-import type { GisRow, Massiva } from "@/modules/consulta-massiva/lib/gis-types";
+import type { GisRow, Massiva, ProcessedRow } from "@/modules/consulta-massiva/lib/gis-types";
 import type { DbLoterica, DbOperadora, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/modules/consulta-massiva/lib/audit";
@@ -29,6 +29,47 @@ import { buildMascaraTextoFromMassiva } from "@/modules/consulta-massiva/lib/mas
 import { toast } from "sonner";
 
 type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
+
+function getMassivaRows(m: Massiva, rows: ProcessedRow[]): ProcessedRow[] {
+  const ids = new Set(m.rowIds);
+  return rows
+    .filter((r) => ids.has(r.__rowId))
+    .sort((a, b) => {
+      const ats = Number.isFinite(a.__ts) ? a.__ts : Number.MAX_SAFE_INTEGER;
+      const bts = Number.isFinite(b.__ts) ? b.__ts : Number.MAX_SAFE_INTEGER;
+      return ats - bts;
+    });
+}
+
+function pickRowText(row: ProcessedRow | undefined, ...keys: string[]): string {
+  if (!row) return "";
+  for (const key of keys) {
+    const value = row[key];
+    if (value != null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
+function massivaControlFields(m: Massiva, rows: ProcessedRow[]) {
+  const first = getMassivaRows(m, rows)[0];
+  return {
+    circuito_pai: pickRowText(
+      first,
+      "Designação",
+      "DesignaÃ§Ã£o",
+      "DesignaÃƒÂ§ÃƒÂ£o",
+      "Designacao",
+      "DESIGNACAO",
+      "Circuito",
+      "Circuito OEMP",
+    ),
+    consorcio_ul: "CONSÓRCIO",
+    tipo_link: m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO",
+    chamado: pickRowText(first, "Chamado"),
+    inc: pickRowText(first, "Nº REQ Caixa", "NÂº REQ Caixa", "REQ Caixa"),
+    data_hora_abertura: new Date(m.primeiro_ts).toISOString(),
+  };
+}
 
 async function fetchAllOperadoras(): Promise<DbOperadora[]> {
   const out: DbOperadora[] = [];
@@ -135,22 +176,31 @@ export default function Page() {
           arquivo_2links: file2?.name ?? null,
         }).select("id").single();
         if (analise && r.massivas.length) {
-          await supabase.from("massivas").insert(r.massivas.map((m) => ({
-            analise_id: analise.id,
-            id_massiva: m.id_massiva,
-            tipo_massiva: m.tipo_massiva,
-            operadora: m.operadora,
-            uf: m.uf,
-            qtd_circuitos: m.qtd_circuitos,
-            primeiro_alarme: new Date(m.primeiro_ts).toISOString(),
-            ultimo_alarme: new Date(m.ultimo_ts).toISOString(),
-            qtd_lotericas_isoladas: m.qtd_lotericas_isoladas ?? 0,
-            cidade_epicentro: m.cidade_epicentro ?? null,
-            uf_epicentro: m.uf_epicentro ?? null,
-            sinalizacao_60km: m.sinalizacao_60km ?? null,
-            raio_maximo_km: m.raio_maximo_km ?? null,
-            mascara_texto: m.mascara_texto ?? null,
-          })));
+          await supabase.from("massivas").insert(r.massivas.map((m) => {
+            const control = massivaControlFields(m, r.rows);
+            return {
+              analise_id: analise.id,
+              id_massiva: m.id_massiva,
+              tipo_massiva: m.tipo_massiva,
+              operadora: m.operadora,
+              uf: m.uf,
+              qtd_circuitos: m.qtd_circuitos,
+              primeiro_alarme: new Date(m.primeiro_ts).toISOString(),
+              ultimo_alarme: new Date(m.ultimo_ts).toISOString(),
+              qtd_lotericas_isoladas: m.qtd_lotericas_isoladas ?? 0,
+              cidade_epicentro: m.cidade_epicentro ?? null,
+              uf_epicentro: m.uf_epicentro ?? null,
+              sinalizacao_60km: m.sinalizacao_60km ?? null,
+              raio_maximo_km: m.raio_maximo_km ?? null,
+              mascara_texto: m.mascara_texto ?? null,
+              circuito_pai: control.circuito_pai,
+              consorcio_ul: control.consorcio_ul,
+              tipo_link: control.tipo_link,
+              chamado: control.chamado || null,
+              inc: control.inc || null,
+              data_hora_abertura: control.data_hora_abertura,
+            };
+          }));
         }
         await logAudit("EXECUTAR_ANALISE", "analises", {
           massivas: r.massivas.length,

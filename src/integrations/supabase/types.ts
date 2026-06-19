@@ -1290,10 +1290,17 @@ export type Database = {
       massivas: {
         Row: {
           analise_id: string | null
+          atualizacao: string | null
+          chamado: string | null
           created_at: string
+          circuito_pai: string | null
+          consorcio_ul: string
+          data_hora_abertura: string | null
+          data_hora_normalizacao: string | null
           id: string
           id_massiva: string
           cidade_epicentro: string | null
+          inc: string | null
           mascara_texto: string | null
           operadora: string
           primeiro_alarme: string | null
@@ -1302,6 +1309,7 @@ export type Database = {
           raio_maximo_km: number | null
           sinalizacao_60km: string | null
           status: string
+          tipo_link: string | null
           tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf: string
           uf_epicentro: string | null
@@ -1309,10 +1317,17 @@ export type Database = {
         }
         Insert: {
           analise_id?: string | null
+          atualizacao?: string | null
+          chamado?: string | null
           created_at?: string
+          circuito_pai?: string | null
+          consorcio_ul?: string
+          data_hora_abertura?: string | null
+          data_hora_normalizacao?: string | null
           id?: string
           id_massiva: string
           cidade_epicentro?: string | null
+          inc?: string | null
           mascara_texto?: string | null
           operadora?: string
           primeiro_alarme?: string | null
@@ -1321,6 +1336,7 @@ export type Database = {
           raio_maximo_km?: number | null
           sinalizacao_60km?: string | null
           status?: string
+          tipo_link?: string | null
           tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf?: string
           uf_epicentro?: string | null
@@ -1328,10 +1344,17 @@ export type Database = {
         }
         Update: {
           analise_id?: string | null
+          atualizacao?: string | null
+          chamado?: string | null
           created_at?: string
+          circuito_pai?: string | null
+          consorcio_ul?: string
+          data_hora_abertura?: string | null
+          data_hora_normalizacao?: string | null
           id?: string
           id_massiva?: string
           cidade_epicentro?: string | null
+          inc?: string | null
           mascara_texto?: string | null
           operadora?: string
           primeiro_alarme?: string | null
@@ -1340,6 +1363,7 @@ export type Database = {
           raio_maximo_km?: number | null
           sinalizacao_60km?: string | null
           status?: string
+          tipo_link?: string | null
           tipo_massiva?: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf?: string
           uf_epicentro?: string | null

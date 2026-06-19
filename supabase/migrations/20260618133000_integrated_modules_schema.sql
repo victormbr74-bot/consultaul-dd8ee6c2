@@ -264,8 +264,17 @@ ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS uf_epicentro text;
 ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS sinalizacao_60km text;
 ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS raio_maximo_km numeric;
 ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS mascara_texto text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS circuito_pai text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS consorcio_ul text NOT NULL DEFAULT 'CONSÓRCIO';
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS tipo_link text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS chamado text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS inc text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS data_hora_abertura timestamptz;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS data_hora_normalizacao timestamptz;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS atualizacao text;
 CREATE INDEX IF NOT EXISTS idx_massivas_analise ON public.massivas(analise_id);
 CREATE INDEX IF NOT EXISTS idx_massivas_status_created ON public.massivas(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_massivas_abertura ON public.massivas(data_hora_abertura DESC);
 
 CREATE TABLE IF NOT EXISTS public.massiva_circuitos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

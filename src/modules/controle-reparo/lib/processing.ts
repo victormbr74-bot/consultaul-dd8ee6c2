@@ -181,6 +181,20 @@ export interface ProcessReport {
       chamado: string | null;
       motivo: string;
     }>;
+    semIncAte24h: {
+      total: number;
+      obsSemInc: number;
+      responsavelSemInc: number;
+      filaJiraSemInc: number;
+      statusPlanilhaCecAnalisando: number;
+      exemplos: Array<{
+        chave: string;
+        codigo_loterica: string;
+        chamado: string | null;
+        data_hora_inicial: string | null;
+        duracao_h: number | null;
+      }>;
+    };
     incSnowPreenchido: number;
     incSnowVazio: number;
     incSnowIgnoradoInvalido: number;
@@ -832,6 +846,22 @@ function normalizeIncidentValue(v: string | null | undefined): string | null {
   return /^INC[-_]?\d+/.test(normalized) ? normalized : null;
 }
 
+function caseAgeHours(row: ControleRow, referenceIso: string | undefined): number | null {
+  if (row.duracao_h != null && Number.isFinite(row.duracao_h)) return row.duracao_h;
+  if (!row.data_hora_inicial) return null;
+  const start = new Date(row.data_hora_inicial).getTime();
+  if (isNaN(start)) return null;
+  const reference = referenceIso ? new Date(referenceIso).getTime() : Date.now();
+  if (isNaN(reference)) return null;
+  return Math.max(0, (reference - start) / 3600000);
+}
+
+function isSemIncAte24h(row: ControleRow, referenceIso: string | undefined): boolean {
+  if (normalizeIncidentValue(row.chamado)) return false;
+  const hours = caseAgeHours(row, referenceIso);
+  return hours != null && hours <= 24;
+}
+
 const INC_SNOW_COLUMN_CANDIDATES = [
   "Nº INC Snow",
   "Nº Inc Snow",
@@ -1106,6 +1136,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   let ordemConvertidaReparo = 0;
   let statusPlanilhaCec = 0;
   let oempTotal = 0;
+  const semIncAte24hKeys = new Set<string>();
   const filaJiraVaziaExemplos: ProcessReport["jira"]["filaJiraVaziaExemplos"] = [];
 
   const getGrafanaCircuit = (...keys: Array<string | null | undefined>) => {
@@ -1231,6 +1262,9 @@ export function processControle(input: ProcessInput): ProcessResult {
       row.inc_snow = null;
       row.obs = SEM_INC;
       row.responsavel = SEM_INC;
+      if (isSemIncAte24h(row, processadoEm)) {
+        semIncAte24hKeys.add(row.chave);
+      }
     } else if (jr) {
       incValidosTotal++;
       jiraFound = true;
@@ -1329,6 +1363,9 @@ export function processControle(input: ProcessInput): ProcessResult {
 
     // Status Planilha vem exclusivamente do D-1; ausente ou inválido vira CEC ANALISANDO.
     row.status_planilha = inheritedD1?.status_planilha ?? STATUS_PLANILHA_PADRAO;
+    if (semIncAte24hKeys.has(row.chave)) {
+      row.status_planilha = STATUS_PLANILHA_PADRAO;
+    }
     if (row.status_planilha === STATUS_PLANILHA_PADRAO) {
       statusPlanilhaCec++;
     }
@@ -1358,7 +1395,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   const oiPreservadoD1 = oiRows.filter((r) => !isDistribuivel(r.responsavel)).length;
   let oiIdx = 0;
   for (const r of oiRows) {
-    if (isDistribuivel(r.responsavel)) {
+    if (isDistribuivel(r.responsavel) && !semIncAte24hKeys.has(r.chave)) {
       r.responsavel = responsaveis.oi[oiIdx % responsaveis.oi.length];
       oiIdx++;
     }
@@ -1370,7 +1407,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   );
   const oempDistribuidos = oempRows.filter((r) => isDistribuivel(r.responsavel)).length;
   for (const r of oempRows) {
-    if (isDistribuivel(r.responsavel)) {
+    if (isDistribuivel(r.responsavel) && !semIncAte24hKeys.has(r.chave)) {
       r.responsavel = oempResponsavel(r.uf, responsaveis);
     }
   }
@@ -1383,7 +1420,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   ).length;
   let secIdx = 0;
   for (const r of secRows) {
-    if (isDistribuivel(r.responsavel) && !isOiCase(r)) {
+    if (isDistribuivel(r.responsavel) && !isOiCase(r) && !semIncAte24hKeys.has(r.chave)) {
       r.responsavel = responsaveis.secundario[secIdx % responsaveis.secundario.length];
       secIdx++;
     }
@@ -1477,6 +1514,25 @@ export function processControle(input: ProcessInput): ProcessResult {
 
   const d1SituacaoReparo = controleD1.filter((r) => isReparoValue(getVal(r, "SITUACAO"))).length;
   const d1OrdemReparo = controleD1.filter((r) => isReparoValue(getVal(r, "ORDEM"))).length;
+  const semIncAte24hRows = controle.filter(
+    (r) => r.status_normalizacao === "ATIVO" && semIncAte24hKeys.has(r.chave),
+  );
+  const semIncAte24hReport: ProcessReport["jira"]["semIncAte24h"] = {
+    total: semIncAte24hRows.length,
+    obsSemInc: semIncAte24hRows.filter((r) => r.obs === SEM_INC).length,
+    responsavelSemInc: semIncAte24hRows.filter((r) => r.responsavel === SEM_INC).length,
+    filaJiraSemInc: semIncAte24hRows.filter((r) => r.fila_jira === SEM_INC).length,
+    statusPlanilhaCecAnalisando: semIncAte24hRows.filter(
+      (r) => r.status_planilha === STATUS_PLANILHA_PADRAO,
+    ).length,
+    exemplos: semIncAte24hRows.slice(0, 10).map((r) => ({
+      chave: r.chave,
+      codigo_loterica: r.codigo_loterica,
+      chamado: r.chamado,
+      data_hora_inicial: r.data_hora_inicial,
+      duracao_h: r.duracao_h,
+    })),
+  };
   const finalAtivos = seenKeys.size;
   const report: ProcessReport = {
     processamento: {
@@ -1518,6 +1574,7 @@ export function processControle(input: ProcessInput): ProcessResult {
       filaJiraVazia,
       filaJiraSemInc: semIncTotal,
       filaJiraVaziaExemplos,
+      semIncAte24h: semIncAte24hReport,
       incSnowPreenchido: jiraIncSnowPreenchido,
       incSnowVazio: jiraIncSnowVazio,
       incSnowIgnoradoInvalido: jiraIncSnowIgnoradoInvalido,

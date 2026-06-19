@@ -1293,12 +1293,18 @@ export type Database = {
           created_at: string
           id: string
           id_massiva: string
+          cidade_epicentro: string | null
+          mascara_texto: string | null
           operadora: string
           primeiro_alarme: string | null
           qtd_circuitos: number
+          qtd_lotericas_isoladas: number
+          raio_maximo_km: number | null
+          sinalizacao_60km: string | null
           status: string
           tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf: string
+          uf_epicentro: string | null
           ultimo_alarme: string | null
         }
         Insert: {
@@ -1306,12 +1312,18 @@ export type Database = {
           created_at?: string
           id?: string
           id_massiva: string
+          cidade_epicentro?: string | null
+          mascara_texto?: string | null
           operadora?: string
           primeiro_alarme?: string | null
           qtd_circuitos: number
+          qtd_lotericas_isoladas?: number
+          raio_maximo_km?: number | null
+          sinalizacao_60km?: string | null
           status?: string
           tipo_massiva: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf?: string
+          uf_epicentro?: string | null
           ultimo_alarme?: string | null
         }
         Update: {
@@ -1319,12 +1331,18 @@ export type Database = {
           created_at?: string
           id?: string
           id_massiva?: string
+          cidade_epicentro?: string | null
+          mascara_texto?: string | null
           operadora?: string
           primeiro_alarme?: string | null
           qtd_circuitos?: number
+          qtd_lotericas_isoladas?: number
+          raio_maximo_km?: number | null
+          sinalizacao_60km?: string | null
           status?: string
           tipo_massiva?: Database["public"]["Enums"]["tipo_massiva_enum"]
           uf?: string
+          uf_epicentro?: string | null
           ultimo_alarme?: string | null
         }
         Relationships: [

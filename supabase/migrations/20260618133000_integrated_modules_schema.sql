@@ -258,7 +258,14 @@ CREATE TABLE IF NOT EXISTS public.massivas (
   status text NOT NULL DEFAULT 'MASSIVA',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS qtd_lotericas_isoladas integer NOT NULL DEFAULT 0;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS cidade_epicentro text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS uf_epicentro text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS sinalizacao_60km text;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS raio_maximo_km numeric;
+ALTER TABLE public.massivas ADD COLUMN IF NOT EXISTS mascara_texto text;
 CREATE INDEX IF NOT EXISTS idx_massivas_analise ON public.massivas(analise_id);
+CREATE INDEX IF NOT EXISTS idx_massivas_status_created ON public.massivas(status, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.massiva_circuitos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

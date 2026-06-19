@@ -46,6 +46,20 @@ function resolveCasoPai(first?: ProcessedRow): string {
   return clean(first?.["Designação"] ?? first?.["DesignaÃ§Ã£o"]).replace(/^CEF/i, "") || "-";
 }
 
+function resolveDesignacao(first?: ProcessedRow): string {
+  return clean(first?.["Designação"] ?? first?.["DesignaÃ§Ã£o"] ?? first?.["DesignaÃƒÂ§ÃƒÂ£o"]) || "-";
+}
+
+function resolveChamadoInterno(participants: ProcessedRow[]): string {
+  return participants
+    .map((r) => clean(r["Nº REQ Caixa"] ?? r["NÂº REQ Caixa"] ?? r["REQ Caixa"]))
+    .find(Boolean) || "PENDENTE";
+}
+
+function padQty(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
 export function buildMascaraFromMassiva(
   m: Massiva,
   rows: ProcessedRow[],
@@ -75,6 +89,43 @@ function esc(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+export function buildMascaraTextoFromMassiva(
+  m: Massiva,
+  rows: ProcessedRow[],
+  overrides: Partial<MascaraInput> = {},
+): string {
+  const participants = firstAlarmRows(m, rows);
+  const first = participants[0];
+  const base = buildMascaraFromMassiva(m, rows, {
+    cliente: "CAIXA ECONÔMICA",
+    chamado_interno: resolveChamadoInterno(participants),
+    ...overrides,
+  });
+  const tipoEvento = m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal";
+  const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
+  const designacao = resolveDesignacao(first);
+
+  return [
+    "CONSÓRCIO LOTÉRICAS ",
+    "Evento Massivo - Chamado Aberto",
+    "===============================",
+    `Cliente: ${base.cliente ?? ""}`,
+    `Chamado interno : ${base.chamado_interno}`,
+    `Chamado: ${base.inc_massiva}`,
+    `${base.caso_pai} | Evento Massivo ${tipoEvento} | | ${designacao} | NA`,
+    `Tipo: ${tipoLabel}`,
+    `UF: ${base.uf_label}`,
+    `Quantidade Isoladas:${base.qtd_isoladas}`,
+    `Quantidade total: ${padQty(base.qtd_total)}`,
+    `Horário da falha: ${base.horario_falha}`,
+    `Horário de Normalização: ${base.horario_normalizacao}`,
+    `Causa/Solução: ${base.causa_solucao}`,
+    `Status: ${base.status_texto}`,
+    "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.",
+    "===============================",
+  ].join("\n");
 }
 
 function isolatedPlainRows(d: MascaraInput): string[] {

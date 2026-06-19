@@ -8,7 +8,10 @@ import MassivaAnalise from "@/modules/consulta-massiva/pages/Analise";
 import MassivaAuditoria from "@/modules/consulta-massiva/pages/Auditoria";
 import MassivaCidades from "@/modules/consulta-massiva/pages/Cidades";
 import MassivaEscalonamentos from "@/modules/consulta-massiva/pages/Escalonamentos";
+import MascaraMassiva from "@/modules/consulta-massiva/pages/MascaraMassiva";
+import MassivasAbertas from "@/modules/consulta-massiva/pages/MassivasAbertas";
 import MassivaOperadoras from "@/modules/consulta-massiva/pages/Operadoras";
+import Passagem from "@/modules/consulta-massiva/pages/Passagem";
 import MassivaUsuarios from "@/modules/consulta-massiva/pages/Usuarios";
 
 import ControleAdmin from "@/modules/controle-reparo/pages/Admin";
@@ -34,6 +37,11 @@ const nativePages: Record<string, Record<string, ComponentType>> = {
     "meus-casos": ControleMeusCasos,
     implantacao: ControleImplantacao,
     admin: ControleAdmin,
+  },
+  "passagem-turno": {
+    "mascara-massiva": MascaraMassiva,
+    passagem: Passagem,
+    "massivas-abertas": MassivasAbertas,
   },
 };
 

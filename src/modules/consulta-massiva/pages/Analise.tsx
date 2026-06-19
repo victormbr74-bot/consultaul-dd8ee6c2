@@ -25,6 +25,7 @@ import { logAudit } from "@/modules/consulta-massiva/lib/audit";
 import { loadCidadesLookup } from "@/modules/consulta-massiva/lib/base-cidades";
 import { SINALIZACAO_LABEL } from "@/modules/consulta-massiva/lib/geo";
 import { Sinalizacao60kmBadge } from "@/modules/consulta-massiva/components/Sinalizacao60kmBadge";
+import { buildMascaraTextoFromMassiva } from "@/modules/consulta-massiva/lib/mascara";
 import { toast } from "sonner";
 
 type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
@@ -111,6 +112,9 @@ export default function Page() {
       const all: GisRow[] = [...(file1?.rows ?? []), ...(file2?.rows ?? [])];
       const t0 = performance.now();
       const r = processGis(all, opQ.data ?? [], lotQ.data ?? [], cidadesQ.data);
+      for (const m of r.massivas) {
+        m.mascara_texto = buildMascaraTextoFromMassiva(m, r.rows);
+      }
       const dt = Math.round(performance.now() - t0);
       setResult(r);
       setProcessing(false);
@@ -140,6 +144,12 @@ export default function Page() {
             qtd_circuitos: m.qtd_circuitos,
             primeiro_alarme: new Date(m.primeiro_ts).toISOString(),
             ultimo_alarme: new Date(m.ultimo_ts).toISOString(),
+            qtd_lotericas_isoladas: m.qtd_lotericas_isoladas ?? 0,
+            cidade_epicentro: m.cidade_epicentro ?? null,
+            uf_epicentro: m.uf_epicentro ?? null,
+            sinalizacao_60km: m.sinalizacao_60km ?? null,
+            raio_maximo_km: m.raio_maximo_km ?? null,
+            mascara_texto: m.mascara_texto ?? null,
           })));
         }
         await logAudit("EXECUTAR_ANALISE", "analises", {
@@ -462,6 +472,48 @@ export default function Page() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 rounded-xl border border-border bg-card">
+              <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+                <div className="flex items-center gap-2">
+                  <FileSignature className="h-4 w-4 text-noc-blue" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide">Mascara de massiva</h2>
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  {filteredMassivas.length} gerada{filteredMassivas.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="space-y-3 p-3">
+                {filteredMassivas.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                    Nenhuma mascara gerada porque nao ha massiva detectada no filtro atual.
+                  </div>
+                ) : (
+                  filteredMassivas.map((m) => (
+                    <div key={m.id_massiva} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-mono font-semibold">{m.id_massiva}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(m.mascara_texto ?? "");
+                            toast.success("Mascara copiada");
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                      <textarea
+                        className="h-80 w-full resize-y rounded-md border border-input bg-background p-3 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        readOnly
+                        value={m.mascara_texto ?? ""}
+                      />
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

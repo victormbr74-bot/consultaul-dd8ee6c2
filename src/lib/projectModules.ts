@@ -26,6 +26,16 @@ export const projectModules: ProjectModule[] = [
     ],
   },
   {
+    id: "passagem-turno",
+    label: "PASSAGEM DE TURNO",
+    description: "Mascara de massiva, passagem operacional e massivas abertas.",
+    items: [
+      { id: "mascara-massiva", label: "MASCARA DE MASSIVA", path: "/mascara-massiva" },
+      { id: "passagem", label: "PASSAGEM", path: "/passagem" },
+      { id: "massivas-abertas", label: "MASSIVAS ABERTAS", path: "/massivas-abertas" },
+    ],
+  },
+  {
     id: "controle-reparo",
     label: "Controle de Reparo",
     description: "Importacoes, dashboard, controle operacional, implantacao e casos.",

@@ -422,7 +422,7 @@ function oempResponsavel(
 const SEM_INC = "SEM INC";
 
 const RESPONSAVEL_ALIASES = {
-  secundario: [["Rodrigo Nunes"], ["Ronivon"], ["Pedro"]],
+  secundario: [["Rodrigo Nunes", "Rodrigo Nunes da Silva", "Rodrigo"], ["Ronivon"], ["Pedro"]],
   oi: [["Wesley"], ["Sidney"], ["Estanislau", "Antonio Estanislau"]],
   oemp: {
     sp: ["Carol", "Caroline", "Caroline Victoria"],

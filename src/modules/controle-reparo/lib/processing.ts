@@ -421,13 +421,24 @@ function oempResponsavel(
 }
 const SEM_INC = "SEM INC";
 
+// Aliases devem corresponder EXATAMENTE ao nome completo cadastrado em profiles.nome.
+// Nunca usar apelidos/primeiros nomes para evitar ambiguidade (ex.: "Rodrigo" colidia
+// entre "Rodrigo Nunes da Silva" e "Rodrigo Pereira dos Santos de Oliveira").
 const RESPONSAVEL_ALIASES = {
-  secundario: [["Rodrigo Nunes"], ["Ronivon"], ["Pedro"]],
-  oi: [["Wesley"], ["Sidney"], ["Estanislau", "Antonio Estanislau"]],
+  secundario: [
+    ["Rodrigo Nunes da Silva"],
+    ["Ronivon Nunes Figueiredo"],
+    ["Pedro Gabriel Cardoso dos Santos"],
+  ],
+  oi: [
+    ["Wesley Fernandes da Fonseca Rodrigues"],
+    ["Sidney Silva Neiva"],
+    ["Antonio Estanislau"],
+  ],
   oemp: {
-    sp: ["Carol", "Caroline", "Caroline Victoria"],
-    nordeste: ["Anabelly"],
-    demais: ["Samara"],
+    sp: ["Caroline Victoria Marques de Oliveira"],
+    nordeste: ["Anabelly Cris Silva"],
+    demais: ["Samara De Paiva Pontes"],
   },
 } as const;
 
@@ -480,13 +491,21 @@ function resolveResponsaveis(profileNames: string[]): ResolvedResponsaveis {
   const oi = RESPONSAVEL_ALIASES.oi.map((aliases) =>
     uniqueProfileMatch(cleanProfiles, aliases[0], aliases),
   );
-  const oempSp = uniqueProfileMatch(cleanProfiles, "Carol", RESPONSAVEL_ALIASES.oemp.sp);
+  const oempSp = uniqueProfileMatch(
+    cleanProfiles,
+    "Caroline Victoria Marques de Oliveira",
+    RESPONSAVEL_ALIASES.oemp.sp,
+  );
   const oempNordeste = uniqueProfileMatch(
     cleanProfiles,
-    "Anabelly",
+    "Anabelly Cris Silva",
     RESPONSAVEL_ALIASES.oemp.nordeste,
   );
-  const oempDemais = uniqueProfileMatch(cleanProfiles, "Samara", RESPONSAVEL_ALIASES.oemp.demais);
+  const oempDemais = uniqueProfileMatch(
+    cleanProfiles,
+    "Samara De Paiva Pontes",
+    RESPONSAVEL_ALIASES.oemp.demais,
+  );
   return {
     secundario,
     oi,

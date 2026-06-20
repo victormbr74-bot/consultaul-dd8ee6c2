@@ -14,6 +14,7 @@ type MassivaRecord = {
   id: string;
   id_massiva: string;
   circuito_pai: string | null;
+  massiva_circuitos?: Array<{ codigo_loterica: string | null }>;
   consorcio_ul: string;
   uf: string;
   tipo_link: string | null;
@@ -50,7 +51,7 @@ type EditableField = keyof EditState;
 type EditingCell = { id: string; field: EditableField } | null;
 
 const MASSIVA_SELECT =
-  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto";
+  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica)";
 
 async function fetchMassivas(): Promise<MassivaRecord[]> {
   const { data, error } = await supabase
@@ -120,6 +121,18 @@ function fromDateTimeLocal(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
+function normalizeMassivaStatus(value: string | null | undefined): string {
+  return `${value ?? ""}`.trim().toUpperCase() === "NORMALIZADO" ? "NORMALIZADO" : "EM ANDAMENTO";
+}
+
+function statusFor(row: MassivaRecord, pending: Record<string, Partial<EditState>>): string {
+  return normalizeMassivaStatus(pending[row.id]?.status ?? row.status);
+}
+
+function codigoLoterica(row: MassivaRecord): string {
+  return row.massiva_circuitos?.find((circuito) => circuito.codigo_loterica)?.codigo_loterica ?? "-";
+}
+
 function editStateFrom(row: MassivaRecord): EditState {
   return {
     consorcio_ul: row.consorcio_ul ?? "CONSÓRCIO",
@@ -129,7 +142,7 @@ function editStateFrom(row: MassivaRecord): EditState {
     qtd_lotericas_isoladas: String(row.qtd_lotericas_isoladas ?? 0),
     inc: row.inc ?? "",
     data_hora_abertura: toDateTimeLocal(row.data_hora_abertura ?? row.primeiro_alarme),
-    status: row.status ?? "MASSIVA",
+    status: normalizeMassivaStatus(row.status),
     data_hora_normalizacao: toDateTimeLocal(row.data_hora_normalizacao),
     atualizacao: row.atualizacao ?? "",
     operadora: row.operadora ?? "",
@@ -151,8 +164,18 @@ export default function MassivasAbertas() {
     return rows.filter((m) => eventDate(m).getTime() >= start);
   }, [rows]);
   const dayRows = useMemo(() => rows.filter((m) => sameDay(eventDate(m), now)), [rows]);
-  const abertas = rows.filter((m) => m.status !== "NORMALIZADO");
-  const normalizadas = rows.filter((m) => m.status === "NORMALIZADO");
+  const displayRows = useMemo(
+    () =>
+      [...rows].sort((a, b) => {
+        const aNormalizada = statusFor(a, pending) === "NORMALIZADO";
+        const bNormalizada = statusFor(b, pending) === "NORMALIZADO";
+        if (aNormalizada !== bNormalizada) return aNormalizada ? 1 : -1;
+        return eventDate(b).getTime() - eventDate(a).getTime();
+      }),
+    [rows, pending],
+  );
+  const abertas = displayRows.filter((m) => statusFor(m, pending) !== "NORMALIZADO");
+  const normalizadas = displayRows.filter((m) => statusFor(m, pending) === "NORMALIZADO");
 
   const totalChart = useMemo(() => chartByOperadora(monthRows), [monthRows]);
   const principalChart = useMemo(() => chartByOperadora(monthRows.filter(isPrincipal)), [monthRows]);
@@ -283,9 +306,10 @@ export default function MassivasAbertas() {
           </div>
         </div>
         <div className="overflow-auto">
-          <table className="w-full min-w-[1320px] text-xs">
+          <table className="w-full min-w-[1400px] text-xs">
             <thead className="bg-card">
               <tr className="border-b border-border text-left">
+                <th className="px-3 py-2">Código Lotérica</th>
                 <th className="px-3 py-2">Circuito Pai</th>
                 <th className="px-3 py-2">Consórcio UL</th>
                 <th className="px-3 py-2">UF</th>
@@ -302,12 +326,13 @@ export default function MassivasAbertas() {
               </tr>
             </thead>
             <tbody>
-              {q.isLoading && <tr><td colSpan={13} className="px-3 py-10 text-center text-muted-foreground">Carregando...</td></tr>}
+              {q.isLoading && <tr><td colSpan={14} className="px-3 py-10 text-center text-muted-foreground">Carregando...</td></tr>}
               {!q.isLoading && rows.length === 0 && (
-                <tr><td colSpan={13} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva registrada.</td></tr>
+                <tr><td colSpan={14} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva registrada.</td></tr>
               )}
-              {rows.map((m) => (
+              {displayRows.map((m) => (
                 <tr key={m.id} className={pending[m.id] ? "border-b border-border/50 bg-primary/5" : "border-b border-border/50"}>
+                  <td className="px-3 py-2 font-mono">{codigoLoterica(m)}</td>
                   <td className="px-3 py-2 font-mono">{m.circuito_pai || "-"}</td>
                   <EditableCell row={m} field="consorcio_ul" value={valueFor(m, "consorcio_ul")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} />
                   <td className="px-3 py-2 font-mono">{m.uf}</td>
@@ -414,7 +439,7 @@ function EditableCell({
 
   if (editing) {
     if (kind === "tipo" || kind === "status") {
-      const options = kind === "tipo" ? ["PRIMÁRIO", "SECUNDÁRIO"] : ["MASSIVA", "NORMALIZADO", "PENDENTE"];
+      const options = kind === "tipo" ? ["PRIMÁRIO", "SECUNDÁRIO"] : ["EM ANDAMENTO", "NORMALIZADO"];
       return (
         <td className="px-2 py-1">
           <select

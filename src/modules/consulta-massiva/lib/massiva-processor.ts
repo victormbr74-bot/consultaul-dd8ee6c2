@@ -220,11 +220,13 @@ export function processGis(
     const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial", "Data e Hora", "Data/Hora", "DataHora");
     const correctedTs = parseDateBR(dataHoraRaw);
     const correctedCodigo = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica", "Codigo da Loterica", "Codigo");
-    const identified = identifyOperadora(tipoRaw, desig, ip, correctedCodigo, lookup);
     const fromLotericas = identifyFromLotericas(tipoRaw, correctedCodigo, desig, ip, lotericasLookup);
-    const id = identified.classificacao === "NAO_IDENTIFICADO"
-      ? (fromLotericas ?? fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
-      : identified;
+    const identified = identifyOperadora(tipoRaw, desig, ip, correctedCodigo, lookup);
+    const id = fromLotericas ?? (
+      identified.classificacao === "NAO_IDENTIFICADO"
+        ? (fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
+        : identified
+    );
     return {
       ...r,
       __rowId: `r${i}`,

@@ -1,7 +1,21 @@
-import type { DbOperadora, DbEscalonamento } from "./db-types";
+import type { DbLoterica, DbOperadora, DbEscalonamento } from "./db-types";
 
 const upper = (v: unknown) => String(v ?? "").trim().toUpperCase();
 const norm = (v: unknown) => String(v ?? "").trim();
+
+const rawValue = (row: DbLoterica, ...keys: string[]) => {
+  const raw = row.raw_data;
+  if (!raw || typeof raw !== "object") return "";
+  const normalizeKey = (v: string) =>
+    v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  const entries = Object.entries(raw);
+  for (const key of keys) {
+    const target = normalizeKey(key);
+    const found = entries.find(([k, v]) => normalizeKey(k) === target && norm(v));
+    if (found) return norm(found[1]);
+  }
+  return "";
+};
 
 export interface OperadoraLookup {
   byCodigo: Map<string, DbOperadora>;
@@ -24,6 +38,37 @@ export function buildOperadoraLookup(rows: DbOperadora[]): OperadoraLookup {
     if (r.ip_loopback_secundario) byLoopS.set(norm(r.ip_loopback_secundario), r);
   }
   return { byCodigo, byDesig, byLoopP, byLoopS, all: rows };
+}
+
+export function operadoraFromLoterica(row: DbLoterica): DbOperadora {
+  const empresaOemp = upper(rawValue(row, "EMPRESA OEMP", "EMPRESA PRINCIPAL", "OPERADORA PRINCIPAL"));
+  const operadora4g = upper(row.operadora || rawValue(row, "OPERADORA 4G", "OPERADORA", "RESP BACKUP"));
+  const operadoraPrincipal = empresaOemp || "VTAL";
+  const designacao =
+    upper(row.designacao_nova) ||
+    upper(row.ccto_oi) ||
+    upper(rawValue(row, "DESIGNACAO NOVA", "DESIGNACAO", "DESIGINACAO NOVA"));
+  const ipLoopback = norm(row.loopback_wan || rawValue(row, "LOOPBACK PRINCIPAL"));
+  const ipLoopbackSec = norm(row.loopback_lan || rawValue(row, "LOOPBACK SECUNDARIO"));
+  const codigo = norm(row.cod_ul);
+
+  return {
+    id: codigo || designacao || ipLoopback || ipLoopbackSec,
+    codigo_loterica: codigo,
+    designacao,
+    ip_loopback: ipLoopback,
+    ip_loopback_secundario: ipLoopbackSec,
+    operadora: operadoraPrincipal,
+    operadora_4g: operadora4g,
+    tipo_empresa: operadoraPrincipal === "VTAL" ? "VTAL" : "OEMP",
+    ativo: true,
+  };
+}
+
+export function operadorasFromLotericas(rows: DbLoterica[]): DbOperadora[] {
+  return rows
+    .map(operadoraFromLoterica)
+    .filter((row) => row.codigo_loterica || row.designacao || row.ip_loopback || row.ip_loopback_secundario);
 }
 
 export function identifyOperadora(

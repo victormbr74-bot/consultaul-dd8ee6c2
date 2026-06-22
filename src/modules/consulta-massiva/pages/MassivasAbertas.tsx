@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { applyAtualizacaoToMascara, proximoStatusLine } from "@/modules/consulta-massiva/lib/mascara";
 
 type MassivaCircuito = {
   codigo_loterica: string | null;
@@ -171,7 +172,7 @@ function editStateFrom(row: MassivaRecord): EditState {
     data_hora_abertura: toDateTimeLocal(row.data_hora_abertura ?? row.primeiro_alarme),
     status: normalizeMassivaStatus(row.status),
     data_hora_normalizacao: toDateTimeLocal(row.data_hora_normalizacao),
-    atualizacao: row.atualizacao ?? row.mascara_texto ?? "",
+    atualizacao: row.atualizacao ?? "",
     operadora: row.operadora ?? "",
   };
 }
@@ -239,6 +240,7 @@ export default function MassivasAbertas() {
         const current = rows.find((row) => row.id === id);
         if (!current) continue;
         const merged = { ...editStateFrom(current), ...values };
+        const shouldUpdateMascara = Object.prototype.hasOwnProperty.call(values, "atualizacao");
         const payload = {
           consorcio_ul: merged.consorcio_ul,
           tipo_link: merged.tipo_link,
@@ -251,6 +253,9 @@ export default function MassivasAbertas() {
           data_hora_normalizacao: fromDateTimeLocal(merged.data_hora_normalizacao),
           atualizacao: merged.atualizacao || null,
           operadora: merged.operadora,
+          ...(shouldUpdateMascara
+            ? { mascara_texto: applyAtualizacaoToMascara(current.mascara_texto, merged.atualizacao) }
+            : {}),
         };
         const { error } = await supabase.from("massivas").update(payload).eq("id", id);
         if (error) throw error;
@@ -291,11 +296,43 @@ export default function MassivasAbertas() {
   });
 
   const copy = async (m: MassivaRecord) => {
-    let text = m.mascara_texto ?? "";
-    if (m.atualizacao) {
-      text = text.replace(/^(Status: ).*$/m, `$1${m.atualizacao}`);
-      text = text.replace(/Evento Massivo - Chamado Aberto/g, "Evento Massivo - ATUALIZAÇÃO");
+    const atualizacao = valueFor(m, "atualizacao");
+    if (m.mascara_texto) {
+      const text = applyAtualizacaoToMascara(m.mascara_texto, atualizacao);
+      await navigator.clipboard.writeText(text);
+      toast.success("Mascara copiada");
+      return;
     }
+
+    const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
+    const tipoEvento = m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal";
+    const caso = `${m.inc ?? m.chamado ?? "PENDENTE"} | Evento Massivo ${tipoEvento} | | ${m.circuito_pai ?? "-"}`;
+    const chamadoInterno = m.chamado ?? m.inc ?? "PENDENTE";
+    const isoladas = (m.massiva_circuitos ?? [])
+      .filter((c) => c.ip_loopback)
+      .map((c) => `${c.ip_loopback}\t${c.designacao ?? m.circuito_pai ?? "-"}`);
+
+    const text = [
+      "===============================",
+      "CONSÓRCIO LOTÉRICAS ",
+      "Evento Massivo - ATUALIZAÇÃO",
+      "===============================",
+      `Cliente: CAIXA ECONÔMICA`,
+      `Chamado interno : ${chamadoInterno}`,
+      `Caso: ${caso}`,
+      `Tipo: ${tipoLabel}`,
+      `UF: ${m.uf}`,
+      `Quantidade Isoladas:${String(m.qtd_lotericas_isoladas).padStart(2, "0")}`,
+      `Quantidade total: ${String(m.qtd_circuitos).padStart(2, "0")}`,
+      `Horário da falha: ${m.primeiro_alarme ?? m.data_hora_abertura ?? "PENDENTE"}`,
+      `Horário de Normalização: ${m.data_hora_normalizacao ?? "PENDENTE"}`,
+      `Causa/Solução: PENDENTE`,
+      `Status: ${atualizacao || ""}`,
+      `Horas: ${proximoStatusLine()}`,
+      "===============================",
+      "",
+      ...isoladas,
+    ].join("\n");
     await navigator.clipboard.writeText(text);
     toast.success("Mascara copiada");
   };

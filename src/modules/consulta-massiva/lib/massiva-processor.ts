@@ -73,12 +73,40 @@ function fixMojibake(value: string): string {
   }
 }
 
+function clean(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
 function normalizeLookup(value: unknown): string {
   return String(value ?? "").trim().toUpperCase();
 }
 
 function normalizeCircuito(value: unknown): string {
   return normalizeLookup(value).replace(/[^A-Z0-9]/g, "");
+}
+
+function dedupeInputRows(input: InputRow[]): InputRow[] {
+  const seen = new Set<string>();
+  const out: InputRow[] = [];
+  for (const row of input) {
+    const key = [
+      getCell(row, "ID do Alarmes", "ID do Alarme", "ID Alarmes", "Alarme"),
+      getCell(row, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo"),
+      getCell(row, "Designação", "DesignaÃ§Ã£o", "Designacao", "DESIGNACAO"),
+      getCell(row, "IP Loopback", "IP LOOPBACK", "IP_LOOPBACK", "Loopback"),
+      getCell(row, "Data e Hora Incial", "Data e Hora Inicial", "Data e Hora", "Data/Hora", "DataHora"),
+    ]
+      .map((value) => normalizeLookup(value))
+      .join("|");
+    if (!key.replace(/\|/g, "")) {
+      out.push(row);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }
 
 function rawValue(row: DbLoterica | undefined, ...keys: string[]): string {
@@ -146,14 +174,8 @@ function identifyFromLotericas(
 
   const isSecundario = normalizeLookup(tipoLink) === "SECUNDARIO";
   if (isSecundario) {
-    // Regra item 9: Secundário usa Operadora (col E) como Operadora
-    // e OPERADORA 4G (col AJ) como Tipo Emp.
-    const operadora = normalizeLookup(
-      hit.operadora || rawValue(hit, "OPERADORA"),
-    );
-    const operadora4g = normalizeLookup(
-      rawValue(hit, "OPERADORA 4G") || hit.operadora,
-    );
+    const operadora = normalizeLookup(hit.operadora || rawValue(hit, "OPERADORA"));
+    const operadora4g = normalizeLookup(rawValue(hit, "OPERADORA 4G"));
     if (!operadora && !operadora4g) return null;
     const op = operadora || operadora4g;
     return {
@@ -313,7 +335,7 @@ export interface ProcessResult {
       semGeo: number;
     };
   };
-  lotericasIsoladasDetalhe: Array<{ massiva: string; codigo: string; loterica: string }>;
+  lotericasIsoladasDetalhe: Array<{ massiva: string; ip_loopback: string; designacao: string }>;
 }
 
 export function processGis(
@@ -324,8 +346,9 @@ export function processGis(
 ): ProcessResult {
   const lookup: OperadoraLookup = buildOperadoraLookup(operadorasRows);
   const lotericasLookup = buildLotericasLookup(lotericasRows);
+  const inputRows = dedupeInputRows(input);
 
-  const rows: ProcessedRow[] = input.map((r, i) => {
+  const rows: ProcessedRow[] = inputRows.map((r, i) => {
     const tipoRawOrig = getCell(r, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo");
     const tipoUpper = tipoRawOrig.toUpperCase().trim();
     // Normaliza variações: PRINCIPAL/PRI/MAIN, SECUNDARIO/SEC/BACKUP/BKP
@@ -499,7 +522,7 @@ export function processGis(
   );
 
   const rowById = new Map(rows.map((r) => [r.__rowId, r]));
-  const lotericasIsoladasDetalhe: Array<{ massiva: string; codigo: string; loterica: string }> = [];
+  const lotericasIsoladasDetalhe: Array<{ massiva: string; ip_loopback: string; designacao: string }> = [];
   const lotByMassiva = new Map<string, Map<string, string>>();
 
   for (const m of massivas) {
@@ -508,16 +531,15 @@ export function processGis(
     for (const rowId of m.rowIds) {
       const r = rowById.get(rowId);
       if (!r) continue;
-      const cod = codigoLotericaFromRow(r);
-      if (!cod) continue;
-      if (!codigosIsolados.has(cod)) continue;
+      const ip = clean(r["IP Loopback"] ?? r.__ipLoopback);
+      const desig = clean(r["Designação"] ?? r.__designacao);
+      if (!ip) continue;
       if ((m.tipo_link === "PRINCIPAL" && isPrincipalOut(r)) || (m.tipo_link === "SECUNDARIO" && isBackupOut(r))) {
-        const lot = nomeLotericaFromRow(r);
-        if (lot && !isolatedInMassiva.has(cod)) isolatedInMassiva.set(cod, lot);
+        if (desig && !isolatedInMassiva.has(ip)) isolatedInMassiva.set(ip, desig);
       }
     }
     for (const [cod, links] of lotericaLinks) {
-      if (!codigosIsolados.has(cod) || isolatedInMassiva.has(cod)) continue;
+      if (isolatedInMassiva.has(cod)) continue;
       const candidateIdxs = m.tipo_link === "PRINCIPAL" ? links.principal : links.backup;
       const matchIdx = Array.from(candidateIdxs).find((idx) => {
         const r = rows[idx];
@@ -526,14 +548,17 @@ export function processGis(
         return Number.isFinite(r.__ts) && r.__ts >= m.primeiro_ts && r.__ts <= m.ultimo_ts;
       });
       if (matchIdx != null) {
-        isolatedInMassiva.set(cod, nomeLotericaFromRow(rows[matchIdx]));
+        const rr = rows[matchIdx];
+        const ip = clean(rr["IP Loopback"] ?? rr.__ipLoopback);
+        const desig = clean(rr["Designação"] ?? rr.__designacao);
+        if (ip) isolatedInMassiva.set(ip, desig || ip);
       }
     }
     lotByMassiva.set(m.id_massiva, isolatedInMassiva);
     m.qtd_lotericas_isoladas = isolatedInMassiva.size;
-    m.lotericas_isoladas = Array.from(isolatedInMassiva, ([codigo, loterica]) => ({ codigo, loterica }));
-    for (const [codigo, loterica] of isolatedInMassiva) {
-      lotericasIsoladasDetalhe.push({ massiva: m.id_massiva, codigo, loterica });
+    m.lotericas_isoladas = Array.from(isolatedInMassiva, ([ip_loopback, designacao]) => ({ ip_loopback, designacao }));
+    for (const [ip_loopback, designacao] of isolatedInMassiva) {
+      lotericasIsoladasDetalhe.push({ massiva: m.id_massiva, ip_loopback, designacao });
     }
   }
 

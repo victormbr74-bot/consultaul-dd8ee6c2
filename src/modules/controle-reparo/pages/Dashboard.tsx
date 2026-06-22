@@ -354,10 +354,10 @@ function DashboardToolbar({
     <Card className="rounded-md border bg-card/95 p-3 shadow-sm">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wide text-foreground/80">
             Filtro ativo
           </div>
-          <div className="truncate text-sm font-semibold">{selectedLabel}</div>
+          <div className="truncate text-sm font-bold text-foreground">{selectedLabel}</div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <Button
@@ -396,7 +396,7 @@ function Panel({
       <div className="flex min-h-11 min-w-0 items-center justify-between gap-3 border-b px-4 py-2">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">{title}</h2>
-          {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+          {subtitle && <p className="truncate text-xs font-medium text-foreground/70">{subtitle}</p>}
         </div>
       </div>
       <div className="min-w-0 p-3 sm:p-4">{children}</div>
@@ -435,14 +435,14 @@ function Kpi({
       className="min-w-0 text-left outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
-        className={`flex min-h-[126px] min-w-0 flex-col justify-between rounded-md border bg-background/45 p-4 transition-colors hover:border-primary/50 ${
-          active ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30" : ""
+        className={`flex min-h-[126px] min-w-0 flex-col justify-between rounded-md border bg-background p-4 transition-colors hover:border-primary/50 ${
+          active ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30" : "border-border"
         }`}
       >
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-3xl font-semibold tabular-nums leading-none">{value}</div>
-            <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">{label}</div>
+            <div className="text-3xl font-semibold tabular-nums leading-none text-foreground">{value}</div>
+            <div className="mt-2 line-clamp-2 text-sm font-medium text-foreground/80">{label}</div>
           </div>
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${TONES[tone]}`}
@@ -476,7 +476,7 @@ function FaixaPanel({
   return (
     <Panel title={title} subtitle={`Filtro: ${subtitle}`}>
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_254px]">
-        <div className="min-h-[350px] min-w-0 rounded-md border bg-background px-3 pb-3 pt-4">
+        <div className="faixa-chart text-foreground min-h-[350px] min-w-0 rounded-md border bg-background px-3 pb-3 pt-4">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={chartData} margin={{ top: 8, right: 14, left: 0, bottom: 22 }}>
               <CartesianGrid
@@ -490,14 +490,14 @@ function FaixaPanel({
                 tickLine={false}
                 interval={0}
                 axisLine={false}
-                tick={{ fill: "var(--foreground)", fontSize: 11, fontWeight: 500 }}
+                tick={{ fill: "currentColor", fontSize: 11, fontWeight: 500 }}
               />
               <YAxis
                 allowDecimals={false}
                 width={42}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "var(--foreground)", fontSize: 11, fontWeight: 500 }}
+                tick={{ fill: "currentColor", fontSize: 11, fontWeight: 500 }}
               />
               <Tooltip
                 cursor={{ fill: "var(--muted)", opacity: 0.45 }}
@@ -506,8 +506,8 @@ function FaixaPanel({
                   const item = payload[0].payload as FaixaChartRow;
                   return (
                     <div className="rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow">
-                      <div className="font-semibold">{item.label}</div>
-                      <div className="mt-1 text-muted-foreground">
+                      <div className="font-semibold text-foreground">{item.label}</div>
+                      <div className="mt-1 text-foreground/70">
                         {item.value} registros · {item.pct.toFixed(1)}%
                       </div>
                     </div>

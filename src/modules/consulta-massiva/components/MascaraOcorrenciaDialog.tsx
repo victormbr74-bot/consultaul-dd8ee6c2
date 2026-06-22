@@ -54,6 +54,7 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
     horario_normalizacao: normalizacao || "PENDENTE",
     causa_solucao: causa || "PENDENTE",
     status_texto: statusTxt,
+    atualizacao: statusTxt,
   };
 
   const handleCopy = async () => {
@@ -87,11 +88,11 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
           <Info label="Cliente" value={base.cliente ?? ""} />
           <Info label="INC da Massiva" value={base.inc_massiva} mono />
           <Info label="Chamado interno" value={base.chamado_interno} mono />
-          <Info label="Caso Pai" value={base.caso_pai} mono />
+          <Info label="Caso" value={base.caso} mono />
           <Info label="Tipo" value={base.tipo_label} />
           <Info label="UF" value={base.uf_label} />
-          <Info label="Qtd. total" value={String(base.qtd_total)} mono />
-          <Info label="Qtd. isoladas" value={String(base.qtd_isoladas)} mono />
+          <Info label="Qtd. total" value={String(base.qtd_total).padStart(2, "0")} mono />
+          <Info label="Qtd. isoladas" value={String(base.qtd_isoladas).padStart(2, "0")} mono />
           <Info label="Horario da falha" value={base.horario_falha} mono />
         </div>
 
@@ -113,7 +114,7 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
         </div>
 
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-          Lotericas isoladas na mascara: {base.qtd_isoladas}. A lista exportada mostra somente Codigo e Loterica.
+          Links isolados na mascara: {base.qtd_isoladas}. A lista exportada mostra IP Loopback e Designação.
         </div>
 
         <DialogFooter className="gap-2">

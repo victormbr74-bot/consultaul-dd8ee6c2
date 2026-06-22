@@ -6,7 +6,7 @@ export interface MascaraInput {
   cliente?: string;
   inc_massiva: string;
   chamado_interno: string;
-  caso_pai: string;
+  caso: string;
   tipo_label: "PRINCIPAL" | "SECUNDÁRIO";
   uf_label: string;
   qtd_total: number;
@@ -16,13 +16,71 @@ export interface MascaraInput {
   causa_solucao: string;
   status_texto: string;
   atualizacao?: string;
-  lotericas_isoladas: Array<{ codigo: string; loterica: string }>;
+  lotericas_isoladas: Array<{ ip_loopback: string; designacao: string }>;
 }
 
-export const STATUS_PADRAO =
-  "A equipe de campo foi mobilizada para diagnosticar a causa raiz da interrupção no meio de transmissão.\n" +
-  "Prazo estimado de 2 horas para diagnóstico da falha e deslocamento da equipe de campo.\n" +
-  "Acompanhamento contínuo pelo NOC até a normalização total dos circuitos afetados.";
+export const STATUS_PADRAO = "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";
+
+export function proximoStatusLine(baseDate = new Date()): string {
+  const next = new Date(baseDate.getTime() + 2 * 60 * 60 * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `proximo status em ${p(next.getDate())}/${p(next.getMonth() + 1)}/${next.getFullYear()} as  ${p(next.getHours())}:${p(next.getMinutes())}:${p(next.getSeconds())}`;
+}
+
+export const proxStatus = proximoStatusLine;
+
+function valueFromMask(lines: string[], label: string): string {
+  const found = lines.find((line) => line.trim().toLowerCase().startsWith(label.toLowerCase()));
+  if (!found) return "";
+  const idx = found.indexOf(":");
+  return idx >= 0 ? found.slice(idx + 1).trim() : "";
+}
+
+function padMaskQty(value: string): string {
+  const cleanValue = value.trim();
+  const numeric = cleanValue.match(/\d+/)?.[0];
+  return numeric ? numeric.padStart(2, "0") : cleanValue;
+}
+
+export function applyAtualizacaoToMascara(
+  mascaraTexto: string | null | undefined,
+  atualizacao: string,
+): string {
+  const updateText = String(atualizacao ?? "").trim();
+  const lines = String(mascaraTexto ?? "").split(/\r?\n/);
+  const separator = "===============================";
+  const separatorIndexes = lines
+    .map((line, index) => (line.trim() === separator ? index : -1))
+    .filter((index) => index >= 0);
+  const lastSeparator = separatorIndexes.at(-1) ?? -1;
+  const links = lastSeparator >= 0 ? lines.slice(lastSeparator + 1).map((line) => line.trim()).filter(Boolean) : [];
+  const oldCaso =
+    valueFromMask(lines, "Caso:") ||
+    lines.find((line) => /\|\s*Evento Massivo\s+/i.test(line) && !line.trim().startsWith("Caso:"))?.trim() ||
+    "- | Evento Massivo Principal | | -";
+
+  return [
+    separator,
+    "CONSÓRCIO LOTÉRICAS ",
+    "Evento Massivo - ATUALIZAÇÃO",
+    separator,
+    `Cliente: ${valueFromMask(lines, "Cliente:") || "CAIXA ECONÔMICA"}`,
+    `Chamado interno : ${valueFromMask(lines, "Chamado interno") || "-"}`,
+    `Caso: ${oldCaso.replace(/\s*\|\s*NA\s*$/i, "")}`,
+    `Tipo: ${valueFromMask(lines, "Tipo:") || "PRIMÁRIO"}`,
+    `UF: ${valueFromMask(lines, "UF:") || "-"}`,
+    `Quantidade Isoladas:${padMaskQty(valueFromMask(lines, "Quantidade Isoladas:") || "0")}`,
+    `Quantidade total: ${padMaskQty(valueFromMask(lines, "Quantidade total:") || "0")}`,
+    `Horário da falha: ${valueFromMask(lines, "Horário da falha:") || "PENDENTE"}`,
+    `Horário de Normalização: ${valueFromMask(lines, "Horário de Normalização:") || "PENDENTE"}`,
+    `Causa/Solução: ${valueFromMask(lines, "Causa/Solução:") || "PENDENTE"}`,
+    `Status: ${updateText}`,
+    `Horas: ${proximoStatusLine()}`,
+    separator,
+    "",
+    ...links,
+  ].join("\n");
+}
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
@@ -51,6 +109,12 @@ function resolveDesignacao(first?: ProcessedRow): string {
   return clean(first?.["Designação"] ?? first?.["DesignaÃ§Ã£o"] ?? first?.["DesignaÃƒÂ§ÃƒÂ£o"]) || "-";
 }
 
+function resolveCasoCodigo(participants: ProcessedRow[]): string {
+  return participants
+    .map((r) => clean(r["Nº REQ Caixa"] ?? r["NÂº REQ Caixa"] ?? r["NÃ‚Âº REQ Caixa"] ?? r["REQ Caixa"]))
+    .find(Boolean) || "PENDENTE";
+}
+
 function resolveChamadoInterno(participants: ProcessedRow[]): string {
   return participants
     .map((r) => clean(r["Nº REQ Caixa"] ?? r["NÂº REQ Caixa"] ?? r["REQ Caixa"]))
@@ -67,11 +131,15 @@ export function buildMascaraFromMassiva(
   overrides: Partial<MascaraInput> = {},
 ): MascaraInput {
   const participants = firstAlarmRows(m, rows);
+  const first = participants[0];
+  const designacao = resolveDesignacao(first);
+  const chamadoInterno = resolveInc(participants);
+  const casoCodigo = resolveCasoCodigo(participants);
   return {
     cliente: "CAIXA ECONOMICA",
     inc_massiva: resolveInc(participants),
-    chamado_interno: "",
-    caso_pai: resolveCasoPai(participants[0]),
+    chamado_interno: chamadoInterno,
+    caso: `${casoCodigo} | Evento Massivo ${m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal"} | | ${designacao}`,
     tipo_label: m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRINCIPAL",
     uf_label: m.uf,
     qtd_total: m.qtd_circuitos,
@@ -79,7 +147,7 @@ export function buildMascaraFromMassiva(
     horario_falha: m.primeiro_alarme,
     horario_normalizacao: "PENDENTE",
     causa_solucao: "PENDENTE",
-    status_texto: STATUS_PADRAO,
+    status_texto: overrides.status_texto ?? "",
     atualizacao: overrides.atualizacao ?? "",
     lotericas_isoladas: m.lotericas_isoladas ?? [],
     ...overrides,
@@ -102,81 +170,73 @@ export function buildMascaraTextoFromMassiva(
   const first = participants[0];
   const base = buildMascaraFromMassiva(m, rows, {
     cliente: "CAIXA ECONÔMICA",
-    chamado_interno: resolveChamadoInterno(participants),
     ...overrides,
   });
-  const tipoEvento = m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal";
   const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
   const designacao = resolveDesignacao(first);
 
   return [
+    "===============================",
     "CONSÓRCIO LOTÉRICAS ",
-    "Evento Massivo - ATUALIZAÇÃO",
+    "Evento Massivo - Chamado Aberto",
     "===============================",
     `Cliente: ${base.cliente ?? ""}`,
     `Chamado interno : ${base.chamado_interno}`,
-    `Chamado: ${base.inc_massiva}`,
-    `${base.caso_pai} | Evento Massivo ${tipoEvento} | | ${designacao} | NA`,
+    `Caso: ${base.caso}`,
     `Tipo: ${tipoLabel}`,
     `UF: ${base.uf_label}`,
-    `Quantidade Isoladas:${base.qtd_isoladas}`,
+    `Quantidade Isoladas:${padQty(base.qtd_isoladas)}`,
     `Quantidade total: ${padQty(base.qtd_total)}`,
     `Horário da falha: ${base.horario_falha}`,
     `Horário de Normalização: ${base.horario_normalizacao}`,
     `Causa/Solução: ${base.causa_solucao}`,
     `Status: ${base.atualizacao || base.status_texto}`,
-    "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.",
+    `Horas: ${STATUS_PADRAO}`,
     "===============================",
+    "",
+    ...base.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),
   ].join("\n");
 }
 
-function isolatedPlainRows(d: MascaraInput): string[] {
-  if (!d.lotericas_isoladas.length) return ["Nenhuma lotérica isolada identificada."];
-  return d.lotericas_isoladas.map((l) => `${l.codigo}\t${l.loterica}`);
-}
-
-function isolatedHtmlRows(d: MascaraInput): string {
-  if (!d.lotericas_isoladas.length) {
-    return `<tr><td colspan="2" style="padding:6px 8px;border:1px solid #ccc">Nenhuma lotérica isolada identificada.</td></tr>`;
-  }
-  return d.lotericas_isoladas
-    .map(
-      (l) =>
-        `<tr><td style="padding:4px 8px;border:1px solid #ccc;font-family:monospace">${esc(l.codigo)}</td>` +
-        `<td style="padding:4px 8px;border:1px solid #ccc">${esc(l.loterica)}</td></tr>`,
-    )
-    .join("");
-}
 
 export function buildMascaraHtml(d: MascaraInput): string {
+  const isoladasRows = d.lotericas_isoladas.length
+    ? d.lotericas_isoladas
+        .map(
+          (l) =>
+            `<tr><td style="padding:4px 8px;border:1px solid #ccc;font-family:monospace">${esc(l.ip_loopback)}</td>` +
+            `<td style="padding:4px 8px;border:1px solid #ccc">${esc(l.designacao)}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="2" style="padding:6px 8px;border:1px solid #ccc">Nenhuma lotérica isolada identificada.</td></tr>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>Evento Massivo - ${esc(d.inc_massiva)}</title></head>
 <body style="font-family:Arial,sans-serif;color:#222;max-width:820px;margin:24px auto;padding:16px">
   <h2 style="margin:0 0 4px 0;color:#0b3a82">CONSÓRCIO LOTÉRICAS</h2>
-  <h3 style="margin:0 0 16px 0">Evento Massivo - ATUALIZAÇÃO</h3>
+  <h3 style="margin:0 0 16px 0">Evento Massivo - Chamado Aberto</h3>
   <div style="font-family:monospace;margin-bottom:14px">===============================</div>
   <table style="border-collapse:collapse;width:100%;font-size:13px">
     <tbody>
       <tr><td style="padding:4px 8px;background:#f3f4f6;width:210px"><b>Cliente</b></td><td style="padding:4px 8px">${esc(d.cliente ?? "")}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>INC da Massiva</b></td><td style="padding:4px 8px">${esc(d.inc_massiva)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Chamado interno</b></td><td style="padding:4px 8px">${esc(d.chamado_interno)}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Caso Pai</b></td><td style="padding:4px 8px"><b>${esc(d.caso_pai)}</b></td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Caso</b></td><td style="padding:4px 8px">${esc(d.caso)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Tipo</b></td><td style="padding:4px 8px">${esc(d.tipo_label)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>UF</b></td><td style="padding:4px 8px">${esc(d.uf_label)}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade total</b></td><td style="padding:4px 8px">${d.qtd_total}</td></tr>
-      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade isoladas</b></td><td style="padding:4px 8px">${d.qtd_isoladas}</td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade Isoladas</b></td><td style="padding:4px 8px">${String(d.qtd_isoladas).padStart(2, "0")}</td></tr>
+      <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Quantidade total</b></td><td style="padding:4px 8px">${String(d.qtd_total).padStart(2, "0")}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horário da falha</b></td><td style="padding:4px 8px">${esc(d.horario_falha)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Horário de normalização</b></td><td style="padding:4px 8px">${esc(d.horario_normalizacao)}</td></tr>
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Causa/Solução</b></td><td style="padding:4px 8px">${esc(d.causa_solucao)}</td></tr>
     </tbody>
   </table>
   <p style="white-space:pre-line;margin:16px 0 0 0;font-size:13px"><b>Status:</b> ${esc(d.atualizacao || d.status_texto)}</p>
-  <h4 style="margin:16px 0 4px 0">Lotéricas isoladas (${d.qtd_isoladas})</h4>
+  <p style="white-space:pre-line;margin:8px 0 0 0;font-size:12px;color:#374151"><b>Horas:</b> ${esc(STATUS_PADRAO)}</p>
+  <h4 style="margin:16px 0 4px 0">Links isolados (${d.qtd_isoladas})</h4>
   <table style="border-collapse:collapse;width:100%;font-size:12px">
     <thead><tr style="background:#0b3a82;color:#fff">
-      <th style="padding:6px 8px;text-align:left">Codigo</th>
-      <th style="padding:6px 8px;text-align:left">Lotérica</th>
+      <th style="padding:6px 8px;text-align:left">IP Loopback</th>
+      <th style="padding:6px 8px;text-align:left">Designação</th>
     </tr></thead>
-    <tbody>${isolatedHtmlRows(d)}</tbody>
+    <tbody>${isoladasRows}</tbody>
   </table>
 </body></html>`;
 }
@@ -219,26 +279,25 @@ function htmlToPlain(d: MascaraInput): string {
   return [
     "CONSÓRCIO LOTÉRICAS",
     "",
-    "Evento Massivo - ATUALIZAÇÃO",
+    "Evento Massivo - Chamado Aberto",
     "",
     "===============================",
     "",
     `Cliente: ${d.cliente ?? ""}`,
-    `INC da Massiva: ${d.inc_massiva}`,
-    `Chamado interno: ${d.chamado_interno}`,
-    `Caso Pai: ${d.caso_pai}`,
+    `Chamado interno : ${d.chamado_interno}`,
+    `Caso: ${d.caso}`,
     `Tipo: ${d.tipo_label}`,
     `UF: ${d.uf_label}`,
-    `Quantidade total: ${d.qtd_total}`,
-    `Quantidade isoladas: ${d.qtd_isoladas}`,
+    `Quantidade Isoladas: ${padQty(d.qtd_isoladas)}`,
+    `Quantidade total: ${padQty(d.qtd_total)}`,
     `Horário da falha: ${d.horario_falha}`,
     `Horário de normalização: ${d.horario_normalizacao}`,
     `Causa/Solução: ${d.causa_solucao}`,
     "",
     `Status: ${d.atualizacao || d.status_texto}`,
+    `Horas: ${STATUS_PADRAO}`,
     "",
-    `Lotéricas isoladas (${d.qtd_isoladas}):`,
-    ...isolatedPlainRows(d),
+    ...d.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),
   ].join("\n");
 }
 
@@ -251,19 +310,18 @@ export function exportMascaraPdf(d: MascaraInput) {
   doc.text("CONSÓRCIO LOTÉRICAS", 40, 40);
   doc.setFontSize(11);
   doc.setTextColor(40, 40, 40);
-  doc.text("Evento Massivo - ATUALIZAÇÃO", 40, 58);
+  doc.text("Evento Massivo - Chamado Aberto", 40, 58);
   doc.setDrawColor(200);
   doc.line(40, 64, w - 40, 64);
 
   const meta: Array<[string, string]> = [
     ["Cliente", d.cliente ?? ""],
-    ["INC da Massiva", d.inc_massiva],
     ["Chamado interno", d.chamado_interno],
-    ["Caso Pai", d.caso_pai],
+    ["Caso", d.caso],
     ["Tipo", d.tipo_label],
     ["UF", d.uf_label],
-    ["Quantidade total", String(d.qtd_total)],
-    ["Quantidade isoladas", String(d.qtd_isoladas)],
+    ["Quantidade Isoladas", String(d.qtd_isoladas).padStart(2, "0")],
+    ["Quantidade total", String(d.qtd_total).padStart(2, "0")],
     ["Horário da falha", d.horario_falha],
     ["Horário de normalização", d.horario_normalizacao],
     ["Causa/Solução", d.causa_solucao],
@@ -286,12 +344,22 @@ export function exportMascaraPdf(d: MascaraInput) {
   doc.setFontSize(9);
   const statusLines = doc.splitTextToSize(d.atualizacao || d.status_texto, w - 80);
   doc.text(statusLines, 40, afterMeta + 14);
-  const cursor = afterMeta + 14 + statusLines.length * 11 + 8;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Horas", 40, afterMeta + 14 + statusLines.length * 11 + 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const standardLines = STATUS_PADRAO.split("\n");
+  const standardY = afterMeta + 14 + statusLines.length * 11 + 18;
+  standardLines.forEach((line, idx) => {
+    doc.text(line, 40, standardY + idx * 11);
+  });
+  const cursor = standardY + standardLines.length * 11 + 10;
   autoTable(doc, {
     startY: cursor,
-    head: [["Código", "Lotérica"]],
+    head: [["IP Loopback", "Designação"]],
     body: d.lotericas_isoladas.length
-      ? d.lotericas_isoladas.map((l) => [l.codigo, l.loterica])
+      ? d.lotericas_isoladas.map((l) => [l.ip_loopback, l.designacao])
       : [["", "Nenhuma lotérica isolada identificada."]],
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [11, 58, 130], textColor: 255 },

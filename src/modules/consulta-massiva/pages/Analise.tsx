@@ -106,17 +106,6 @@ function massivaFingerprintFromRows(m: Massiva, rows: ProcessedRow[]): string {
   ].join("|");
 }
 
-function massivaHeaderFingerprintFromRows(m: Massiva): string {
-  return [
-    m.tipo_massiva,
-    m.uf,
-    m.operadora,
-    m.qtd_circuitos,
-    minuteIso(m.primeiro_ts),
-    minuteIso(m.ultimo_ts),
-  ].join("|");
-}
-
 function massivaFingerprintFromDb(row: PersistedMassivaForDedupe): string {
   const circuitos = (row.massiva_circuitos ?? [])
     .map((c) => c.codigo_loterica || c.designacao || c.ip_loopback || "")
@@ -131,17 +120,6 @@ function massivaFingerprintFromDb(row: PersistedMassivaForDedupe): string {
     minuteIso(row.primeiro_alarme ?? row.data_hora_abertura),
     minuteIso(row.ultimo_alarme),
     circuitos || row.circuito_pai || "",
-  ].join("|");
-}
-
-function massivaHeaderFingerprintFromDb(row: PersistedMassivaForDedupe): string {
-  return [
-    row.tipo_massiva,
-    row.uf,
-    row.operadora,
-    row.qtd_circuitos,
-    minuteIso(row.primeiro_alarme ?? row.data_hora_abertura),
-    minuteIso(row.ultimo_alarme),
   ].join("|");
 }
 
@@ -292,20 +270,14 @@ export default function Page() {
 
           const existingRows = (existingMassivas ?? []) as PersistedMassivaForDedupe[];
           const existingKeys = new Set(existingRows.map(massivaFingerprintFromDb));
-          const existingHeaderKeys = new Set(existingRows.map(massivaHeaderFingerprintFromDb));
           const batchKeys = new Set<string>();
-          const batchHeaderKeys = new Set<string>();
           const massivasParaInserir = r.massivas.filter((m) => {
             const key = massivaFingerprintFromRows(m, r.rows);
-            const headerKey = massivaHeaderFingerprintFromRows(m);
             if (
               existingKeys.has(key) ||
-              existingHeaderKeys.has(headerKey) ||
-              batchKeys.has(key) ||
-              batchHeaderKeys.has(headerKey)
+              batchKeys.has(key)
             ) return false;
             batchKeys.add(key);
-            batchHeaderKeys.add(headerKey);
             return true;
           });
 

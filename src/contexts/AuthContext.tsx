@@ -36,7 +36,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (rolesResult.value.error) {
         console.error("Failed to fetch user roles", rolesResult.value.error);
       } else {
-        isAdmin = rolesResult.value.data?.some((r) => r.role === "admin") ?? false;
+        isAdmin = rolesResult.value.data?.some((r) =>
+          r.role === "administrador_master" ||
+          r.role === "administrador" ||
+          r.role === "admin" ||
+          r.role === "ADMIN"
+        ) ?? false;
       }
     } else {
       console.error("Failed to fetch user roles", rolesResult.reason);

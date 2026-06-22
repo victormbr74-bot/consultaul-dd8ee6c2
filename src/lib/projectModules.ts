@@ -45,7 +45,6 @@ export const projectModules: ProjectModule[] = [
       { id: "controle", label: "Controle Operacional", path: "/controle" },
       { id: "meus-casos", label: "Meus Casos", path: "/meus-casos" },
       { id: "implantacao", label: "Implantacao", path: "/implantacao" },
-      { id: "admin", label: "Admin Master", path: "/admin" },
     ],
   },
 ];

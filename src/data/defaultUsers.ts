@@ -1,7 +1,7 @@
 export type DefaultUserSeedItem = {
   name: string;
   user_code: string;
-  role?: "admin" | "user";
+  role?: "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
 };
 
 export const DEFAULT_USER_SEED: DefaultUserSeedItem[] = [

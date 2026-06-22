@@ -14,7 +14,6 @@ import MassivaOperadoras from "@/modules/consulta-massiva/pages/Operadoras";
 import Passagem from "@/modules/consulta-massiva/pages/Passagem";
 import MassivaUsuarios from "@/modules/consulta-massiva/pages/Usuarios";
 
-import ControleAdmin from "@/modules/controle-reparo/pages/Admin";
 import ControleDashboard from "@/modules/controle-reparo/pages/Dashboard";
 import ControleImplantacao from "@/modules/controle-reparo/pages/Implantacao";
 import ControleImportacoes from "@/modules/controle-reparo/pages/Importacoes";
@@ -36,7 +35,6 @@ const nativePages: Record<string, Record<string, ComponentType>> = {
     controle: ControleOperacional,
     "meus-casos": ControleMeusCasos,
     implantacao: ControleImplantacao,
-    admin: ControleAdmin,
   },
   "passagem-turno": {
     "mascara-massiva": MascaraMassiva,

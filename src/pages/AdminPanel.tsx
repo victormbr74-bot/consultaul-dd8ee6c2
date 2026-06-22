@@ -15,20 +15,22 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound, Webhook } from "lucide-react";
 import { notifyJirayab } from "@/lib/jirayabNotify";
 
+type AppRole = "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
+
 type UserRow = {
   id: string;
   name: string;
   user_code: string | null;
-  role: "admin" | "user";
+  role: AppRole;
   active: boolean;
   created_at?: string;
 };
 
 type AdminAction =
-  | { action: "create_user"; payload: { name: string; user_code: string; role: "admin" | "user"; password?: string } }
-  | { action: "update_user"; payload: { user_id: string; name?: string; user_code?: string; role?: "admin" | "user"; active?: boolean; password?: string } }
+  | { action: "create_user"; payload: { name: string; user_code: string; role: AppRole; password?: string } }
+  | { action: "update_user"; payload: { user_id: string; name?: string; user_code?: string; role?: AppRole; active?: boolean; password?: string } }
   | { action: "delete_user"; payload: { user_id: string } }
-  | { action: "seed_users"; payload: { users: Array<{ name: string; user_code: string; role?: "admin" | "user" }>; default_password?: string } }
+  | { action: "seed_users"; payload: { users: Array<{ name: string; user_code: string; role?: AppRole }>; default_password?: string } }
   | { action: "reset_passwords"; payload: { user_id?: string; reset_all?: boolean; default_password?: string } };
 
 type ChangeRequestRow = {
@@ -52,6 +54,24 @@ type ChangeRequestViewRow = ChangeRequestRow & {
 };
 
 const DEFAULT_PASSWORD = "Oi@12345";
+
+const ROLE_LABEL: Record<AppRole, string> = {
+  administrador_master: "ADM Master",
+  administrador: "Administrador",
+  admin: "Admin",
+  operacao: "Operação",
+  consulta: "Consulta",
+  user: "Usuário",
+};
+
+const ROLE_VARIANT: Record<AppRole, "default" | "secondary" | "destructive" | "outline"> = {
+  administrador_master: "default",
+  administrador: "default",
+  admin: "secondary",
+  operacao: "outline",
+  consulta: "secondary",
+  user: "secondary",
+};
 
 const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const { isAdmin, loading: authLoading, user } = useAuth();
@@ -80,13 +100,13 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "user">("user");
+  const [newRole, setNewRole] = useState<AppRole>("user");
   const [newPassword, setNewPassword] = useState("");
 
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCode, setEditCode] = useState("");
-  const [editRole, setEditRole] = useState<"admin" | "user">("user");
+  const [editRole, setEditRole] = useState<AppRole>("user");
   const [editActive, setEditActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
 
@@ -426,7 +446,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         user_code: p.user_code,
         active: p.active,
         created_at: p.created_at,
-        role: (roles?.find((r) => r.user_id === p.id)?.role || "user") as "admin" | "user",
+        role: (roles?.find((r) => r.user_id === p.id)?.role || "user") as AppRole,
       }));
 
       setUsers(merged);
@@ -1105,11 +1125,15 @@ ${failureDetails}`,
                   </div>
                   <div className="space-y-1">
                     <Label>Papel</Label>
-                    <Select value={newRole} onValueChange={(v) => setNewRole(v as "admin" | "user")}>
+                    <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="user">Usuário</SelectItem>
+                        <SelectItem value="consulta">Consulta</SelectItem>
+                        <SelectItem value="operacao">Operação</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="administrador">Administrador</SelectItem>
+                        <SelectItem value="administrador_master">ADM Master</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1160,15 +1184,19 @@ ${failureDetails}`,
                           </td>
                           <td className="p-3">
                             {editId === u.id ? (
-                              <Select value={editRole} onValueChange={(v) => setEditRole(v as "admin" | "user")}>
+                              <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
                                 <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="user">Usuário</SelectItem>
+                                  <SelectItem value="consulta">Consulta</SelectItem>
+                                  <SelectItem value="operacao">Operação</SelectItem>
                                   <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="administrador">Administrador</SelectItem>
+                                  <SelectItem value="administrador_master">ADM Master</SelectItem>
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role === "admin" ? "Admin" : "Usuário"}</Badge>
+                              <Badge variant={ROLE_VARIANT[u.role]}>{ROLE_LABEL[u.role]}</Badge>
                             )}
                           </td>
                           <td className="p-3">

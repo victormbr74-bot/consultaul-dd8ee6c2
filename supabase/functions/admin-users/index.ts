@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type AppRole = "admin" | "user";
+type AppRole = "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
 
 type UserPayload = {
   user_id?: string;
@@ -43,7 +43,13 @@ const json = (body: unknown, status = 200) =>
   });
 
 const normalizeUserCode = (value: unknown) => String(value ?? "").replace(/\D/g, "");
-const normalizeRole = (value: unknown): AppRole => (value === "admin" ? "admin" : "user");
+const normalizeRole = (value: unknown): AppRole => {
+  const str = String(value ?? "").trim().toLowerCase();
+  if (str === "administrador_master" || str === "administrador" || str === "admin" || str === "ADMIN" || str === "operacao" || str === "consulta" || str === "user") {
+    return str as AppRole;
+  }
+  return "user";
+};
 const buildEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`;
 const isMissingTableError = (message: string) =>
   message.includes("Could not find the table") ||
@@ -185,9 +191,8 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await callerClient.auth.getUser();
     if (authError || !authData.user) return json({ error: "Não autenticado." }, 401);
 
-    const { data: adminCheck, error: adminCheckError } = await callerClient.rpc("has_role", {
+    const { data: adminCheck, error: adminCheckError } = await callerClient.rpc("is_admin", {
       _user_id: authData.user.id,
-      _role: "admin",
     });
 
     if (adminCheckError) return json({ error: adminCheckError.message }, 403);
@@ -207,7 +212,8 @@ Deno.serve(async (req) => {
       const userCode = normalizeUserCode(p.user_code);
       const role = normalizeRole(p.role);
       const rawPassword = typeof p.password === "string" ? p.password.trim() : "";
-      if (role === "admin" && !rawPassword) {
+      const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+      if (isAdminRole && !rawPassword) {
         return json({ error: "Senha obrigatoria para usuarios admin." }, 400);
       }
       const password = rawPassword || "Oi@12345";
@@ -326,7 +332,8 @@ Deno.serve(async (req) => {
           if (existingProfile?.id) {
             userId = existingProfile.id;
           } else {
-            if (role === "admin") {
+            const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+            if (isAdminRole) {
               throw new Error("Seed nao cria usuario admin sem senha explicita. Crie o admin manualmente.");
             }
             const email = buildEmail(userCode);
@@ -355,8 +362,8 @@ Deno.serve(async (req) => {
 
           await applyRole(adminClient, userId, role);
 
-          // Reset password for non-admin users (keep admins untouched).
-          if (role !== "admin") {
+          const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+          if (!isAdminRole) {
             const { error: passError } = await adminClient.auth.admin.updateUserById(userId, {
               password: defaultPassword,
             });

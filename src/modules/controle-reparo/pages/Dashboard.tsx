@@ -405,12 +405,42 @@ function Panel({
 }
 
 const TONES = {
-  primary: "bg-primary/10 text-primary",
-  baixo: "bg-faixa-baixo/20 text-faixa-baixo",
-  medio: "bg-faixa-medio/25 text-faixa-medio",
-  atencao: "bg-faixa-atencao/30 text-faixa-atencao",
-  ok: "bg-faixa-ok/20 text-faixa-ok",
-  critico: "bg-faixa-critico/20 text-faixa-critico",
+  primary: {
+    card: "border-sky-500/35 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.18),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-sky-400/80 shadow-[0_0_22px_rgba(14,165,233,0.24)] ring-1 ring-sky-400/40",
+    icon: "bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/20",
+    bar: "bg-sky-400",
+  },
+  baixo: {
+    card: "border-cyan-500/30 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-cyan-300/75 shadow-[0_0_22px_rgba(34,211,238,0.20)] ring-1 ring-cyan-300/35",
+    icon: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-400/20",
+    bar: "bg-cyan-300",
+  },
+  medio: {
+    card: "border-amber-500/30 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.16),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-amber-300/75 shadow-[0_0_22px_rgba(245,158,11,0.22)] ring-1 ring-amber-300/35",
+    icon: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/20",
+    bar: "bg-amber-300",
+  },
+  atencao: {
+    card: "border-violet-500/30 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.16),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-violet-300/75 shadow-[0_0_22px_rgba(139,92,246,0.22)] ring-1 ring-violet-300/35",
+    icon: "bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/20",
+    bar: "bg-violet-300",
+  },
+  ok: {
+    card: "border-emerald-500/30 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-emerald-300/75 shadow-[0_0_22px_rgba(16,185,129,0.22)] ring-1 ring-emerald-300/35",
+    icon: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/20",
+    bar: "bg-emerald-300",
+  },
+  critico: {
+    card: "border-rose-500/35 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.18),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.28))]",
+    active: "border-rose-300/80 shadow-[0_0_22px_rgba(244,63,94,0.24)] ring-1 ring-rose-300/40",
+    icon: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/20",
+    bar: "bg-rose-300",
+  },
 };
 
 function Kpi({
@@ -428,6 +458,8 @@ function Kpi({
   active?: boolean;
   onClick?: () => void;
 }) {
+  const toneStyle = TONES[tone];
+
   return (
     <button
       onClick={onClick}
@@ -435,24 +467,27 @@ function Kpi({
       className="min-w-0 text-left outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
-        className={`flex min-h-[126px] min-w-0 flex-col justify-between rounded-md border bg-background p-4 transition-colors hover:border-primary/50 ${
-          active ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30" : "border-border"
+        className={`relative flex min-h-[126px] min-w-0 flex-col justify-between overflow-hidden rounded-md border p-4 transition-all duration-200 hover:brightness-110 ${
+          toneStyle.card
+        } ${
+          active ? toneStyle.active : "shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
         }`}
       >
+        <div className={`absolute inset-x-0 top-0 h-px opacity-80 ${toneStyle.bar}`} />
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-3xl font-semibold tabular-nums leading-none text-foreground">{value}</div>
             <div className="mt-2 line-clamp-2 text-sm font-medium text-foreground/80">{label}</div>
           </div>
           <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${TONES[tone]}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${toneStyle.icon}`}
           >
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700/70">
           <div
-            className={`h-full rounded-full ${active ? "bg-primary" : "bg-muted-foreground/35"}`}
+            className={`h-full rounded-full ${toneStyle.bar} ${active ? "w-full" : "w-[78%] opacity-75"}`}
           />
         </div>
       </div>

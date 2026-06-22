@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, BarChart3, Copy, Eye, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +64,18 @@ type EditState = {
 
 type EditableField = keyof EditState;
 type EditingCell = { id: string; field: EditableField } | null;
+type BulkEditState = {
+  statusEnabled: boolean;
+  status: string;
+  normalizacaoEnabled: boolean;
+  data_hora_normalizacao: string;
+  atualizacaoEnabled: boolean;
+  atualizacao: string;
+  chamadoEnabled: boolean;
+  chamado: string;
+  incEnabled: boolean;
+  inc: string;
+};
 
 const MASSIVA_SELECT =
   "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
@@ -163,6 +176,21 @@ function editStateFrom(row: MassivaRecord): EditState {
   };
 }
 
+function emptyBulkEdit(): BulkEditState {
+  return {
+    statusEnabled: true,
+    status: "EM ANDAMENTO",
+    normalizacaoEnabled: false,
+    data_hora_normalizacao: "",
+    atualizacaoEnabled: true,
+    atualizacao: "",
+    chamadoEnabled: false,
+    chamado: "",
+    incEnabled: false,
+    inc: "",
+  };
+}
+
 export default function MassivasAbertas() {
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
@@ -170,6 +198,9 @@ export default function MassivasAbertas() {
   const [pending, setPending] = useState<Record<string, Partial<EditState>>>({});
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
   const [viewingMassiva, setViewingMassiva] = useState<MassivaRecord | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEdit, setBulkEdit] = useState<BulkEditState>(() => emptyBulkEdit());
 
   const rows = q.data ?? [];
   const now = new Date();
@@ -191,6 +222,10 @@ export default function MassivasAbertas() {
   );
   const abertas = displayRows.filter((m) => statusFor(m, pending) !== "NORMALIZADO");
   const normalizadas = displayRows.filter((m) => statusFor(m, pending) === "NORMALIZADO");
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedRows = useMemo(() => displayRows.filter((row) => selectedIdSet.has(row.id)), [displayRows, selectedIdSet]);
+  const allVisibleSelected = displayRows.length > 0 && displayRows.every((row) => selectedIdSet.has(row.id));
+  const someVisibleSelected = displayRows.some((row) => selectedIdSet.has(row.id));
 
   const totalChart = useMemo(() => chartByOperadora(monthRows), [monthRows]);
   const principalChart = useMemo(() => chartByOperadora(monthRows.filter(isPrincipal)), [monthRows]);
@@ -242,6 +277,19 @@ export default function MassivasAbertas() {
     onError: (error) => toast.error("Falha ao excluir massiva: " + (error as Error).message),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("massivas").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["massivas-controle"] });
+      setSelectedIds([]);
+      toast.success("Massivas excluÃ­das");
+    },
+    onError: (error) => toast.error("Falha ao excluir massivas: " + (error as Error).message),
+  });
+
   const copy = async (text: string) => {
     await navigator.clipboard.writeText(text);
     toast.success("Mascara copiada");
@@ -262,6 +310,22 @@ export default function MassivasAbertas() {
     }));
   };
 
+  const setSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      if (checked) return current.includes(id) ? current : [...current, id];
+      return current.filter((item) => item !== id);
+    });
+  };
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSelectedIds((current) => {
+      const visibleIds = displayRows.map((row) => row.id);
+      if (checked) return Array.from(new Set([...current, ...visibleIds]));
+      const visibleIdSet = new Set(visibleIds);
+      return current.filter((id) => !visibleIdSet.has(id));
+    });
+  };
+
   const saveAll = () => {
     if (changedCount === 0) return;
     saveMutation.mutate(pending);
@@ -276,6 +340,43 @@ export default function MassivasAbertas() {
     if (!isAdmin) return;
     const ok = window.confirm(`Excluir a massiva ${row.circuito_pai || row.id_massiva}?`);
     if (ok) deleteMutation.mutate(row.id);
+  };
+
+  const openBulkEdit = () => {
+    const first = selectedRows[0];
+    setBulkEdit({
+      ...emptyBulkEdit(),
+      status: first ? valueFor(first, "status") : "EM ANDAMENTO",
+      atualizacao: first ? valueFor(first, "atualizacao") : "",
+    });
+    setBulkEditOpen(true);
+  };
+
+  const applyBulkEdit = () => {
+    if (selectedRows.length === 0) return;
+    const values: Partial<EditState> = {};
+    if (bulkEdit.statusEnabled) values.status = bulkEdit.status;
+    if (bulkEdit.normalizacaoEnabled) values.data_hora_normalizacao = bulkEdit.data_hora_normalizacao;
+    if (bulkEdit.atualizacaoEnabled) values.atualizacao = bulkEdit.atualizacao;
+    if (bulkEdit.chamadoEnabled) values.chamado = bulkEdit.chamado;
+    if (bulkEdit.incEnabled) values.inc = bulkEdit.inc;
+    if (Object.keys(values).length === 0) {
+      toast.error("Selecione pelo menos um campo para editar.");
+      return;
+    }
+    setPending((current) => {
+      const next = { ...current };
+      for (const row of selectedRows) next[row.id] = { ...next[row.id], ...values };
+      return next;
+    });
+    setBulkEditOpen(false);
+    toast.success("EdiÃ§Ã£o aplicada Ã s massivas selecionadas");
+  };
+
+  const deleteSelected = () => {
+    if (!isAdmin || selectedRows.length === 0) return;
+    const ok = window.confirm(`Excluir ${selectedRows.length} massiva${selectedRows.length === 1 ? "" : "s"} selecionada${selectedRows.length === 1 ? "" : "s"}?`);
+    if (ok) bulkDeleteMutation.mutate(selectedRows.map((row) => row.id));
   };
 
   return (
@@ -320,10 +421,34 @@ export default function MassivasAbertas() {
             </Button>
           </div>
         </div>
+        {selectedRows.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary/5 px-3 py-2">
+            <span className="text-xs text-muted-foreground">
+              {selectedRows.length} massiva{selectedRows.length === 1 ? "" : "s"} selecionada{selectedRows.length === 1 ? "" : "s"}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={openBulkEdit}>
+                Editar selecionadas
+              </Button>
+              {isAdmin && (
+                <Button size="sm" variant="outline" disabled={bulkDeleteMutation.isPending} onClick={deleteSelected}>
+                  <Trash2 className="h-3.5 w-3.5" /> Excluir selecionadas
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="overflow-auto">
-          <table className="w-full min-w-[1400px] text-xs">
+          <table className="w-full min-w-[1460px] text-xs">
             <thead className="bg-card">
               <tr className="border-b border-border text-left">
+                <th className="w-10 px-3 py-2">
+                  <Checkbox
+                    checked={allVisibleSelected || (someVisibleSelected ? "indeterminate" : false)}
+                    onCheckedChange={(checked) => toggleAllVisible(checked === true)}
+                    aria-label="Selecionar massivas visiveis"
+                  />
+                </th>
                 <th className="px-3 py-2">Código Lotérica</th>
                 <th className="px-3 py-2">Circuito Pai</th>
                 <th className="px-3 py-2">Consórcio UL</th>
@@ -341,12 +466,19 @@ export default function MassivasAbertas() {
               </tr>
             </thead>
             <tbody>
-              {q.isLoading && <tr><td colSpan={14} className="px-3 py-10 text-center text-muted-foreground">Carregando...</td></tr>}
+              {q.isLoading && <tr><td colSpan={15} className="px-3 py-10 text-center text-muted-foreground">Carregando...</td></tr>}
               {!q.isLoading && rows.length === 0 && (
-                <tr><td colSpan={14} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva registrada.</td></tr>
+                <tr><td colSpan={15} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva registrada.</td></tr>
               )}
               {displayRows.map((m) => (
                 <tr key={m.id} className={pending[m.id] ? "border-b border-border/50 bg-primary/5" : "border-b border-border/50"}>
+                  <td className="px-3 py-2">
+                    <Checkbox
+                      checked={selectedIdSet.has(m.id)}
+                      onCheckedChange={(checked) => setSelected(m.id, checked === true)}
+                      aria-label={`Selecionar massiva ${m.circuito_pai || m.id_massiva}`}
+                    />
+                  </td>
                   <td className="px-3 py-2 font-mono">
                     <div className="flex items-center gap-2">
                       <Button
@@ -393,7 +525,133 @@ export default function MassivasAbertas() {
         </div>
       </div>
       <MassivaUnitsDialog massiva={viewingMassiva} onClose={() => setViewingMassiva(null)} />
+      <BulkEditDialog
+        open={bulkEditOpen}
+        selectedCount={selectedRows.length}
+        value={bulkEdit}
+        setValue={setBulkEdit}
+        onClose={() => setBulkEditOpen(false)}
+        onApply={applyBulkEdit}
+      />
     </div>
+  );
+}
+
+function BulkEditDialog({
+  open,
+  selectedCount,
+  value,
+  setValue,
+  onClose,
+  onApply,
+}: {
+  open: boolean;
+  selectedCount: number;
+  value: BulkEditState;
+  setValue: (value: BulkEditState) => void;
+  onClose: () => void;
+  onApply: () => void;
+}) {
+  const set = (patch: Partial<BulkEditState>) => setValue({ ...value, ...patch });
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Editar massivas selecionadas</DialogTitle>
+          <DialogDescription>
+            Os campos marcados serao aplicados a {selectedCount} massiva{selectedCount === 1 ? "" : "s"} como alteracao pendente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <BulkFieldToggle checked={value.statusEnabled} onCheckedChange={(checked) => set({ statusEnabled: checked })} label="Status">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+              value={value.status}
+              disabled={!value.statusEnabled}
+              onChange={(e) => set({ status: e.target.value })}
+            >
+              <option value="EM ANDAMENTO">EM ANDAMENTO</option>
+              <option value="NORMALIZADO">NORMALIZADO</option>
+            </select>
+          </BulkFieldToggle>
+
+          <BulkFieldToggle
+            checked={value.normalizacaoEnabled}
+            onCheckedChange={(checked) => set({ normalizacaoEnabled: checked })}
+            label="Data/Hora Normalizacao"
+          >
+            <Input
+              type="datetime-local"
+              className="h-9 text-xs"
+              value={value.data_hora_normalizacao}
+              disabled={!value.normalizacaoEnabled}
+              onChange={(e) => set({ data_hora_normalizacao: e.target.value })}
+            />
+          </BulkFieldToggle>
+
+          <BulkFieldToggle checked={value.chamadoEnabled} onCheckedChange={(checked) => set({ chamadoEnabled: checked })} label="Chamado">
+            <Input
+              className="h-9 text-xs font-mono"
+              value={value.chamado}
+              disabled={!value.chamadoEnabled}
+              onChange={(e) => set({ chamado: e.target.value })}
+            />
+          </BulkFieldToggle>
+
+          <BulkFieldToggle checked={value.incEnabled} onCheckedChange={(checked) => set({ incEnabled: checked })} label="INC">
+            <Input
+              className="h-9 text-xs font-mono"
+              value={value.inc}
+              disabled={!value.incEnabled}
+              onChange={(e) => set({ inc: e.target.value })}
+            />
+          </BulkFieldToggle>
+
+          <BulkFieldToggle
+            checked={value.atualizacaoEnabled}
+            onCheckedChange={(checked) => set({ atualizacaoEnabled: checked })}
+            label="Atualizacao"
+          >
+            <Textarea
+              rows={5}
+              className="text-xs"
+              value={value.atualizacao}
+              disabled={!value.atualizacaoEnabled}
+              onChange={(e) => set({ atualizacao: e.target.value })}
+            />
+          </BulkFieldToggle>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={onApply}>Aplicar edicao</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BulkFieldToggle({
+  checked,
+  onCheckedChange,
+  label,
+  children,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="grid gap-2 rounded-md border border-border p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+        <Checkbox checked={checked} onCheckedChange={(next) => onCheckedChange(next === true)} />
+        <span>{label}</span>
+      </div>
+      {children}
+    </label>
   );
 }
 

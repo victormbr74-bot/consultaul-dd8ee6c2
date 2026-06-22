@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity, AlertOctagon, AlertTriangle, Building2, CheckCircle2, Download, FileSignature, FileText, Flame, Globe2,
@@ -30,6 +30,25 @@ import { toast } from "sonner";
 
 type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
 
+const ANALISE_STORAGE_KEY = "consulta-massiva:analise-atual:v3";
+
+type PersistedMassivaForDedupe = {
+  id: string;
+  tipo_massiva: string;
+  operadora: string;
+  uf: string;
+  qtd_circuitos: number;
+  primeiro_alarme: string | null;
+  ultimo_alarme: string | null;
+  data_hora_abertura: string | null;
+  circuito_pai: string | null;
+  massiva_circuitos?: Array<{
+    codigo_loterica: string | null;
+    designacao: string | null;
+    ip_loopback: string | null;
+  }>;
+};
+
 function getMassivaRows(m: Massiva, rows: ProcessedRow[]): ProcessedRow[] {
   const ids = new Set(m.rowIds);
   return rows
@@ -48,6 +67,82 @@ function pickRowText(row: ProcessedRow | undefined, ...keys: string[]): string {
     if (value != null && String(value).trim()) return String(value).trim();
   }
   return "";
+}
+
+function minuteIso(value: number | string | null | undefined): string {
+  const ts = typeof value === "number" ? value : value ? new Date(value).getTime() : NaN;
+  if (!Number.isFinite(ts)) return "";
+  return new Date(Math.floor(ts / 60000) * 60000).toISOString();
+}
+
+function dayRangeFor(ts: number) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  const start = d.toISOString();
+  d.setHours(23, 59, 59, 999);
+  return { start, end: d.toISOString() };
+}
+
+function rowCircuitKey(row: ProcessedRow): string {
+  return pickRowText(row, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "Codigo da Loterica", "Código da Lotérica")
+    || pickRowText(row, "Designação", "DesignaÃ§Ã£o", "Designacao")
+    || pickRowText(row, "IP Loopback");
+}
+
+function massivaFingerprintFromRows(m: Massiva, rows: ProcessedRow[]): string {
+  const circuitos = getMassivaRows(m, rows)
+    .map(rowCircuitKey)
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  return [
+    m.tipo_massiva,
+    m.uf,
+    m.operadora,
+    m.qtd_circuitos,
+    minuteIso(m.primeiro_ts),
+    minuteIso(m.ultimo_ts),
+    circuitos,
+  ].join("|");
+}
+
+function massivaHeaderFingerprintFromRows(m: Massiva): string {
+  return [
+    m.tipo_massiva,
+    m.uf,
+    m.operadora,
+    m.qtd_circuitos,
+    minuteIso(m.primeiro_ts),
+    minuteIso(m.ultimo_ts),
+  ].join("|");
+}
+
+function massivaFingerprintFromDb(row: PersistedMassivaForDedupe): string {
+  const circuitos = (row.massiva_circuitos ?? [])
+    .map((c) => c.codigo_loterica || c.designacao || c.ip_loopback || "")
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  return [
+    row.tipo_massiva,
+    row.uf,
+    row.operadora,
+    row.qtd_circuitos,
+    minuteIso(row.primeiro_alarme ?? row.data_hora_abertura),
+    minuteIso(row.ultimo_alarme),
+    circuitos || row.circuito_pai || "",
+  ].join("|");
+}
+
+function massivaHeaderFingerprintFromDb(row: PersistedMassivaForDedupe): string {
+  return [
+    row.tipo_massiva,
+    row.uf,
+    row.operadora,
+    row.qtd_circuitos,
+    minuteIso(row.primeiro_alarme ?? row.data_hora_abertura),
+    minuteIso(row.ultimo_alarme),
+  ].join("|");
 }
 
 function massivaControlFields(m: Massiva, rows: ProcessedRow[]) {
@@ -113,6 +208,34 @@ export default function Page() {
   const operadorasConsultaUl = useMemo(() => operadorasFromLotericas(lotQ.data ?? []), [lotQ.data]);
   const escMap = useMemo(() => buildEscalonamentoMap(escQ.data ?? []), [escQ.data]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ANALISE_STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as {
+        file1?: LoadedFile;
+        file2?: LoadedFile;
+        result?: ProcessResult | null;
+        filters?: Filters;
+      };
+      setFile1(parsed.file1 ?? null);
+      setFile2(parsed.file2 ?? null);
+      setResult(parsed.result ?? null);
+      setFilters(parsed.filters ?? emptyFilters);
+    } catch (e) {
+      console.warn("failed to restore saved massiva analysis", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!file1 && !file2 && !result) return;
+    try {
+      localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify({ file1, file2, result, filters }));
+    } catch (e) {
+      console.warn("failed to save massiva analysis", e);
+    }
+  }, [file1, file2, result, filters]);
+
   const onUploadGis = async (origem: "1_LINK" | "2_LINKS", file: File) => {
     try {
       const rows = await readGisFile(file, origem);
@@ -156,7 +279,40 @@ export default function Page() {
           arquivo_2links: file2?.name ?? null,
         }).select("id").single();
         if (analise && r.massivas.length) {
-          await supabase.from("massivas").insert(r.massivas.map((m) => {
+          const minTs = Math.min(...r.massivas.map((m) => m.primeiro_ts));
+          const maxTs = Math.max(...r.massivas.map((m) => m.primeiro_ts));
+          const startRange = dayRangeFor(minTs).start;
+          const endRange = dayRangeFor(maxTs).end;
+          const { data: existingMassivas, error: existingError } = await supabase
+            .from("massivas")
+            .select("id,tipo_massiva,operadora,uf,qtd_circuitos,primeiro_alarme,ultimo_alarme,data_hora_abertura,circuito_pai,massiva_circuitos(codigo_loterica,designacao,ip_loopback)")
+            .gte("data_hora_abertura", startRange)
+            .lte("data_hora_abertura", endRange);
+          if (existingError) throw existingError;
+
+          const existingRows = (existingMassivas ?? []) as PersistedMassivaForDedupe[];
+          const existingKeys = new Set(existingRows.map(massivaFingerprintFromDb));
+          const existingHeaderKeys = new Set(existingRows.map(massivaHeaderFingerprintFromDb));
+          const batchKeys = new Set<string>();
+          const batchHeaderKeys = new Set<string>();
+          const massivasParaInserir = r.massivas.filter((m) => {
+            const key = massivaFingerprintFromRows(m, r.rows);
+            const headerKey = massivaHeaderFingerprintFromRows(m);
+            if (
+              existingKeys.has(key) ||
+              existingHeaderKeys.has(headerKey) ||
+              batchKeys.has(key) ||
+              batchHeaderKeys.has(headerKey)
+            ) return false;
+            batchKeys.add(key);
+            batchHeaderKeys.add(headerKey);
+            return true;
+          });
+
+          if (massivasParaInserir.length === 0) {
+            toast.info(`${r.massivas.length} massiva(s) duplicada(s) ignorada(s) no controle.`);
+          } else {
+            const { data: persistedMassivas, error: massivasError } = await supabase.from("massivas").insert(massivasParaInserir.map((m) => {
             const control = massivaControlFields(m, r.rows);
             return {
               analise_id: analise.id,
@@ -180,7 +336,42 @@ export default function Page() {
               inc: control.inc || null,
               data_hora_abertura: control.data_hora_abertura,
             };
-          }));
+          })).select("id,id_massiva");
+          if (massivasError) throw massivasError;
+
+          const massivaDbIdByPublicId = new Map((persistedMassivas ?? []).map((m) => [m.id_massiva, m.id]));
+          const circuitos = massivasParaInserir.flatMap((m) => {
+            const massivaId = massivaDbIdByPublicId.get(m.id_massiva);
+            if (!massivaId) return [];
+            return getMassivaRows(m, r.rows).map((row) => ({
+              massiva_id: massivaId,
+              codigo_loterica: pickRowText(row, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "Codigo da Loterica", "Código da Lotérica"),
+              loterica: pickRowText(row, "Lotérica", "LotÃ©rica", "Loterica"),
+              tipo_link: row.__tipoLink,
+              cidade: pickRowText(row, "Cidade"),
+              uf: row.__uf,
+              telefone: pickRowText(row, "Telefone"),
+              designacao: pickRowText(row, "Designação", "DesignaÃ§Ã£o", "Designacao"),
+              ip_loopback: pickRowText(row, "IP Loopback"),
+              data_hora: Number.isFinite(row.__ts) ? new Date(row.__ts).toISOString() : null,
+              empresa: pickRowText(row, "Empresa", "Site Owner"),
+              mensagem: pickRowText(row, "Mensagem"),
+              alarme_id: pickRowText(row, "ID do Alarmes", "ID do Alarme"),
+              regional: pickRowText(row, "Regional"),
+              tecnologia: pickRowText(row, "Tecnologia"),
+              operadora: row.__operadora,
+              tipo_empresa: row.__tipoEmp || row.__classificacao,
+              status: String(row["Status Massiva"] ?? ""),
+            }));
+          });
+          for (let i = 0; i < circuitos.length; i += 500) {
+            const { error } = await supabase.from("massiva_circuitos").insert(circuitos.slice(i, i + 500));
+            if (error) throw error;
+          }
+          if (massivasParaInserir.length < r.massivas.length) {
+            toast.info(`${r.massivas.length - massivasParaInserir.length} massiva(s) duplicada(s) ignorada(s) no controle.`);
+          }
+          }
         }
         await logAudit("EXECUTAR_ANALISE", "analises", {
           massivas: r.massivas.length,
@@ -283,7 +474,8 @@ export default function Page() {
       return {
         "ID Massiva": m.id_massiva, "Tipo Massiva": m.tipo_massiva,
         UF: m.uf, Operadora: m.operadora, Parceira: m.parceira,
-        "Qtde Circuitos": m.qtd_circuitos,
+        "Qtde Links Fora": m.qtd_circuitos,
+        "Qtde Lotéricas Isoladas": m.qtd_lotericas_isoladas ?? 0,
         "Primeiro Alarme": m.primeiro_alarme, "Último Alarme": m.ultimo_alarme,
         "Janela (min)": m.janela_minutos,
         "Possui Escalonamento": esc ? "Sim" : "Não",
@@ -300,7 +492,13 @@ export default function Page() {
       };
     }), [filteredMassivas, escMap]);
 
-  const reset = () => { setFile1(null); setFile2(null); setResult(null); setFilters(emptyFilters); };
+  const reset = () => {
+    setFile1(null);
+    setFile2(null);
+    setResult(null);
+    setFilters(emptyFilters);
+    localStorage.removeItem(ANALISE_STORAGE_KEY);
+  };
 
   const opsCount = operadorasConsultaUl.length;
   const lotCount = lotQ.data?.length ?? 0;
@@ -457,7 +655,8 @@ export default function Page() {
                       <th className="px-3 py-2 font-semibold">Tipo</th>
                       <th className="px-3 py-2 font-semibold">UF</th>
                       <th className="px-3 py-2 font-semibold">Operadora</th>
-                      <th className="px-3 py-2 font-semibold text-right">Qtd</th>
+                      <th className="px-3 py-2 font-semibold text-right">Links</th>
+                      <th className="px-3 py-2 font-semibold text-right">Isoladas</th>
                       <th className="px-3 py-2 font-semibold">Sinalização 60 KM</th>
                       <th className="px-3 py-2 font-semibold">Epicentro</th>
                       <th className="px-3 py-2 font-semibold text-right">Raio</th>
@@ -470,7 +669,7 @@ export default function Page() {
                   </thead>
                   <tbody>
                     {filteredMassivas.length === 0 && (
-                      <tr><td colSpan={13} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva detectada.</td></tr>
+                      <tr><td colSpan={14} className="px-3 py-10 text-center text-muted-foreground">Nenhuma massiva detectada.</td></tr>
                     )}
                     {filteredMassivas.map((m) => (
                       <tr key={m.id_massiva} onClick={() => setDrill(m)} className="cursor-pointer border-b border-border/50 hover:bg-accent/40">
@@ -478,13 +677,13 @@ export default function Page() {
                         <td className="px-3 py-2"><MassivaBadge tipo={m.tipo_massiva} /></td>
                         <td className="px-3 py-2 font-mono font-semibold">{m.uf}</td>
                         <td className="px-3 py-2 font-mono">{m.operadora}</td>
+                        <td className="px-3 py-2 text-right font-mono">{m.qtd_circuitos}</td>
                         <td className="px-3 py-2 text-right font-mono">
-                          <div>{m.qtd_circuitos}</div>
                           {m.qtd_lotericas_isoladas ? (
-                            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-noc-yellow/15 px-1 py-0.5 text-[10px] font-semibold text-noc-yellow">
-                              <AlertOctagon className="h-3 w-3" />{m.qtd_lotericas_isoladas} isolada{m.qtd_lotericas_isoladas > 1 ? "s" : ""}
-                            </div>
-                          ) : null}
+                            <span className="inline-flex items-center justify-end gap-1 rounded bg-noc-yellow/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-yellow">
+                              <AlertOctagon className="h-3 w-3" />{m.qtd_lotericas_isoladas}
+                            </span>
+                          ) : "0"}
                         </td>
                         <td className="px-3 py-2"><Sinalizacao60kmBadge sinalizacao={m.sinalizacao_60km} /></td>
                         <td className="px-3 py-2 font-mono text-[11px]">{m.cidade_epicentro ? `${m.cidade_epicentro}/${m.uf_epicentro}` : "-"}</td>

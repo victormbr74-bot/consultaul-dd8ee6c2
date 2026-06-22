@@ -1,20 +1,34 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BarChart3, Copy, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Activity, BarChart3, Copy, Eye, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+type MassivaCircuito = {
+  codigo_loterica: string | null;
+  loterica: string | null;
+  tipo_link: string | null;
+  cidade: string | null;
+  uf: string | null;
+  designacao: string | null;
+  ip_loopback: string | null;
+  operadora: string | null;
+  tipo_empresa: string | null;
+  status: string | null;
+};
 
 type MassivaRecord = {
   id: string;
   id_massiva: string;
   circuito_pai: string | null;
-  massiva_circuitos?: Array<{ codigo_loterica: string | null }>;
+  massiva_circuitos?: MassivaCircuito[];
   consorcio_ul: string;
   uf: string;
   tipo_link: string | null;
@@ -51,7 +65,7 @@ type EditableField = keyof EditState;
 type EditingCell = { id: string; field: EditableField } | null;
 
 const MASSIVA_SELECT =
-  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica)";
+  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
 
 async function fetchMassivas(): Promise<MassivaRecord[]> {
   const { data, error } = await supabase
@@ -155,6 +169,7 @@ export default function MassivasAbertas() {
   const q = useQuery({ queryKey: ["massivas-controle"], queryFn: fetchMassivas, staleTime: 30_000 });
   const [pending, setPending] = useState<Record<string, Partial<EditState>>>({});
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
+  const [viewingMassiva, setViewingMassiva] = useState<MassivaRecord | null>(null);
 
   const rows = q.data ?? [];
   const now = new Date();
@@ -332,7 +347,21 @@ export default function MassivasAbertas() {
               )}
               {displayRows.map((m) => (
                 <tr key={m.id} className={pending[m.id] ? "border-b border-border/50 bg-primary/5" : "border-b border-border/50"}>
-                  <td className="px-3 py-2 font-mono">{codigoLoterica(m)}</td>
+                  <td className="px-3 py-2 font-mono">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0"
+                        onClick={() => setViewingMassiva(m)}
+                        title="Ver unidades da massiva"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <span>{codigoLoterica(m)}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-2 font-mono">{m.circuito_pai || "-"}</td>
                   <EditableCell row={m} field="consorcio_ul" value={valueFor(m, "consorcio_ul")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} />
                   <td className="px-3 py-2 font-mono">{m.uf}</td>
@@ -363,7 +392,70 @@ export default function MassivasAbertas() {
           </table>
         </div>
       </div>
+      <MassivaUnitsDialog massiva={viewingMassiva} onClose={() => setViewingMassiva(null)} />
     </div>
+  );
+}
+
+function MassivaUnitsDialog({ massiva, onClose }: { massiva: MassivaRecord | null; onClose: () => void }) {
+  const circuitos = massiva?.massiva_circuitos ?? [];
+
+  return (
+    <Dialog open={!!massiva} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[88vh] max-w-[95vw] flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-border p-4">
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <span>Unidades da massiva</span>
+            <span className="font-mono text-sm text-muted-foreground">{massiva?.id_massiva}</span>
+          </DialogTitle>
+          <DialogDescription>
+            {circuitos.length} unidade{circuitos.length === 1 ? "" : "s"} vinculada{circuitos.length === 1 ? "" : "s"} a esta massiva.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-auto">
+          <table className="w-full min-w-[1050px] text-xs">
+            <thead className="sticky top-0 z-10 bg-card">
+              <tr className="border-b border-border text-left">
+                <th className="px-3 py-2">Código</th>
+                <th className="px-3 py-2">Lotérica</th>
+                <th className="px-3 py-2">Cidade</th>
+                <th className="px-3 py-2">UF</th>
+                <th className="px-3 py-2">Designação</th>
+                <th className="px-3 py-2">IP Loopback</th>
+                <th className="px-3 py-2">Link</th>
+                <th className="px-3 py-2">Operadora</th>
+                <th className="px-3 py-2">Tipo Emp.</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {circuitos.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
+                    Nenhuma unidade gravada para esta massiva.
+                  </td>
+                </tr>
+              )}
+              {circuitos.map((circuito, index) => (
+                <tr key={`${circuito.codigo_loterica ?? "sem-codigo"}-${circuito.designacao ?? index}`} className="border-b border-border/50 hover:bg-accent/30">
+                  <td className="whitespace-nowrap px-3 py-2 font-mono">{circuito.codigo_loterica || "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{circuito.loterica || "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{circuito.cidade || "-"}</td>
+                  <td className="px-3 py-2 font-mono">{circuito.uf || "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono">{circuito.designacao || "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono">{circuito.ip_loopback || "-"}</td>
+                  <td className="px-3 py-2 font-mono">{circuito.tipo_link || "-"}</td>
+                  <td className="px-3 py-2 font-mono">{circuito.operadora || "-"}</td>
+                  <td className="px-3 py-2 font-mono">{circuito.tipo_empresa || "-"}</td>
+                  <td className="px-3 py-2 font-mono">{circuito.status || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

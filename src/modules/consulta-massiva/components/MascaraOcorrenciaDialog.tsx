@@ -37,15 +37,15 @@ export function MascaraOcorrenciaDialog({ open, onClose, massiva, rows }: Props)
   );
   const [normalizacao, setNormalizacao] = useState("PENDENTE");
   const [causa, setCausa] = useState("PENDENTE");
-  const [statusTxt, setStatusTxt] = useState(STATUS_PADRAO);
+  const [statusTxt, setStatusTxt] = useState(() => massiva?.atualizacao || STATUS_PADRAO);
 
   useEffect(() => {
     if (open) {
       setNormalizacao("PENDENTE");
       setCausa("PENDENTE");
-      setStatusTxt(STATUS_PADRAO);
+      setStatusTxt(massiva?.atualizacao || STATUS_PADRAO);
     }
-  }, [open, massiva?.id_massiva]);
+  }, [open, massiva?.id_massiva, massiva?.atualizacao]);
 
   if (!base || !massiva) return null;
 

@@ -15,6 +15,7 @@ export interface MascaraInput {
   horario_normalizacao: string;
   causa_solucao: string;
   status_texto: string;
+  atualizacao?: string;
   lotericas_isoladas: Array<{ codigo: string; loterica: string }>;
 }
 
@@ -79,6 +80,7 @@ export function buildMascaraFromMassiva(
     horario_normalizacao: "PENDENTE",
     causa_solucao: "PENDENTE",
     status_texto: STATUS_PADRAO,
+    atualizacao: overrides.atualizacao ?? "",
     lotericas_isoladas: m.lotericas_isoladas ?? [],
     ...overrides,
   };
@@ -109,7 +111,7 @@ export function buildMascaraTextoFromMassiva(
 
   return [
     "CONSÓRCIO LOTÉRICAS ",
-    "Evento Massivo - Chamado Aberto",
+    "Evento Massivo - ATUALIZAÇÃO",
     "===============================",
     `Cliente: ${base.cliente ?? ""}`,
     `Chamado interno : ${base.chamado_interno}`,
@@ -122,7 +124,7 @@ export function buildMascaraTextoFromMassiva(
     `Horário da falha: ${base.horario_falha}`,
     `Horário de Normalização: ${base.horario_normalizacao}`,
     `Causa/Solução: ${base.causa_solucao}`,
-    `Status: ${base.status_texto}`,
+    `Status: ${base.atualizacao || base.status_texto}`,
     "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.",
     "===============================",
   ].join("\n");
@@ -150,7 +152,7 @@ export function buildMascaraHtml(d: MascaraInput): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Evento Massivo - ${esc(d.inc_massiva)}</title></head>
 <body style="font-family:Arial,sans-serif;color:#222;max-width:820px;margin:24px auto;padding:16px">
   <h2 style="margin:0 0 4px 0;color:#0b3a82">CONSÓRCIO LOTÉRICAS</h2>
-  <h3 style="margin:0 0 16px 0">Evento Massivo - Chamado Aberto</h3>
+  <h3 style="margin:0 0 16px 0">Evento Massivo - ATUALIZAÇÃO</h3>
   <div style="font-family:monospace;margin-bottom:14px">===============================</div>
   <table style="border-collapse:collapse;width:100%;font-size:13px">
     <tbody>
@@ -167,7 +169,7 @@ export function buildMascaraHtml(d: MascaraInput): string {
       <tr><td style="padding:4px 8px;background:#f3f4f6"><b>Causa/Solução</b></td><td style="padding:4px 8px">${esc(d.causa_solucao)}</td></tr>
     </tbody>
   </table>
-  <p style="white-space:pre-line;margin:16px 0 0 0;font-size:13px"><b>Status:</b> ${esc(d.status_texto)}</p>
+  <p style="white-space:pre-line;margin:16px 0 0 0;font-size:13px"><b>Status:</b> ${esc(d.atualizacao || d.status_texto)}</p>
   <h4 style="margin:16px 0 4px 0">Lotéricas isoladas (${d.qtd_isoladas})</h4>
   <table style="border-collapse:collapse;width:100%;font-size:12px">
     <thead><tr style="background:#0b3a82;color:#fff">
@@ -217,7 +219,7 @@ function htmlToPlain(d: MascaraInput): string {
   return [
     "CONSÓRCIO LOTÉRICAS",
     "",
-    "Evento Massivo - Chamado Aberto",
+    "Evento Massivo - ATUALIZAÇÃO",
     "",
     "===============================",
     "",
@@ -233,7 +235,7 @@ function htmlToPlain(d: MascaraInput): string {
     `Horário de normalização: ${d.horario_normalizacao}`,
     `Causa/Solução: ${d.causa_solucao}`,
     "",
-    `Status: ${d.status_texto}`,
+    `Status: ${d.atualizacao || d.status_texto}`,
     "",
     `Lotéricas isoladas (${d.qtd_isoladas}):`,
     ...isolatedPlainRows(d),
@@ -249,7 +251,7 @@ export function exportMascaraPdf(d: MascaraInput) {
   doc.text("CONSÓRCIO LOTÉRICAS", 40, 40);
   doc.setFontSize(11);
   doc.setTextColor(40, 40, 40);
-  doc.text("Evento Massivo - Chamado Aberto", 40, 58);
+  doc.text("Evento Massivo - ATUALIZAÇÃO", 40, 58);
   doc.setDrawColor(200);
   doc.line(40, 64, w - 40, 64);
 
@@ -282,7 +284,7 @@ export function exportMascaraPdf(d: MascaraInput) {
   doc.text("Status", 40, afterMeta);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  const statusLines = doc.splitTextToSize(d.status_texto, w - 80);
+  const statusLines = doc.splitTextToSize(d.atualizacao || d.status_texto, w - 80);
   doc.text(statusLines, 40, afterMeta + 14);
   const cursor = afterMeta + 14 + statusLines.length * 11 + 8;
   autoTable(doc, {

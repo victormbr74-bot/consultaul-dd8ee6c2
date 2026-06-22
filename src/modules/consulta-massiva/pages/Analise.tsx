@@ -257,7 +257,7 @@ export default function Page() {
       const t0 = performance.now();
       const r = processGis(all, operadorasConsultaUl, lotQ.data ?? [], cidadesQ.data);
       for (const m of r.massivas) {
-        m.mascara_texto = buildMascaraTextoFromMassiva(m, r.rows);
+        m.mascara_texto = buildMascaraTextoFromMassiva(m, r.rows, { atualizacao: m.atualizacao || "" });
       }
       const dt = Math.round(performance.now() - t0);
       setResult(r);

@@ -290,7 +290,12 @@ export default function MassivasAbertas() {
     onError: (error) => toast.error("Falha ao excluir massivas: " + (error as Error).message),
   });
 
-  const copy = async (text: string) => {
+  const copy = async (m: MassivaRecord) => {
+    let text = m.mascara_texto ?? "";
+    if (m.atualizacao) {
+      text = text.replace(/^(Status: ).*$/m, `$1${m.atualizacao}`);
+      text = text.replace(/Evento Massivo - Chamado Aberto/g, "Evento Massivo - ATUALIZAÇÃO");
+    }
     await navigator.clipboard.writeText(text);
     toast.success("Mascara copiada");
   };
@@ -508,7 +513,7 @@ export default function MassivasAbertas() {
                   <EditableCell row={m} field="atualizacao" value={valueFor(m, "atualizacao")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} kind="textarea" className="max-w-[260px]" />
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="outline" disabled={!m.mascara_texto} onClick={() => copy(m.mascara_texto ?? "")}>
+                      <Button size="sm" variant="outline" disabled={!m.mascara_texto} onClick={() => copy(m)}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                       {isAdmin && (

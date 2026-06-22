@@ -490,14 +490,14 @@ function FaixaPanel({
                 tickLine={false}
                 interval={0}
                 axisLine={false}
-                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                tick={{ fill: "var(--foreground)", fontSize: 11, fontWeight: 500 }}
               />
               <YAxis
                 allowDecimals={false}
-                width={38}
+                width={42}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                tick={{ fill: "var(--foreground)", fontSize: 11, fontWeight: 500 }}
               />
               <Tooltip
                 cursor={{ fill: "var(--muted)", opacity: 0.45 }}
@@ -523,10 +523,10 @@ function FaixaPanel({
           </ResponsiveContainer>
         </div>
 
-        <div className="min-w-0 rounded-md border bg-background">
-          <div className="border-b px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Distribuição
-          </div>
+      <div className="min-w-0 rounded-md border bg-background">
+        <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+          Distribuição
+        </div>
           <div className="px-3 py-3">
             {chartData.map((item) => (
               <button
@@ -534,27 +534,27 @@ function FaixaPanel({
                 onClick={() => onOpen(`${title} · ${subtitle} · ${item.label}`, item.rows)}
                 className="mb-3 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_54px] items-start gap-3 rounded-sm text-left outline-none last:mb-0 hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="truncate text-xs font-semibold">{item.label}</span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="truncate text-xs font-semibold text-foreground">{item.label}</span>
+                    </div>
+                    <div className="ml-4 mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${item.pct}%`, backgroundColor: item.color }}
+                      />
+                    </div>
                   </div>
-                  <div className="ml-4 mt-2 h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${item.pct}%`, backgroundColor: item.color }}
-                    />
+                  <div className="text-right">
+                    <div className="text-xs font-bold tabular-nums text-foreground">{item.value}</div>
+                    <div className="text-[11px] font-semibold tabular-nums text-foreground/80">
+                      {item.pct.toFixed(0)}%
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-semibold tabular-nums">{item.value}</div>
-                  <div className="text-[10px] text-muted-foreground tabular-nums">
-                    {item.pct.toFixed(0)}%
-                  </div>
-                </div>
               </button>
             ))}
           </div>

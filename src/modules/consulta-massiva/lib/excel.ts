@@ -3,13 +3,65 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { GIS_COLUMNS, type GisRow, type Origem, type ProcessedRow } from "./gis-types";
 
+function fixMojibake(value: string): string {
+  if (!/[ÃƒÃ‚]/.test(value) || typeof TextDecoder === "undefined") return value;
+  try {
+    const bytes = Uint8Array.from(Array.from(value, (ch) => ch.charCodeAt(0) & 0xff));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeHeader(value: string): string {
+  return String(value ?? "")
+    .replace(/^\uFEFF/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+}
+
+function headerVariants(value: string): string[] {
+  const raw = String(value ?? "");
+  const variants = new Set<string>([normalizeHeader(raw)]);
+  const fixed = fixMojibake(raw);
+  if (fixed !== raw) variants.add(normalizeHeader(fixed));
+  return Array.from(variants).filter(Boolean);
+}
+
+function getCell(row: GisRow, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value != null && String(value).trim() !== "") return String(value);
+  }
+  const entries = Object.entries(row);
+  const targets = new Set(keys.flatMap(headerVariants));
+  for (const [key, value] of entries) {
+    if (value == null || String(value).trim() === "") continue;
+    const variants = headerVariants(key);
+    if (variants.some((variant) => targets.has(variant))) return String(value);
+  }
+  return "";
+}
+
+function backupOrigemFromTipoLink(value: string): Origem | null {
+  const tipo = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+  if (/^(SEC|BACKUP|BKP|BKO|BK\b)/.test(tipo)) return "2_LINKS";
+  return null;
+}
+
 export function parseDateBR(value: unknown): number {
   if (value == null || value === "") return NaN;
-  if (typeof value === "number") {
+  const excelSerialToTimestamp = (serial: number): number => {
     // Excel serial date: days since 1899-12-30. Treat as local wall-clock time
     // so values like 14:17 in the sheet stay 14:17 instead of being shifted
     // by the user's timezone offset.
-    const ms = Math.round((value - 25569) * 86400 * 1000);
+    const ms = Math.round((serial - 25569) * 86400 * 1000);
     const d = new Date(ms);
     return new Date(
       d.getUTCFullYear(),
@@ -19,8 +71,15 @@ export function parseDateBR(value: unknown): number {
       d.getUTCMinutes(),
       d.getUTCSeconds(),
     ).getTime();
+  };
+  if (typeof value === "number") {
+    return excelSerialToTimestamp(value);
   }
   const s = String(value).trim();
+  if (/^\d{4,6}(?:\.\d+)?$/.test(s)) {
+    const serial = Number(s);
+    if (serial >= 20000 && serial <= 80000) return excelSerialToTimestamp(serial);
+  }
   const m = s.match(
     /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})[ T]?(\d{1,2})?:?(\d{1,2})?:?(\d{1,2})?/,
   );
@@ -45,7 +104,10 @@ export async function readGisFile(file: File, origem: Origem): Promise<GisRow[]>
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<GisRow>(sheet, { defval: "", raw: true });
-  return rows.map((r) => ({ ...r, __origem: origem }));
+  return rows.map((r) => ({
+    ...r,
+    __origem: backupOrigemFromTipoLink(getCell(r, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo")) ?? origem,
+  }));
 }
 
 export function exportToXlsx(rows: Record<string, unknown>[], filename: string) {

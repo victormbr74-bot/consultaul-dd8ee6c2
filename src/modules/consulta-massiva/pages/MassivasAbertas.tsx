@@ -158,7 +158,7 @@ function editStateFrom(row: MassivaRecord): EditState {
     data_hora_abertura: toDateTimeLocal(row.data_hora_abertura ?? row.primeiro_alarme),
     status: normalizeMassivaStatus(row.status),
     data_hora_normalizacao: toDateTimeLocal(row.data_hora_normalizacao),
-    atualizacao: row.atualizacao ?? "",
+    atualizacao: row.atualizacao ?? row.mascara_texto ?? "",
     operadora: row.operadora ?? "",
   };
 }

@@ -30,7 +30,7 @@ import { toast } from "sonner";
 
 type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
 
-const ANALISE_STORAGE_KEY = "consulta-massiva:analise-atual:v3";
+const ANALISE_STORAGE_KEY = "consulta-massiva:analise-atual:v4";
 
 type PersistedMassivaForDedupe = {
   id: string;

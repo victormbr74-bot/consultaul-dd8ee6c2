@@ -255,20 +255,6 @@ function Indicadores({
     return [
       ...general,
       {
-        key: "principalAll",
-        label: "Total Link Principal",
-        rows: g.principalAll,
-        icon: Network,
-        tone: "primary",
-      },
-      {
-        key: "backupAll",
-        label: "Total Link Secundário",
-        rows: g.backupAll,
-        icon: Radio,
-        tone: "primary",
-      },
-      {
         key: "principalFora",
         label: "Principal Down",
         rows: g.principalFora,

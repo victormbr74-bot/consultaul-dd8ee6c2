@@ -17,6 +17,7 @@ export interface MascaraInput {
   status_texto: string;
   atualizacao?: string;
   lotericas_isoladas: Array<{ ip_loopback: string; designacao: string }>;
+  links_envolvidos: Array<{ ip_loopback: string; designacao: string }>;
 }
 
 export const STATUS_PADRAO = "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";

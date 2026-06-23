@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
@@ -100,7 +101,18 @@ export function DrillDownDialog({
   onClose: () => void;
 }) {
   const open = !!data;
-  const rows = data?.rows ?? [];
+  const allRows = data?.rows ?? [];
+  const [page, setPage] = useState(0);
+  const pageSize = 30;
+  const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const rows = allRows.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const start = allRows.length === 0 ? 0 : safePage * pageSize + 1;
+  const end = Math.min((safePage + 1) * pageSize, allRows.length);
+
+  useEffect(() => {
+    if (!open) setPage(0);
+  }, [open]);
 
   const slug = (data?.title ?? "indicador")
     .toLowerCase()
@@ -116,29 +128,36 @@ export function DrillDownDialog({
           <DialogTitle className="flex flex-wrap items-center gap-2">
             {data?.title}
             <Badge variant="secondary" className="tabular-nums">
-              {rows.length} registros
+              {allRows.length} registros
             </Badge>
           </DialogTitle>
           <DialogDescription>Detalhamento dos registros do indicador selecionado.</DialogDescription>
         </DialogHeader>
 
-        <div className="mb-2 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={rows.length === 0}
-            onClick={() => exportControle(rows, "xlsx", `${slug}`)}
-          >
-            <Download className="mr-2 h-4 w-4" /> Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={rows.length === 0}
-            onClick={() => exportControle(rows, "csv", `${slug}`)}
-          >
-            <Download className="mr-2 h-4 w-4" /> CSV
-          </Button>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={allRows.length === 0}
+              onClick={() => exportControle(rows, "xlsx", `${slug}`)}
+            >
+              <Download className="mr-2 h-4 w-4" /> Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={allRows.length === 0}
+              onClick={() => exportControle(rows, "csv", `${slug}`)}
+            >
+              <Download className="mr-2 h-4 w-4" /> CSV
+            </Button>
+          </div>
+          {allRows.length > pageSize && (
+            <span className="text-xs text-muted-foreground">
+              {start}–{end} de {allRows.length}
+            </span>
+          )}
         </div>
 
         <div className="overflow-auto rounded border" style={{ maxHeight: "60vh" }}>
@@ -153,7 +172,7 @@ export function DrillDownDialog({
             <tbody>
               {rows.map((r, i) => (
                 <tr
-                  key={`${r.id ?? r.codigo_loterica}-${i}`}
+                  key={`${r.id ?? r.codigo_loterica}-${safePage}-${i}`}
                   className="border-b [&>td]:border-b [&>td]:border-r [&>td]:border-border/80 [&>td]:px-2 [&>td]:py-1 [&>td]:align-top [&>td:last-child]:border-r-0"
                 >
                   {DRILL_COLUMNS.map((column) => {
@@ -180,6 +199,30 @@ export function DrillDownDialog({
             </tbody>
           </table>
         </div>
+
+        {allRows.length > pageSize && (
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={safePage <= 0}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+            </Button>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              Página {safePage + 1} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={safePage >= totalPages - 1}
+              onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
+            >
+              Próxima <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

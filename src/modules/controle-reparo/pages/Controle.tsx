@@ -402,8 +402,66 @@ const COLUMN_LAYOUT: Record<string, string> = {
   status_zabbix: "min-w-[160px]",
 };
 
-function columnLayoutClass(id: string): string {
+const DEFAULT_COLUMN_WIDTHS: Record<string, string> = {
+  codigo_loterica: "132px",
+  loterica: "220px",
+  tipo_link: "112px",
+  uf: "72px",
+  designacao: "150px",
+  ip_loopback: "140px",
+  inicio: "178px",
+  tempo: "104px",
+  chamado: "124px",
+  previsao: "178px",
+  ultimo_comentario: "380px",
+  ordem: "140px",
+  novo_circuito: "190px",
+  grafana: "120px",
+  empresa: "160px",
+  designacao_parceiro: "210px",
+  responsavel_backup: "190px",
+  situacao: "190px",
+  status_planilha: "260px",
+  status_jira: "160px",
+  obs: "320px",
+  responsavel: "180px",
+  fila_jira: "150px",
+  inc_snow: "140px",
+  incidente_mam: "150px",
+  status_zabbix: "160px",
+};
+
+const STORAGE_KEY_COL_WIDTHS = "controle-col-widths-v1";
+
+function loadColumnWidths(): Record<string, string> {
+  if (typeof window === "undefined") return DEFAULT_COLUMN_WIDTHS;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_COL_WIDTHS);
+    if (!raw) return DEFAULT_COLUMN_WIDTHS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_COLUMN_WIDTHS, ...parsed };
+  } catch {
+    return DEFAULT_COLUMN_WIDTHS;
+  }
+}
+
+function persistColumnWidths(widths: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY_COL_WIDTHS, JSON.stringify(widths));
+  } catch {
+    /* ignore */
+  }
+}
+
+function columnLayoutClass(id: string, widths: Record<string, string>): string {
   return COLUMN_LAYOUT[id] ?? "min-w-[130px]";
+}
+
+function columnStyle(id: string, widths: Record<string, string>): React.CSSProperties | undefined {
+  const custom = widths[id];
+  if (!custom) return undefined;
+  return { width: custom, minWidth: custom };
 }
 
 interface QuickFilter {
@@ -517,17 +575,68 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
   const [versao, setVersao] = useState<number | null>(() => initialVersion());
   const [histCodigo, setHistCodigo] = useState<string | null>(null);
   const [histLot, setHistLot] = useState<string | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() => loadColumnWidths());
+  const resizingRef = useRef<{ id: string; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    persistColumnWidths(columnWidths);
+  }, [columnWidths]);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      const ref = resizingRef.current;
+      if (!ref) return;
+      const dx = event.clientX - ref.startX;
+      const newWidth = Math.max(60, ref.startWidth + dx);
+      setColumnWidths((current) => ({ ...current, [ref.id]: `${newWidth}px` }));
+    };
+
+    const onUp = () => {
+      resizingRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const startResize = (id: string, event: React.MouseEvent<HTMLTableCellElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const th = event.currentTarget;
+    const startWidth = th.getBoundingClientRect().width;
+    resizingRef.current = { id, startX: event.clientX, startWidth };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
 
   // ---- estado persistido (item 5) ----
   const [st, setSt] = useState<PersistedState>(() => normalizePersistedState(loadState()));
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const schedulePersist = (state: PersistedState) => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      persistState(state);
+      persistTimerRef.current = null;
+    }, 60);
+  };
+
   useEffect(() => {
-    persistState(st);
-  }, [st]);
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, []);
 
   const updateState = (updater: (state: PersistedState) => PersistedState) => {
     setSt((current) => {
       const next = updater(current);
-      persistState(next);
+      schedulePersist(next);
       return next;
     });
   };
@@ -550,6 +659,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         : [...s.hiddenColumns, id],
     }));
   const showAllColumns = () => updateState((s) => ({ ...s, hiddenColumns: [] }));
+  const resetColumnWidths = () => setColumnWidths(DEFAULT_COLUMN_WIDTHS);
 
   const { data: datas } = useQuery({
     queryKey: ["controle-datas"],
@@ -921,6 +1031,8 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={showAllColumns}>Mostrar todas</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={resetColumnWidths}>Resetar larguras</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -957,11 +1069,13 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         <table ref={tableRef} className="w-max min-w-full border-separate border-spacing-0 border border-border text-sm">
           <thead className="sticky top-0 z-10 bg-secondary text-secondary-foreground shadow-sm">
             <tr className="[&>th]:whitespace-nowrap [&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
-              <th className="min-w-12 w-12"></th>
+              <th style={{ width: "48px", minWidth: "48px" }}></th>
               {visibleColumns.map((c) => (
                 <th
                   key={c.id}
-                  className={`${columnLayoutClass(c.id)} ${c.accent ? "bg-accent" : ""}`}
+                  style={columnStyle(c.id, columnWidths)}
+                  className={`${columnLayoutClass(c.id, columnWidths)} ${c.accent ? "bg-accent" : ""} relative`}
+                  onMouseDown={(event) => startResize(c.id, event)}
                 >
                   <ColumnFilterHeader
                     label={c.label}
@@ -970,6 +1084,10 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                     onFilterChange={(f) => setColFilter(c.id, f)}
                     sortDir={st.sort.col === c.id ? st.sort.dir : null}
                     onSort={(dir) => setSort(c.id, dir)}
+                  />
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/20"
+                    onMouseDown={(event) => startResize(c.id, event)}
                   />
                 </th>
               ))}
@@ -981,7 +1099,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                 key={r.id}
                 className="border-b bg-card/60 transition-colors hover:bg-muted/60 [&>td]:border-b [&>td]:border-r [&>td]:border-border/80 [&>td]:px-4 [&>td]:py-3 [&>td]:align-middle [&>td]:leading-6 [&>td:last-child]:border-r-0"
               >
-                <td className="w-12 min-w-12 text-center">
+                <td style={{ width: "48px", minWidth: "48px" }} className="text-center">
                   <button
                     onClick={() => {
                       setHistCodigo(r.codigo_loterica);
@@ -994,13 +1112,19 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                   </button>
                 </td>
                 {visibleColumns.map((c) => (
-                  <Cell
+                  <td
                     key={c.id}
-                    col={c}
-                    row={r}
-                    onSave={saveField}
-                    canEdit={canEditField(c.id, canWrite, isAdmin)}
-                  />
+                    style={columnStyle(c.id, columnWidths)}
+                    className={columnLayoutClass(c.id, columnWidths)}
+                  >
+                    <Cell
+                      col={c}
+                      row={r}
+                      onSave={saveField}
+                      canEdit={canEditField(c.id, canWrite, isAdmin)}
+                      columnWidths={columnWidths}
+                    />
+                  </td>
                 ))}
               </tr>
             ))}
@@ -1076,11 +1200,13 @@ function Cell({
   row,
   onSave,
   canEdit,
+  columnWidths,
 }: {
   col: ColumnDef;
   row: RowT;
   onSave: (row: RowT, field: string, val: string) => void;
   canEdit: boolean;
+  columnWidths: Record<string, string>;
 }) {
   const accent = col.accent ? "bg-accent/30" : "";
   const current = col.text(row);
@@ -1088,7 +1214,7 @@ function Cell({
 
   if (selectOptions) {
     return (
-      <td className={`${columnLayoutClass(col.id)} ${accent}`}>
+      <td className={`${columnLayoutClass(col.id, columnWidths)} ${accent}`}>
         <Select value={current} onValueChange={(v) => onSave(row, col.id, v)} disabled={!canEdit}>
           <SelectTrigger className="h-9 w-60 text-sm">
             <SelectValue placeholder="—" />
@@ -1112,6 +1238,7 @@ function Cell({
         initialValue={editDisplayValue(row, col)}
         onSave={(value) => onSave(row, col.id, value)}
         wide={col.kind === "wideEdit" || col.kind === "comentario"}
+        columnWidths={columnWidths}
       />
     );
   }
@@ -1119,7 +1246,7 @@ function Cell({
   if (col.kind === "tempo") {
     const fx = getFaixa(row.data_hora_inicial, row.duracao_h);
     return (
-      <td className={columnLayoutClass(col.id)}>
+      <td className={columnLayoutClass(col.id, columnWidths)}>
         <Badge className={`${fx.badgeClass} px-2.5 py-1 tabular-nums`}>
           {formatHoras(fx.horas)}
         </Badge>
@@ -1128,14 +1255,14 @@ function Cell({
   }
   if (col.kind === "inicio") {
     return (
-      <td className={`${columnLayoutClass(col.id)} tabular-nums`}>
+      <td className={`${columnLayoutClass(col.id, columnWidths)} tabular-nums`}>
         {formatDataHora(row.data_hora_inicial)}
       </td>
     );
   }
   if (col.kind === "previsao") {
     return (
-      <td className={`${columnLayoutClass(col.id)} tabular-nums`}>
+      <td className={`${columnLayoutClass(col.id, columnWidths)} tabular-nums`}>
         {formatDataHora(row.previsao_atendimento)}
       </td>
     );
@@ -1143,7 +1270,7 @@ function Cell({
   if (col.kind === "comentario") {
     return (
       <td
-        className={`${columnLayoutClass(col.id)} whitespace-pre-wrap break-words align-top leading-6 text-foreground`}
+        className={`${columnLayoutClass(col.id, columnWidths)} whitespace-pre-wrap break-words align-top leading-6 text-foreground`}
       >
         {row.ultimo_comentario}
       </td>
@@ -1153,7 +1280,7 @@ function Cell({
   const v = col.text(row);
   if (col.id === "codigo_loterica") {
     return (
-      <td className={`${columnLayoutClass(col.id)} font-medium`}>
+      <td className={`${columnLayoutClass(col.id, columnWidths)} font-medium`}>
         <div className="flex items-center gap-1.5">
           {row.codigo_loterica}
           {row.pendente_enriquecimento && <AlertTriangle className="h-3 w-3 text-faixa-medio" />}
@@ -1163,7 +1290,7 @@ function Cell({
   }
   if (col.id === "grafana") {
     return (
-      <td className={columnLayoutClass(col.id)}>
+      <td className={columnLayoutClass(col.id, columnWidths)}>
         {row.grafana && <Badge variant="secondary">{row.grafana}</Badge>}
       </td>
     );
@@ -1171,14 +1298,14 @@ function Cell({
   if (col.id === "loterica" || col.id === "designacao_parceiro") {
     return (
       <td
-        className={`${columnLayoutClass(col.id)} max-w-[280px] whitespace-normal break-words leading-6`}
+        className={`${columnLayoutClass(col.id, columnWidths)} max-w-[280px] whitespace-normal break-words leading-6`}
         title={v}
       >
         {v}
       </td>
     );
   }
-  return <td className={columnLayoutClass(col.id)}>{v}</td>;
+  return <td className={columnLayoutClass(col.id, columnWidths)}>{v}</td>;
 }
 
 function EditCell({
@@ -1186,16 +1313,18 @@ function EditCell({
   initialValue,
   onSave,
   wide,
+  columnWidths,
 }: {
   field: string;
   initialValue: string;
   onSave: (val: string) => void;
   wide?: boolean;
+  columnWidths: Record<string, string>;
 }) {
   const [val, setVal] = useState(initialValue);
   useEffect(() => setVal(initialValue), [initialValue]);
   return (
-    <td className={`${columnLayoutClass(field)} bg-accent/25`}>
+    <td style={columnStyle(field, columnWidths)} className={`${columnLayoutClass(field, columnWidths)} bg-accent/25`}>
       <input
         value={val}
         onChange={(e) => setVal(e.target.value)}

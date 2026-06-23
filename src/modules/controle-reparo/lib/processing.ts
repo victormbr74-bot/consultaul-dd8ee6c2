@@ -938,10 +938,7 @@ function normalizeIncSnowValue(v: string | null | undefined): string | null {
   if (!s) return null;
   const key = normKey(s);
   if (INVALID_INC_SNOW_VALUES.has(key)) return null;
-  const compact = s.replace(/\s+/g, "").toUpperCase();
-  if (/^INC[-_]?\d{3,}$/.test(compact)) return compact;
-  if (/^\d{4,}$/.test(compact)) return compact;
-  return null;
+  return s;
 }
 
 function pickIncSnowFromJira(row: Row): IncidentPick {

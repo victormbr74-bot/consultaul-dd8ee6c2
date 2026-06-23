@@ -124,9 +124,6 @@ export default function DashboardPage() {
     queryFn: () => getLatestStaging("jira"),
   });
 
-  const principalRows = useMemo(() => rows.filter((r) => !isLinkBackup(r.tipo_link)), [rows]);
-  const backupRows = useMemo(() => rows.filter((r) => isLinkBackup(r.tipo_link)), [rows]);
-
   const CLOSED_JIRA_STATUSES = new Set([
     "FECHADO", "RESOLVIDO", "CANCELADO", "ENCERRADO", "CLOSED", "DONE", "RESOLVED", "CANCELLED",
   ]);
@@ -144,10 +141,8 @@ export default function DashboardPage() {
     return map;
   }, [jiraRows]);
 
-  function isJiraOpen(status: string | null | undefined): boolean {
-    const s = String(status ?? "").trim().toUpperCase();
-    return s.length > 0 && !CLOSED_JIRA_STATUSES.has(s);
-  }
+  const principalRows = useMemo(() => rows.filter((r) => !isLinkBackup(r.tipo_link)), [rows]);
+  const backupRows = useMemo(() => rows.filter((r) => isLinkBackup(r.tipo_link)), [rows]);
 
   if (rows.length === 0 && datas && !datas.includes(dataRef)) {
     return (
@@ -208,7 +203,7 @@ export default function DashboardPage() {
         </div>
 
         <TabsContent value="operacional" className="mt-4">
-          <Indicadores rows={rows} fullRows={rows} versao={versao ?? 1} showLinks onOpen={open} />
+          <Indicadores rows={rows} fullRows={rows} versao={versao ?? 1} showLinks onOpen={open} jiraIncStatusMap={jiraIncStatusMap} />
         </TabsContent>
 
         <TabsContent value="principal" className="mt-4">
@@ -217,11 +212,12 @@ export default function DashboardPage() {
             fullRows={principalRows}
             versao={versao ?? 1}
             onOpen={open}
+            jiraIncStatusMap={jiraIncStatusMap}
           />
         </TabsContent>
 
         <TabsContent value="backup" className="mt-4">
-          <Indicadores rows={backupRows} fullRows={backupRows} versao={versao ?? 1} onOpen={open} />
+          <Indicadores rows={backupRows} fullRows={backupRows} versao={versao ?? 1} onOpen={open} jiraIncStatusMap={jiraIncStatusMap} />
         </TabsContent>
       </Tabs>
 
@@ -236,12 +232,14 @@ function Indicadores({
   versao,
   showLinks,
   onOpen,
+  jiraIncStatusMap,
 }: {
   rows: ControleRow[];
   fullRows: ControleRow[];
   versao: number;
   showLinks?: boolean;
   onOpen: (title: string, rows: ControleRow[]) => void;
+  jiraIncStatusMap: Map<string, string>;
 }) {
   const g = useMemo(() => computeGroups(rows, fullRows, jiraIncStatusMap), [rows, fullRows, jiraIncStatusMap]);
   const [selectedMetricKey, setSelectedMetricKey] = useState("ativos");
@@ -727,6 +725,15 @@ function isInstalacaoRoteador(r: ControleRow): boolean {
 
 function isNormalizado(r: ControleRow): boolean {
   return r.status_normalizacao === "NORMALIZADO" || normTxt(r.status_planilha) === "NORMALIZADO";
+}
+
+const CLOSED_JIRA_STATUSES = new Set([
+  "FECHADO", "RESOLVIDO", "CANCELADO", "ENCERRADO", "CLOSED", "DONE", "RESOLVED", "CANCELLED",
+]);
+
+function isJiraOpen(status: string | null | undefined): boolean {
+  const s = String(status ?? "").trim().toUpperCase();
+  return s.length > 0 && !CLOSED_JIRA_STATUSES.has(s);
 }
 
 function computeGroups(rows: ControleRow[], fullRows: ControleRow[], jiraMap: Map<string, string>) {

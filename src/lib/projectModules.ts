@@ -38,13 +38,12 @@ export const projectModules: ProjectModule[] = [
   {
     id: "controle-reparo",
     label: "Controle de Reparo",
-    description: "Importacoes, dashboard, controle operacional, implantacao e casos.",
+    description: "Dashboard, importacoes, controle operacional e casos.",
     items: [
       { id: "dashboard", label: "Dashboard", path: "/dashboard" },
       { id: "importacoes", label: "Importacoes", path: "/importacoes" },
       { id: "controle", label: "Controle Operacional", path: "/controle" },
       { id: "meus-casos", label: "Meus Casos", path: "/meus-casos" },
-      { id: "implantacao", label: "Implantacao", path: "/implantacao" },
     ],
   },
 ];

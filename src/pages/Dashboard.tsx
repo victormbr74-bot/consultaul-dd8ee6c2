@@ -72,6 +72,8 @@ const buildDashboardSearchFilter = (value: string) => {
   for (const candidate of buildCircuitSearchVariants(term)) {
     filters.add(`ccto_oi.ilike.%${candidate}%`);
     filters.add(`ccto_oemp.ilike.%${candidate}%`);
+    filters.add(`cpe_meraki.ilike.%${candidate}%`);
+    filters.add(`circuito_elsys.ilike.%${candidate}%`);
   }
 
   for (const candidate of buildCodUlSearchVariants(term)) {
@@ -109,7 +111,8 @@ const LEGACY_EXPORT_HEADERS = [
   "IP Switch",
   "TFL",
   "Circuito OEMP",
-  "Circuitos Meraki",
+  "CPE Meraki",
+  "Circuito Elsys",
   "Empresa OEMP",
   "Tipo UL",
   "Perímetro",
@@ -144,6 +147,8 @@ const BASE_ALIAS_KEYS = [
   "nome_loterica",
   "ccto_oi",
   "ccto_oemp",
+  "cpe_meraki",
+  "circuito_elsys",
   "designacao_nova",
   "operadora",
   "ip_nat",
@@ -171,6 +176,9 @@ const BASE_ALIAS_KEYS = [
   "TFLS",
   "CIRCUITO MERAKI",
   "CIRCUITOS MERAKI",
+  "CPE MERAKI",
+  "CIRCUITO ELSYS",
+  "ELSYS",
   "TIPO LOTERICA",
   "TIPO UL",
   "PERIMETRO",
@@ -424,6 +432,8 @@ const Dashboard = () => {
         const nomeLoterica = firstFilled(row.nome_loterica, pickRaw("NOME UL", "nome_loterica"));
         const cctoOi = firstFilled(row.ccto_oi, pickRaw("CCTO OI", "ccto_oi"));
         const cctoOemp = firstFilled(row.ccto_oemp, pickRaw("CCTO OEMP", "ccto_oemp"));
+        const cpeMeraki = firstFilled(row.cpe_meraki, pickRaw("CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "cpe_meraki"));
+        const circuitoElsys = firstFilled(row.circuito_elsys, pickRaw("CIRCUITO ELSYS", "ELSYS", "circuito_elsys"));
         const designacaoNova = firstFilled(row.designacao_nova, pickRaw("DESIGINACAO NOVA", "DESIGNAÇÃO NOVA", "designacao_nova"));
         const operadora = firstFilled(row.operadora, pickRaw("OPERADORA 4G", "operadora"));
         const ipNat = firstFilled(row.ip_nat, pickRaw("IP NAT", "ip_nat"));
@@ -464,7 +474,8 @@ const Dashboard = () => {
           "IP Switch": pickRaw("IP SWITCH", "LOOPBACK SWITCH"),
           TFL: pickRaw("TFL", "TFLs", "TFLS"),
           "Circuito OEMP": pickRaw("CIRCUITO OEMP"),
-          "Circuitos Meraki": pickRaw("CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"),
+          "CPE Meraki": cpeMeraki,
+          "Circuito Elsys": circuitoElsys,
           "Empresa OEMP": pickRaw("EMPRESA OEMP"),
           "Tipo UL": pickRaw("TIPO LOTERICA", "TIPO UL"),
           "Perímetro": pickRaw("PERIMETRO", "PERÍMETRO"),

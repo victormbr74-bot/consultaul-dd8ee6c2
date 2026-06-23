@@ -21,9 +21,11 @@ type MainField = {
 const FIELDS: MainField[] = [
   { key: "nome_loterica", label: "Nome", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
   { key: "ccto_oi", label: "CCTO OI" },
-  { label: "Circuito Meraki", rawKeys: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"] },
+  { key: "cpe_meraki", label: "CPE Meraki" },
+  { key: "circuito_meraki", label: "Circuito Meraki" },
   { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
   { key: "ccto_oemp", label: "CCTO OEMP" },
+  { key: "circuito_elsys", label: "Circuito Elsys" },
   { key: "operadora", label: "Operadora" },
   { key: "ip_nat", label: "IP NAT", mono: true },
   { key: "ip_wan", label: "IP WAN", mono: true },

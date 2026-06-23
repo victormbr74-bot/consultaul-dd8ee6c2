@@ -25,6 +25,7 @@ import { getVal, cleanText } from "@/modules/controle-reparo/lib/parse";
 import { FAIXAS, formatDataHora, getFaixa } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
 import { DrillDownDialog, type DrillData } from "@/modules/controle-reparo/components/controle/DrillDownDialog";
+import { useAuth } from "@/modules/controle-reparo/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,6 +69,7 @@ type FaixaChartRow = {
 };
 
 export default function DashboardPage() {
+  const { isAdmin } = useAuth();
   const [dataRef, setDataRef] = useState(() => {
     if (typeof window === "undefined") return processingDate();
     return window.sessionStorage.getItem(CONTROL_DATE_SESSION_KEY) || processingDate();

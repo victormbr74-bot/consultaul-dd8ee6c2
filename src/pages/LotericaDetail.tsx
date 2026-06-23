@@ -26,6 +26,8 @@ const EDITABLE_KEYS = [
   "nome_loterica",
   "ccto_oi",
   "ccto_oemp",
+  "cpe_meraki",
+  "circuito_elsys",
   "designacao_nova",
   "operadora",
   "ip_nat",
@@ -104,13 +106,24 @@ const normalizeLotericaRecord = (row: any) => {
     raw["LOOPBACK SECUNDARIO"] || raw["LOOPBACK SECUND\u00C1RIO"] || raw["LOOPBACK SECUNDÃƒÂRIO"] || "",
   ).trim();
   const currentLoopbackLan = String(row?.loopback_lan || "").trim();
+  const cpeMeraki =
+    String(row?.cpe_meraki || "").trim() ||
+    String(getRawValueByAliases(raw, ["CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"]) || "").trim();
+  const circuitoElsys =
+    String(row?.circuito_elsys || "").trim() ||
+    String(getRawValueByAliases(raw, ["CIRCUITO ELSYS", "ELSYS"]) || "").trim();
+  const normalized = {
+    ...row,
+    ...(cpeMeraki ? { cpe_meraki: cpeMeraki } : {}),
+    ...(circuitoElsys ? { circuito_elsys: circuitoElsys } : {}),
+  };
 
   // Corrige registros antigos onde loopback_lan foi importado como REDE LAN.
   if (rawLoopbackSec && (!currentLoopbackLan || currentLoopbackLan === rawRedeLan) && rawLoopbackSec !== rawRedeLan) {
-    return { ...row, loopback_lan: rawLoopbackSec };
+    return { ...normalized, loopback_lan: rawLoopbackSec };
   }
 
-  return row;
+  return normalized;
 };
 
 const buildChangePayload = (beforeRecord: any, afterRecord: any) => {

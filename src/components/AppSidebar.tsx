@@ -235,18 +235,20 @@ export function AppSidebar() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {project.items.map((item) => (
-                      <SidebarMenuSubItem key={item.id}>
-                        <SidebarMenuSubButton asChild size="sm">
-                          <NavLink
-                            to={`/projetos/${project.id}/${item.id}`}
-                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          >
-                            <span>{item.label}</span>
-                          </NavLink>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {project.items
+                      .filter((item) => !(project.id === "controle-reparo" && item.id === "importacoes" && !isAdmin))
+                      .map((item) => (
+                        <SidebarMenuSubItem key={item.id}>
+                          <SidebarMenuSubButton asChild size="sm">
+                            <NavLink
+                              to={`/projetos/${project.id}/${item.id}`}
+                              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            >
+                              <span>{item.label}</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

@@ -13,6 +13,8 @@ describe("lotericaMassUpdate", () => {
       {
         "CODIGO UL": "21-000111-1",
         "CCTO OEM": "OEMP-123456",
+        "CPE MERAKI": "MCO-123456",
+        "Circuito Elsys": "ELSYS-123456",
         "Empresa OEMP": "CLARO",
         "Circuito Backup": "BRISANET-123",
       },
@@ -35,6 +37,8 @@ describe("lotericaMassUpdate", () => {
         ccto_oi: "219123456789",
         loopback_wan: "10.10.10.1",
         ccto_oemp: "OEMP-123456",
+        cpe_meraki: "MCO-123456",
+        circuito_elsys: "ELSYS-123456",
       },
       rawPatch: {
         "EMPRESA OEMP": "CLARO",

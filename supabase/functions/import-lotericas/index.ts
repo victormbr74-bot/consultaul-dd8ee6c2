@@ -144,6 +144,8 @@ function toLoterica(row: Record<string, unknown>, userId: string) {
     nome_loterica: asText(pick(rawData, ["NOME UL", "nome_loterica", "Nome Loterica"])),
     ccto_oi: asText(pick(rawData, ["CCTO OI", "ccto_oi"])),
     ccto_oemp: asText(pick(rawData, ["CCTO OEMP", "ccto_oemp"])),
+    cpe_meraki: asText(pick(rawData, ["CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "cpe_meraki"])),
+    circuito_elsys: asText(pick(rawData, ["CIRCUITO ELSYS", "ELSYS", "circuito_elsys"])),
     operadora: asText(pick(rawData, ["OPERADORA 4G", "operadora", "Operadora"])),
     ip_nat: asText(pick(rawData, ["IP NAT", "ip_nat"])),
     ip_wan: asText(pick(rawData, ["IP WAN", "ip_wan"])),

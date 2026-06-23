@@ -132,7 +132,7 @@ interface CustomTemplateFormState {
 }
 
 const LOOKUP_SELECT =
-  "cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data";
+  "cod_ul,nome_loterica,ccto_oi,ccto_oemp,cpe_meraki,circuito_elsys,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data";
 
 const TEMPLATE_META: Record<TemplateId, { label: string; filePath: string }> = {
   "cisco1900-principal-sencinet": {

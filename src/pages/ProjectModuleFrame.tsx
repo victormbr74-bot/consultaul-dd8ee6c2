@@ -2,6 +2,7 @@ import { Layers, RotateCcw } from "lucide-react";
 import type { ComponentType } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { getProjectModule, getProjectModuleItem } from "@/lib/projectModules";
 
 import MassivaAnalise from "@/modules/consulta-massiva/pages/Analise";
@@ -15,7 +16,6 @@ import Passagem from "@/modules/consulta-massiva/pages/Passagem";
 import MassivaUsuarios from "@/modules/consulta-massiva/pages/Usuarios";
 
 import ControleDashboard from "@/modules/controle-reparo/pages/Dashboard";
-import ControleImplantacao from "@/modules/controle-reparo/pages/Implantacao";
 import ControleImportacoes from "@/modules/controle-reparo/pages/Importacoes";
 import ControleOperacional from "@/modules/controle-reparo/pages/Controle";
 import ControleMeusCasos from "@/modules/controle-reparo/pages/MeusCasos";
@@ -34,7 +34,6 @@ const nativePages: Record<string, Record<string, ComponentType>> = {
     importacoes: ControleImportacoes,
     controle: ControleOperacional,
     "meus-casos": ControleMeusCasos,
-    implantacao: ControleImplantacao,
   },
   "passagem-turno": {
     "mascara-massiva": MascaraMassiva,
@@ -46,11 +45,16 @@ const nativePages: Record<string, Record<string, ComponentType>> = {
 export default function ProjectModuleFrame() {
   const { projectId, itemId } = useParams();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const project = getProjectModule(projectId);
   const item = getProjectModuleItem(project, itemId);
 
   if (!project || !item || !projectId || !itemId) {
     return <Navigate to="/" replace />;
+  }
+
+  if (projectId === "controle-reparo" && itemId === "importacoes" && !isAdmin) {
+    return <Navigate to="/projetos/controle-reparo/dashboard" replace />;
   }
 
   const Page = nativePages[projectId]?.[itemId];

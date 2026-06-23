@@ -21,13 +21,16 @@ export interface MascaraInput {
 
 export const STATUS_PADRAO = "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";
 
-export function proximoStatusLine(baseDate = new Date()): string {
-  const next = new Date(baseDate.getTime() + 2 * 60 * 60 * 1000);
+export const PROXIMO_STATUS_INTERVAL_HOURS = 4;
+
+export function proximoStatusLine(baseDate: Date = new Date()): string {
+  const next = new Date(baseDate.getTime() + PROXIMO_STATUS_INTERVAL_HOURS * 60 * 60 * 1000);
   const p = (n: number) => String(n).padStart(2, "0");
-  return `proximo status em ${p(next.getDate())}/${p(next.getMonth() + 1)}/${next.getFullYear()} as  ${p(next.getHours())}:${p(next.getMinutes())}:${p(next.getSeconds())}`;
+  return `Próximo Status em ${p(next.getDate())}/${p(next.getMonth() + 1)}/${next.getFullYear()} às ${p(next.getHours())}:${p(next.getMinutes())}:${p(next.getSeconds())}`;
 }
 
 export const proxStatus = proximoStatusLine;
+
 
 function valueFromMask(lines: string[], label: string): string {
   const found = lines.find((line) => line.trim().toLowerCase().startsWith(label.toLowerCase()));

@@ -24,14 +24,12 @@ interface Props {
 }
 
 export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: Props) {
-  const [mascaraOpen, setMascaraOpen] = useState(false);
   if (!massiva) return null;
   const set = new Set(massiva.rowIds);
   const matching = rows.filter((r) => set.has(r.__rowId));
   const exportData = processedRowsForExport(matching);
 
   return (
-    <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
 
       <DialogContent className="max-w-[95vw] max-h-[92vh] flex flex-col p-0 gap-0">

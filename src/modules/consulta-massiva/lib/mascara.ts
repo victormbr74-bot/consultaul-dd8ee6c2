@@ -194,29 +194,32 @@ export function buildMascaraTextoFromMassiva(
   });
   const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
   const tituloEvento = base.atualizacao ? "ATUALIZAÇÃO" : "ABERTURA";
+  const parsedFalha = base.horario_falha ? new Date(base.horario_falha) : null;
+  const horasBase = parsedFalha && !isNaN(parsedFalha.getTime()) ? parsedFalha : new Date();
 
   return [
     "===============================",
-    "CONSÓRCIO LOTÉRICAS ",
+    "CONSÓRCIO LOTÉRICAS",
     `Evento Massivo - ${tituloEvento}`,
     "===============================",
     `Cliente: ${base.cliente ?? ""}`,
-    `Chamado interno : ${base.chamado_interno}`,
+    `Chamado interno: ${base.chamado_interno}`,
     `Caso: ${base.caso}`,
     `Tipo: ${tipoLabel}`,
     `UF: ${base.uf_label}`,
-    `Quantidade Isoladas:${padQty(base.qtd_isoladas)}`,
+    `Quantidade Isoladas: ${padQty(base.qtd_isoladas)}`,
     `Quantidade total: ${padQty(base.qtd_total)}`,
     `Horário da falha: ${base.horario_falha}`,
     `Horário de Normalização: ${base.horario_normalizacao}`,
     `Causa/Solução: ${base.causa_solucao}`,
     `Status: ${base.atualizacao || base.status_texto || "PENDENTE"}`,
-    `Horas: ${proximoStatusLine()}`,
+    `Horas: ${proximoStatusLine(horasBase)}`,
     "===============================",
     "",
-    ...base.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),
+    ...formatIpList(base.lotericas_isoladas),
   ].join("\n");
 }
+
 
 
 export function buildMascaraHtml(d: MascaraInput): string {

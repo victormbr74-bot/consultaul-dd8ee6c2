@@ -88,6 +88,8 @@ const DRILL_COLUMNS: DrillColumn[] = [
   { header: "INC Snow", render: (r) => r.inc_snow },
   { header: "Incid. MAM", render: (r) => r.incidente_mam },
   { header: "Status Zabbix", render: (r) => r.status_zabbix },
+  { header: "Status Normalização", render: (r) => r.status_normalizacao },
+  { header: "Normalizado em", render: (r) => formatDataHora(r.normalizado_em) },
 ];
 
 export function DrillDownDialog({

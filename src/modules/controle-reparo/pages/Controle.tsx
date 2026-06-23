@@ -224,7 +224,6 @@ const TREATMENT_EDITABLE_IDS = new Set([
   "status_planilha",
   "status_jira",
   "obs",
-  "responsavel",
   "status_zabbix",
 ]);
 
@@ -674,10 +673,6 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
   const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const saveField = async (row: RowT, field: string, newValRaw: string) => {
-    if (!canWrite) {
-      toast.error("Sem permissão para editar.");
-      return;
-    }
     if (!canEditField(field, canWrite, isAdmin)) {
       toast.error("Campo não editável.");
       return;

@@ -840,7 +840,7 @@ interface IncidentPick {
   invalidIgnored: number;
 }
 
-function normalizeIncidentValue(v: string | null | undefined): string | null {
+export function normalizeIncidentValue(v: string | null | undefined): string | null {
   const s = cleanTechnicalValue(v);
   if (!s) return null;
   const normalized = s.replace(/\s+/g, "").toUpperCase();

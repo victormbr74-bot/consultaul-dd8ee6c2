@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Activity, AlertOctagon, AlertTriangle, Building2, CheckCircle2, Download, FileText, Flame, Globe2,
   HelpCircle, MapPin, Network, Play, Radar, RadioTower, Shield, ShieldOff, Trash2, XCircle, SlidersHorizontal,
@@ -176,6 +177,8 @@ export default function Page() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const { user } = useAuth();
+  const [analiseUsuario, setAnaliseUsuario] = useState<string | null>(null);
 
   const lotQ = useQuery({ queryKey: ["lotericas-massiva-ref"], queryFn: fetchAllLotericas, staleTime: 5 * 60_000 });
   const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
@@ -268,6 +271,7 @@ export default function Page() {
       // Persist analise + massivas (best-effort)
       try {
         const { data: userData } = await supabase.auth.getUser();
+        setAnaliseUsuario(userData.user?.user_metadata?.name ?? userData.user?.email ?? null);
         const currentPayload = { file1, file2, result: r, filters };
         localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify(currentPayload));
         await (supabase as any).from("analise_resultado_atual").upsert({
@@ -522,6 +526,12 @@ export default function Page() {
           <>
             <span aria-hidden>›</span>
             <span className="font-mono">{result.stats.ultimaAtualizacao}</span>
+            {analiseUsuario && (
+              <>
+                <span aria-hidden>›</span>
+                <span className="font-mono truncate max-w-[200px]">{analiseUsuario}</span>
+              </>
+            )}
           </>
         )}
       </nav>
@@ -718,60 +728,6 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="lg:col-span-5 rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between gap-2 border-b border-border p-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-noc-green" />
-                  <h2 className="text-sm font-semibold uppercase tracking-wide">Registros ({filteredRows.length})</h2>
-                </div>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="outline" onClick={() => exportToCsv(processedRowsForExport(filteredRows), "registros.csv")}>CSV</Button>
-                  <Button size="sm" variant="outline" onClick={() => exportToXlsx(processedRowsForExport(filteredRows), "registros.xlsx")}><Download className="h-3.5 w-3.5" /> XLSX</Button>
-                </div>
-              </div>
-              <div className="max-h-[560px] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card">
-                    <tr className="border-b border-border text-left">
-                      <th className="px-3 py-2 font-semibold">Designação</th>
-                      <th className="px-3 py-2 font-semibold">UF</th>
-                      <th className="px-3 py-2 font-semibold">Operadora</th>
-                      <th className="px-3 py-2 font-semibold">Link</th>
-                      <th className="px-3 py-2 font-semibold">Chamado</th>
-                      <th className="px-3 py-2 font-semibold">Situação</th>
-                      <th className="px-3 py-2 font-semibold">Tipo Massiva</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRows.slice(0, 500).map((r) => {
-                      const ch = String(r["Chamado"] ?? "").trim();
-                      return (
-                        <tr key={r.__rowId} className="border-b border-border/50">
-                          <td className="px-3 py-2 font-mono truncate max-w-[140px]">{String(r["Designação"] ?? "")}</td>
-                          <td className="px-3 py-2 font-mono">{r.__uf}</td>
-                          <td className="px-3 py-2 font-mono">{r.__operadora}</td>
-                          <td className="px-3 py-2 font-mono">{r.__tipoLink}</td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {ch ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-noc-green/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-green">🟢 <span className="font-mono">{ch}</span></span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded bg-noc-red/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-red">🔴 SEM</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2"><SituacaoBadge situacao={r.__situacao} /></td>
-                          <td className="px-3 py-2"><MassivaBadge tipo={r["Tipo Massiva"]} /></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {filteredRows.length > 500 && (
-                  <div className="border-t border-border p-2 text-center text-[11px] text-muted-foreground">
-                    Mostrando 500 de {filteredRows.length} — use filtros ou exporte para ver tudo.
-                  </div>
-                )}
-              </div>
-            </div>
           </section>
         </>
       )}

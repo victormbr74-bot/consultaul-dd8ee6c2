@@ -264,7 +264,7 @@ async function clearControleVersion(dataReferencia: string, versao: number): Pro
   if (error) throw error;
 }
 
-async function getLatestStaging(tipo: Tipo): Promise<Row[]> {
+export async function getLatestStaging(tipo: Tipo): Promise<Row[]> {
   const { data: latest, error: latestError } = await supabase
     .from("staging_bases")
     .select("importacao_id, criado_em")

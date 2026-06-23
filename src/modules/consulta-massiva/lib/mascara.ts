@@ -20,7 +20,9 @@ export interface MascaraInput {
   links_envolvidos: Array<{ ip_loopback: string; designacao: string }>;
 }
 
-export const STATUS_PADRAO = "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";
+export const STATUS_PADRAO =
+  "A equipe de campo foi mobilizada para diagnosticar a causa raiz da interrupção no meio de transmissão.\n" +
+  "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";
 
 export const PROXIMO_STATUS_INTERVAL_HOURS = 4;
 
@@ -96,7 +98,7 @@ export function applyAtualizacaoToMascara(
     `Horário da falha: ${valueFromMask(lines, "Horário da falha:") || "PENDENTE"}`,
     `Horário de Normalização: ${valueFromMask(lines, "Horário de Normalização:") || "PENDENTE"}`,
     `Causa/Solução: ${valueFromMask(lines, "Causa/Solução:") || "PENDENTE"}`,
-    `Status: ${updateText}`,
+    `Status: ${updateText || STATUS_PADRAO}`,
     `Horas: ${proximoStatusLine(baseDate)}`,
     separator,
     "",
@@ -176,7 +178,7 @@ export function buildMascaraFromMassiva(
     horario_falha: m.primeiro_alarme,
     horario_normalizacao: "PENDENTE",
     causa_solucao: "PENDENTE",
-    status_texto: overrides.status_texto ?? "",
+    status_texto: overrides.status_texto ?? STATUS_PADRAO,
     atualizacao: overrides.atualizacao ?? "",
     lotericas_isoladas: m.lotericas_isoladas ?? [],
     links_envolvidos: linksEnvolvidos,

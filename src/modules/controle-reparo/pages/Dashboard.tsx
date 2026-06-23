@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { fetchAllControle, fetchControleDatas, fetchControleVersoes } from "@/modules/controle-reparo/lib/db";
+import { fetchAllControle, fetchControleDatas, fetchControleVersoes, getLatestStaging } from "@/modules/controle-reparo/lib/db";
 import {
   CONTROL_DATE_SESSION_KEY,
   CONTROL_VERSION_SESSION_KEY,
@@ -19,7 +19,9 @@ import {
   processingDate,
 } from "@/modules/controle-reparo/lib/date";
 import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
-import { isLinkBackup } from "@/modules/controle-reparo/lib/processing";
+import { isLinkBackup, normalizeIncidentValue } from "@/modules/controle-reparo/lib/processing";
+import type { Row } from "@/modules/controle-reparo/lib/parse";
+import { getVal, cleanText } from "@/modules/controle-reparo/lib/parse";
 import { FAIXAS, getFaixa } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
 import { DrillDownDialog, type DrillData } from "@/modules/controle-reparo/components/controle/DrillDownDialog";
@@ -35,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import {
   Activity,
+  AlertTriangle,
   CheckCircle2,
   ClipboardList,
   Download,
@@ -116,8 +119,35 @@ export default function DashboardPage() {
       >,
   });
 
+  const { data: jiraRows = [] } = useQuery({
+    queryKey: ["jira-staging"],
+    queryFn: () => getLatestStaging("jira"),
+  });
+
   const principalRows = useMemo(() => rows.filter((r) => !isLinkBackup(r.tipo_link)), [rows]);
   const backupRows = useMemo(() => rows.filter((r) => isLinkBackup(r.tipo_link)), [rows]);
+
+  const CLOSED_JIRA_STATUSES = new Set([
+    "FECHADO", "RESOLVIDO", "CANCELADO", "ENCERRADO", "CLOSED", "DONE", "RESOLVED", "CANCELLED",
+  ]);
+
+  const jiraIncStatusMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of jiraRows) {
+      const inc = normalizeIncidentValue(
+        getVal(r, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
+      );
+      if (!inc) continue;
+      const status = cleanText(getVal(r, "Status"));
+      if (!map.has(inc)) map.set(inc, status);
+    }
+    return map;
+  }, [jiraRows]);
+
+  function isJiraOpen(status: string | null | undefined): boolean {
+    const s = String(status ?? "").trim().toUpperCase();
+    return s.length > 0 && !CLOSED_JIRA_STATUSES.has(s);
+  }
 
   if (rows.length === 0 && datas && !datas.includes(dataRef)) {
     return (
@@ -213,7 +243,7 @@ function Indicadores({
   showLinks?: boolean;
   onOpen: (title: string, rows: ControleRow[]) => void;
 }) {
-  const g = useMemo(() => computeGroups(rows, fullRows), [rows, fullRows]);
+  const g = useMemo(() => computeGroups(rows, fullRows, jiraIncStatusMap), [rows, fullRows, jiraIncStatusMap]);
   const [selectedMetricKey, setSelectedMetricKey] = useState("ativos");
 
   const metrics = useMemo<Metric[]>(() => {
@@ -226,6 +256,13 @@ function Indicadores({
         rows: g.normalizados,
         icon: CheckCircle2,
         tone: "ok",
+      },
+      {
+        key: "normalizadosComInc",
+        label: "NORMALIZADOS COM INC",
+        rows: g.normalizadosComInc,
+        icon: AlertTriangle,
+        tone: "atencao",
       },
       {
         key: "aguardandoAberturaOs",
@@ -692,16 +729,24 @@ function isNormalizado(r: ControleRow): boolean {
   return r.status_normalizacao === "NORMALIZADO" || normTxt(r.status_planilha) === "NORMALIZADO";
 }
 
-function computeGroups(rows: ControleRow[], fullRows: ControleRow[]) {
+function computeGroups(rows: ControleRow[], fullRows: ControleRow[], jiraMap: Map<string, string>) {
   const ativos = rows.filter((r) => !isNormalizado(r));
   const normalizados = rows.filter(isNormalizado);
 
   const principalAll = fullRows.filter((r) => !isLinkBackup(r.tipo_link));
   const backupAll = fullRows.filter((r) => isLinkBackup(r.tipo_link));
 
+  const normalizadosComInc = normalizados.filter((r) => {
+    const inc = normalizeIncidentValue(r.chamado) || normalizeIncidentValue(r.inc_snow);
+    if (!inc) return false;
+    const jiraStatus = jiraMap.get(inc);
+    return isJiraOpen(jiraStatus);
+  });
+
   return {
     ativos,
     normalizados,
+    normalizadosComInc,
     reparo: ativos.filter((r) => isReparoLike(r)),
     aguardandoAberturaOs: ativos.filter((r) => isAguardandoAberturaOs(r)),
     migracaoEmAndamento: ativos.filter((r) => isMigracaoEmAndamento(r)),

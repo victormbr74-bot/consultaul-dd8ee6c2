@@ -187,8 +187,6 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
         </div>
       </DialogContent>
     </Dialog>
-    <MascaraOcorrenciaDialog open={mascaraOpen} onClose={() => setMascaraOpen(false)} massiva={massiva} rows={rows} />
-    </>
   );
 }
 

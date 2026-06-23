@@ -328,7 +328,7 @@ function htmlToPlain(d: MascaraInput): string {
     `Status: ${d.atualizacao || d.status_texto}`,
     `Horas: ${STATUS_PADRAO}`,
     "",
-    ...d.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),
+    ...(d.links_envolvidos.length ? d.links_envolvidos : d.lotericas_isoladas).map((l) => `${l.ip_loopback}\t${l.designacao}`),
   ].join("\n");
 }
 

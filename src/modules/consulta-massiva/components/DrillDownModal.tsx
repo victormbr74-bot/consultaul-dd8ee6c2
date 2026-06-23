@@ -45,9 +45,6 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
               {massiva.uf} · {massiva.operadora}
             </span>
             <div className="ml-auto flex gap-1">
-              <Button size="sm" onClick={() => setMascaraOpen(true)}>
-                <FileSignature className="h-4 w-4" /> Máscara
-              </Button>
               <Button size="sm" variant="outline" onClick={() => exportToXlsx(exportData, `${massiva.id_massiva}.xlsx`)}>
                 <Download className="h-4 w-4" /> XLSX
               </Button>

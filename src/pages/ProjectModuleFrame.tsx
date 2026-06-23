@@ -57,6 +57,7 @@ export default function ProjectModuleFrame() {
   if (!Page) {
     return <Navigate to="/" replace />;
   }
+  const pageOwnsScroll = projectId === "controle-reparo" && ["controle", "meus-casos"].includes(itemId);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
@@ -73,7 +74,7 @@ export default function ProjectModuleFrame() {
           Voltar
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className={`min-h-0 flex-1 ${pageOwnsScroll ? "overflow-hidden" : "overflow-auto"}`}>
         <Page />
       </div>
     </div>

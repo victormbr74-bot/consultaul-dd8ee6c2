@@ -51,7 +51,7 @@ const DEFEITOS_OEMP: Defeito[] = [
   { value: "LINK INTERMITENTE", desc: "LINK INTERMITENTE" },
   { value: "LINK ALTA LATENCIA", desc: "LINK COM ALTA LATENCIA, FAVOR ANALISAR" },
   { value: "LINK PERCA DE PACOTE", desc: "LINK COM PERCA DE PACOTE, FAVOR ANALISAR" },
-  { value: "ROTEADOR", desc: "FAVOR VERIFICAR O CABEAMENTO DA PORTA 1 OU 2 DO ROTEADOR." },
+  { value: "TROCA DE CPE", desc: "FAVOR VERIFICAR O CABEAMENTO DA PORTA 1 OU 2 DO CPE." },
   { value: "TROCA DE CHIP", desc: "FAVOR REALIZAR A TROCA DO CHIP DE OPERADO NA LOTERICA" },
 ];
 
@@ -466,10 +466,10 @@ NOME DA UL: ${nomeUl}
 ENDERECO UL: ${endereco}
 CONTATO: ${contato}
 HORARIO DE FUNCIONAMENTO: ${HORARIO_FUNCIONAMENTO_PADRAO}
-DEFEITO RECLAMADO: ${defeitoOemp}
+PROBLEMA: ${defeitoOemp}
 OPERADORA: ${operadora}
 SIM CARD: ${simCard}
-MODELO ROTEADOR: ${modeloRoteador}
+MODELO CPE: ${modeloRoteador}
 CEP: ${cep}
 MUNICIPIO/ESTADO: ${cidade} ${uf}
 RECLAMACAO INICIAL: ${defeitoOempDesc}
@@ -533,10 +533,10 @@ Contato de Autorizacao: ${contatoEnc}`;
     ["ENDERECO UL", endereco],
     ["CONTATO", contato],
     ["HORARIO DE FUNCIONAMENTO", HORARIO_FUNCIONAMENTO_PADRAO],
-    ["DEFEITO RECLAMADO", defeitoOemp],
+    ["PROBLEMA", defeitoOemp],
     ["OPERADORA", operadora],
     ["SIM CARD", simCard],
-    ["MODELO ROTEADOR", modeloRoteador],
+    ["MODELO CPE", modeloRoteador],
     ["CEP", cep],
     ["MUNICIPIO/ESTADO", `${cidade} ${uf}`],
     ["RECLAMACAO INICIAL", defeitoOempDesc],
@@ -831,7 +831,7 @@ Contato de Autorizacao: ${contatoEnc}`;
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
-              label="Defeito Reclamado"
+              label="Problema"
               options={DEFEITOS_OEMP}
               value={defeitoOemp}
               onChange={setDefeitoOemp}

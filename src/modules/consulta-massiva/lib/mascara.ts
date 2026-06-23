@@ -79,7 +79,10 @@ export function applyAtualizacaoToMascara(
     separator,
     "",
     ...links,
-  ].join("\n");
+  ]
+    .join("\n")
+    .replace(/^Evento Massivo - .*$/m, "Evento Massivo - ATUALIZAÇÃO")
+    .replace(/^Chamado interno : -$/m, "Chamado interno : PENDENTE");
 }
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -132,7 +135,7 @@ export function buildMascaraFromMassiva(
 ): MascaraInput {
   const participants = firstAlarmRows(m, rows);
   const first = participants[0];
-  const designacao = resolveDesignacao(first);
+  const tituloEvento = base.atualizacao ? "ATUALIZAÇÃO" : "ABERTURA";
   const chamadoInterno = resolveInc(participants);
   const casoCodigo = resolveCasoCodigo(participants);
   return {
@@ -166,8 +169,6 @@ export function buildMascaraTextoFromMassiva(
   rows: ProcessedRow[],
   overrides: Partial<MascaraInput> = {},
 ): string {
-  const participants = firstAlarmRows(m, rows);
-  const first = participants[0];
   const base = buildMascaraFromMassiva(m, rows, {
     cliente: "CAIXA ECONÔMICA",
     ...overrides,
@@ -178,7 +179,7 @@ export function buildMascaraTextoFromMassiva(
   return [
     "===============================",
     "CONSÓRCIO LOTÉRICAS ",
-    "Evento Massivo - Chamado Aberto",
+    `Evento Massivo - ${tituloEvento}`,
     "===============================",
     `Cliente: ${base.cliente ?? ""}`,
     `Chamado interno : ${base.chamado_interno}`,
@@ -190,8 +191,8 @@ export function buildMascaraTextoFromMassiva(
     `Horário da falha: ${base.horario_falha}`,
     `Horário de Normalização: ${base.horario_normalizacao}`,
     `Causa/Solução: ${base.causa_solucao}`,
-    `Status: ${base.atualizacao || base.status_texto}`,
-    `Horas: ${STATUS_PADRAO}`,
+    `Status: ${base.atualizacao || base.status_texto || "PENDENTE"}`,
+    `Horas: ${proximoStatusLine()}`,
     "===============================",
     "",
     ...base.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),

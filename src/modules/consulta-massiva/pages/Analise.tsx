@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, AlertOctagon, AlertTriangle, Building2, CheckCircle2, Download, FileSignature, FileText, Flame, Globe2,
+  Activity, AlertOctagon, AlertTriangle, Building2, CheckCircle2, Download, FileText, Flame, Globe2,
   HelpCircle, MapPin, Network, Play, Radar, RadioTower, Shield, ShieldOff, Trash2, XCircle, SlidersHorizontal,
 } from "lucide-react";
 import { UploadCard } from "@/modules/consulta-massiva/components/UploadCard";
@@ -9,7 +9,6 @@ import { StatCard } from "@/modules/consulta-massiva/components/StatCard";
 import { MassivaBadge } from "@/modules/consulta-massiva/components/MassivaBadge";
 import { SituacaoBadge } from "@/modules/consulta-massiva/components/SituacaoBadge";
 import { DrillDownModal } from "@/modules/consulta-massiva/components/DrillDownModal";
-import { MascaraOcorrenciaDialog } from "@/modules/consulta-massiva/components/MascaraOcorrenciaDialog";
 import { FiltersBar, emptyFilters, type Filters } from "@/modules/consulta-massiva/components/FiltersBar";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -174,7 +173,6 @@ export default function Page() {
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [drill, setDrill] = useState<Massiva | null>(null);
-  const [mascara, setMascara] = useState<Massiva | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -187,10 +185,10 @@ export default function Page() {
   const escMap = useMemo(() => buildEscalonamentoMap(escQ.data ?? []), [escQ.data]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(ANALISE_STORAGE_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as {
+    let cancelled = false;
+    const applySaved = (payload: unknown) => {
+      if (cancelled || !payload) return;
+      const parsed = payload as {
         file1?: LoadedFile;
         file2?: LoadedFile;
         result?: ProcessResult | null;
@@ -200,9 +198,35 @@ export default function Page() {
       setFile2(parsed.file2 ?? null);
       setResult(parsed.result ?? null);
       setFilters(parsed.filters ?? emptyFilters);
-    } catch (e) {
-      console.warn("failed to restore saved massiva analysis", e);
-    }
+    };
+
+    const loadSaved = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("analise_resultado_atual")
+          .select("payload")
+          .eq("id", "current")
+          .maybeSingle();
+        if (!error && data?.payload) {
+          applySaved(data.payload);
+          return;
+        }
+      } catch (e) {
+        console.warn("failed to restore massiva analysis from database", e);
+      }
+
+      try {
+        const saved = localStorage.getItem(ANALISE_STORAGE_KEY);
+        if (saved) applySaved(JSON.parse(saved));
+      } catch (e) {
+        console.warn("failed to restore saved massiva analysis", e);
+      }
+    };
+
+    void loadSaved();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -244,6 +268,14 @@ export default function Page() {
       // Persist analise + massivas (best-effort)
       try {
         const { data: userData } = await supabase.auth.getUser();
+        const currentPayload = { file1, file2, result: r, filters };
+        localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify(currentPayload));
+        await (supabase as any).from("analise_resultado_atual").upsert({
+          id: "current",
+          payload: currentPayload,
+          updated_by: userData.user?.id ?? null,
+          updated_at: new Date().toISOString(),
+        });
         const { data: analise } = await supabase.from("analises").insert({
           executado_por: userData.user?.id ?? null,
           total_registros: r.stats.totalRegistros,
@@ -470,6 +502,7 @@ export default function Page() {
     setResult(null);
     setFilters(emptyFilters);
     localStorage.removeItem(ANALISE_STORAGE_KEY);
+    void (supabase as any).from("analise_resultado_atual").delete().eq("id", "current");
   };
 
   const opsCount = operadorasConsultaUl.length;
@@ -607,7 +640,7 @@ export default function Page() {
           </Collapsible>
 
           <section className="grid gap-6 lg:grid-cols-5">
-            <div className="lg:col-span-3 rounded-xl border border-border bg-card">
+            <div className="lg:col-span-5 rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between gap-2 border-b border-border p-3">
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-noc-blue" />
@@ -665,8 +698,17 @@ export default function Page() {
                         <td className="px-3 py-2 font-mono text-muted-foreground">{m.ultimo_alarme}</td>
                         <td className="px-3 py-2 text-right font-mono">{m.janela_minutos}m</td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); setMascara(m); }}>
-                            <FileSignature className="h-3.5 w-3.5" />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(m.mascara_texto ?? "");
+                              toast.success("Mascara copiada");
+                            }}
+                          >
+                            Copiar
                           </Button>
                         </td>
                       </tr>
@@ -676,49 +718,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="lg:col-span-3 rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between gap-2 border-b border-border p-3">
-                <div className="flex items-center gap-2">
-                  <FileSignature className="h-4 w-4 text-noc-blue" />
-                  <h2 className="text-sm font-semibold uppercase tracking-wide">Mascara de massiva</h2>
-                </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {filteredMassivas.length} gerada{filteredMassivas.length === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="space-y-3 p-3">
-                {filteredMassivas.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-                    Nenhuma mascara gerada porque nao ha massiva detectada no filtro atual.
-                  </div>
-                ) : (
-                  filteredMassivas.map((m) => (
-                    <div key={m.id_massiva} className="space-y-2">
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-mono font-semibold">{m.id_massiva}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            navigator.clipboard.writeText(m.mascara_texto ?? "");
-                            toast.success("Mascara copiada");
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                      <textarea
-                        className="h-80 w-full resize-y rounded-md border border-input bg-background p-3 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        readOnly
-                        value={m.mascara_texto ?? ""}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="lg:col-span-2 rounded-xl border border-border bg-card">
+            <div className="lg:col-span-5 rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between gap-2 border-b border-border p-3">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 text-noc-green" />
@@ -792,12 +792,6 @@ export default function Page() {
         escalonamento={drill?.parceira ? escMap.get(drill.parceira.toUpperCase()) ?? null : null}
       />
 
-      <MascaraOcorrenciaDialog
-        open={!!mascara}
-        onClose={() => setMascara(null)}
-        massiva={mascara}
-        rows={result?.rows ?? []}
-      />
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent className="max-w-lg">

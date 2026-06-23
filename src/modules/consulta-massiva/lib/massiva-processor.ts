@@ -534,17 +534,20 @@ export function processGis(
       const ip = clean(r["IP Loopback"] ?? r.__ipLoopback);
       const desig = clean(r["Designação"] ?? r.__designacao);
       if (!ip) continue;
-      if ((m.tipo_link === "PRINCIPAL" && isPrincipalOut(r)) || (m.tipo_link === "SECUNDARIO" && isBackupOut(r))) {
+      if (false && ((m.tipo_link === "PRINCIPAL" && isPrincipalOut(r)) || (m.tipo_link === "SECUNDARIO" && isBackupOut(r)))) {
         if (desig && !isolatedInMassiva.has(ip)) isolatedInMassiva.set(ip, desig);
       }
     }
     for (const [cod, links] of lotericaLinks) {
       if (isolatedInMassiva.has(cod)) continue;
-      const candidateIdxs = m.tipo_link === "PRINCIPAL" ? links.principal : links.backup;
+      const massivaIdxs = m.tipo_link === "PRINCIPAL" ? links.principal : links.backup;
+      const hasThisLinkInMassiva = Array.from(massivaIdxs).some((idx) => rowIds.has(rows[idx]?.__rowId));
+      if (!hasThisLinkInMassiva) continue;
+      const candidateIdxs = m.tipo_link === "PRINCIPAL" ? links.backup : links.principal;
       const matchIdx = Array.from(candidateIdxs).find((idx) => {
         const r = rows[idx];
         if (!r || r.__uf !== m.uf) return false;
-        if (rowIds.has(r.__rowId)) return true;
+        if (rowIds.has(r.__rowId)) return false;
         return Number.isFinite(r.__ts) && r.__ts >= m.primeiro_ts && r.__ts <= m.ultimo_ts;
       });
       if (matchIdx != null) {
@@ -584,7 +587,7 @@ export function processGis(
       rows.filter((r) => r["Status Massiva"] === "MASSIVA").map((r) => r.__uf),
     ).size,
     naoIdentificados: rows.filter((r) => r.__classificacao === "NAO_IDENTIFICADO").length,
-    lotericasIsoladas: codigosIsolados.size,
+    lotericasIsoladas: lotericasIsoladasDetalhe.length,
     circuitosIsolados: rows.filter((r) => r.__situacao === "ISOLADO").length,
     ultimaAtualizacao: formatDateBR(Date.now()),
     geo: geoStats,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/modules/controle-reparo/hooks/use-auth";
@@ -510,6 +510,9 @@ export default function ControlePage() {
 
 export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}) {
   const { canWrite, isAdmin, nome } = useAuth();
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomScrollRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
   const [rows, setRows] = useState<RowT[]>([]);
   const [dataRef, setDataRef] = useState<string>(() => initialDataRef());
   const [versao, setVersao] = useState<number | null>(() => initialVersion());
@@ -775,6 +778,45 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
     [dataRef, datas],
   );
 
+  useEffect(() => {
+    const tableScroll = tableScrollRef.current;
+    const bottomScroll = bottomScrollRef.current;
+    const table = tableRef.current;
+    if (!tableScroll || !bottomScroll || !table) return;
+
+    let syncing = false;
+    const syncBottomSize = () => {
+      const spacer = bottomScroll.firstElementChild as HTMLDivElement | null;
+      if (spacer) spacer.style.width = `${table.scrollWidth}px`;
+      bottomScroll.scrollLeft = tableScroll.scrollLeft;
+    };
+    const onTableScroll = () => {
+      if (syncing) return;
+      syncing = true;
+      bottomScroll.scrollLeft = tableScroll.scrollLeft;
+      syncing = false;
+    };
+    const onBottomScroll = () => {
+      if (syncing) return;
+      syncing = true;
+      tableScroll.scrollLeft = bottomScroll.scrollLeft;
+      syncing = false;
+    };
+
+    syncBottomSize();
+    tableScroll.addEventListener("scroll", onTableScroll, { passive: true });
+    bottomScroll.addEventListener("scroll", onBottomScroll, { passive: true });
+    const resizeObserver = new ResizeObserver(syncBottomSize);
+    resizeObserver.observe(table);
+    resizeObserver.observe(tableScroll);
+
+    return () => {
+      tableScroll.removeEventListener("scroll", onTableScroll);
+      bottomScroll.removeEventListener("scroll", onBottomScroll);
+      resizeObserver.disconnect();
+    };
+  }, [visibleColumns.length, pageRows.length, st.hiddenColumns]);
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-card px-4 py-4 sm:px-6">
@@ -906,8 +948,18 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-        <table className="w-max min-w-full border-separate border-spacing-0 border border-border text-sm">
+      <div
+        ref={tableScrollRef}
+        onWheel={(event) => {
+          const el = tableScrollRef.current;
+          if (!el || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+          const before = el.scrollTop;
+          el.scrollTop += event.deltaY;
+          if (el.scrollTop !== before) event.stopPropagation();
+        }}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-auto [scrollbar-gutter:stable]"
+      >
+        <table ref={tableRef} className="w-max min-w-full border-separate border-spacing-0 border border-border text-sm">
           <thead className="sticky top-0 z-10 bg-secondary text-secondary-foreground shadow-sm">
             <tr className="[&>th]:whitespace-nowrap [&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
               <th className="min-w-12 w-12"></th>
@@ -974,8 +1026,9 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
       </div>
 
       {/* Paginação (item 5 — página atual persistida) */}
+      <div className="shrink-0 border-t bg-card">
       {filteredRows.length > PAGE_SIZE && (
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t bg-card px-4 py-2 text-sm sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6">
           <span className="text-muted-foreground">
             {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredRows.length)} de{" "}
             {filteredRows.length}
@@ -1003,6 +1056,15 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
           </div>
         </div>
       )}
+
+      <div
+        ref={bottomScrollRef}
+        className="overflow-x-auto overflow-y-hidden border-t border-border/70"
+        aria-label="Rolagem horizontal da tabela"
+      >
+        <div className="h-4" />
+      </div>
+      </div>
 
       <HistoricoDialog
         codigo={histCodigo}

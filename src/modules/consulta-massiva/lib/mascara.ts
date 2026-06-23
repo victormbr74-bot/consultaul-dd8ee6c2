@@ -158,6 +158,12 @@ export function buildMascaraFromMassiva(
   const designacao = resolveDesignacao(first);
   const chamadoInterno = resolveInc(participants);
   const casoCodigo = resolveCasoCodigo(participants);
+  const linksEnvolvidos = participants
+    .map((r) => ({
+      ip_loopback: clean(r["IP Loopback"]),
+      designacao: clean(r["Designação"] ?? r["DesignaÃ§Ã£o"]),
+    }))
+    .filter((l) => l.ip_loopback || l.designacao);
   return {
     cliente: "CAIXA ECONOMICA",
     inc_massiva: resolveInc(participants),
@@ -173,6 +179,7 @@ export function buildMascaraFromMassiva(
     status_texto: overrides.status_texto ?? "",
     atualizacao: overrides.atualizacao ?? "",
     lotericas_isoladas: m.lotericas_isoladas ?? [],
+    links_envolvidos: linksEnvolvidos,
     ...overrides,
   };
 }

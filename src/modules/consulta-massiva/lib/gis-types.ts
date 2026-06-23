@@ -96,4 +96,5 @@ export interface Massiva {
   qtd_cidades_afetadas?: number;
   cidades_afetadas?: Array<{ cidade: string; uf: string; qtd: number }>;
   mascara_texto?: string;
+  atualizacao?: string;
 }

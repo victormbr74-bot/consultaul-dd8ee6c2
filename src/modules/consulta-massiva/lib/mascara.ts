@@ -174,7 +174,7 @@ export function buildMascaraTextoFromMassiva(
     ...overrides,
   });
   const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
-  const designacao = resolveDesignacao(first);
+  const tituloEvento = base.atualizacao ? "ATUALIZAÇÃO" : "ABERTURA";
 
   return [
     "===============================",

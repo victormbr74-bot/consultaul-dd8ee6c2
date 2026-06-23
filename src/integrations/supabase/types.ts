@@ -119,6 +119,27 @@ export type Database = {
         }
         Relationships: []
       }
+      analise_resultado_atual: {
+        Row: {
+          id: string
+          payload: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          payload?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       analises: {
         Row: {
           arquivo_1link: string | null
@@ -1292,14 +1313,14 @@ export type Database = {
           analise_id: string | null
           atualizacao: string | null
           chamado: string | null
-          created_at: string
+          cidade_epicentro: string | null
           circuito_pai: string | null
           consorcio_ul: string
+          created_at: string
           data_hora_abertura: string | null
           data_hora_normalizacao: string | null
           id: string
           id_massiva: string
-          cidade_epicentro: string | null
           inc: string | null
           mascara_texto: string | null
           operadora: string
@@ -1319,14 +1340,14 @@ export type Database = {
           analise_id?: string | null
           atualizacao?: string | null
           chamado?: string | null
-          created_at?: string
+          cidade_epicentro?: string | null
           circuito_pai?: string | null
           consorcio_ul?: string
+          created_at?: string
           data_hora_abertura?: string | null
           data_hora_normalizacao?: string | null
           id?: string
           id_massiva: string
-          cidade_epicentro?: string | null
           inc?: string | null
           mascara_texto?: string | null
           operadora?: string
@@ -1346,14 +1367,14 @@ export type Database = {
           analise_id?: string | null
           atualizacao?: string | null
           chamado?: string | null
-          created_at?: string
+          cidade_epicentro?: string | null
           circuito_pai?: string | null
           consorcio_ul?: string
+          created_at?: string
           data_hora_abertura?: string | null
           data_hora_normalizacao?: string | null
           id?: string
           id_massiva?: string
-          cidade_epicentro?: string | null
           inc?: string | null
           mascara_texto?: string | null
           operadora?: string

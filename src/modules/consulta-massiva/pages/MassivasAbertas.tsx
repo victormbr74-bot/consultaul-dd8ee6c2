@@ -298,7 +298,7 @@ export default function MassivasAbertas() {
   const copy = async (m: MassivaRecord) => {
     const atualizacao = valueFor(m, "atualizacao");
     if (m.mascara_texto) {
-      const text = applyAtualizacaoToMascara(m.mascara_texto, atualizacao);
+      const text = applyAtualizacaoToMascara(m.mascara_texto, atualizacao, new Date());
       await navigator.clipboard.writeText(text);
       toast.success("Mascara copiada");
       return;
@@ -308,21 +308,23 @@ export default function MassivasAbertas() {
     const tipoEvento = m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal";
     const caso = `${m.inc ?? m.chamado ?? "PENDENTE"} | Evento Massivo ${tipoEvento} | | ${m.circuito_pai ?? "-"}`;
     const chamadoInterno = m.chamado ?? m.inc ?? "PENDENTE";
-    const isoladas = (m.massiva_circuitos ?? [])
+    const isoladasRaw = (m.massiva_circuitos ?? [])
       .filter((c) => c.ip_loopback)
-      .map((c) => `${c.ip_loopback}\t${c.designacao ?? m.circuito_pai ?? "-"}`);
+      .map((c) => ({ ip_loopback: c.ip_loopback ?? "", designacao: c.designacao ?? m.circuito_pai ?? "-" }));
+    const maxIp = isoladasRaw.reduce((acc, l) => Math.max(acc, l.ip_loopback.length), 0);
+    const isoladas = isoladasRaw.map((l) => `${l.ip_loopback.padEnd(maxIp + 3, " ")}${l.designacao}`);
 
     const text = [
       "===============================",
-      "CONSÓRCIO LOTÉRICAS ",
+      "CONSÓRCIO LOTÉRICAS",
       "Evento Massivo - ATUALIZAÇÃO",
       "===============================",
       `Cliente: CAIXA ECONÔMICA`,
-      `Chamado interno : ${chamadoInterno}`,
+      `Chamado interno: ${chamadoInterno}`,
       `Caso: ${caso}`,
       `Tipo: ${tipoLabel}`,
       `UF: ${m.uf}`,
-      `Quantidade Isoladas:${String(m.qtd_lotericas_isoladas).padStart(2, "0")}`,
+      `Quantidade Isoladas: ${String(m.qtd_lotericas_isoladas).padStart(2, "0")}`,
       `Quantidade total: ${String(m.qtd_circuitos).padStart(2, "0")}`,
       `Horário da falha: ${m.primeiro_alarme ?? m.data_hora_abertura ?? "PENDENTE"}`,
       `Horário de Normalização: ${m.data_hora_normalizacao ?? "PENDENTE"}`,
@@ -336,6 +338,7 @@ export default function MassivasAbertas() {
     await navigator.clipboard.writeText(text);
     toast.success("Mascara copiada");
   };
+
 
   const valueFor = (row: MassivaRecord, field: EditableField): string => {
     const base = editStateFrom(row);

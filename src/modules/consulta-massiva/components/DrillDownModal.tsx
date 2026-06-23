@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +10,8 @@ import type { DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
 import { MassivaBadge } from "./MassivaBadge";
 import { SituacaoBadge } from "./SituacaoBadge";
 import { Sinalizacao60kmBadge } from "./Sinalizacao60kmBadge";
-import { MascaraOcorrenciaDialog } from "./MascaraOcorrenciaDialog";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Mail, Phone, ShieldAlert, AlertOctagon, MapPin, FileSignature } from "lucide-react";
+import { Download, FileText, Mail, Phone, ShieldAlert, AlertOctagon, MapPin } from "lucide-react";
 import { exportToPdf, exportToXlsx, processedRowsForExport } from "@/modules/consulta-massiva/lib/excel";
 import { SINALIZACAO_MSG } from "@/modules/consulta-massiva/lib/geo";
 

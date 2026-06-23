@@ -135,7 +135,7 @@ export function buildMascaraFromMassiva(
 ): MascaraInput {
   const participants = firstAlarmRows(m, rows);
   const first = participants[0];
-  const tituloEvento = base.atualizacao ? "ATUALIZAÇÃO" : "ABERTURA";
+  const designacao = resolveDesignacao(first);
   const chamadoInterno = resolveInc(participants);
   const casoCodigo = resolveCasoCodigo(participants);
   return {

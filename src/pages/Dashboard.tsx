@@ -60,7 +60,10 @@ const parseCodUlTerms = (value: string) => {
   return result;
 };
 
-const buildDashboardSearchFilter = (value: string) => {
+const buildDashboardSearchFilter = (
+  value: string,
+  extraColumns: string[] = []
+) => {
   const term = String(value || "").trim();
   if (!term) return "";
 
@@ -72,8 +75,9 @@ const buildDashboardSearchFilter = (value: string) => {
   for (const candidate of buildCircuitSearchVariants(term)) {
     filters.add(`ccto_oi.ilike.%${candidate}%`);
     filters.add(`ccto_oemp.ilike.%${candidate}%`);
-    filters.add(`cpe_meraki.ilike.%${candidate}%`);
-    filters.add(`circuito_elsys.ilike.%${candidate}%`);
+    for (const col of extraColumns) {
+      filters.add(`${col}.ilike.%${candidate}%`);
+    }
   }
 
   for (const candidate of buildCodUlSearchVariants(term)) {
@@ -218,6 +222,46 @@ const Dashboard = () => {
   const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const search = sidebarSearch;
+  const extraSearchColumnsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkColumn = async (column: string) => {
+      const { error } = await supabase
+        .from("lotericas")
+        .select(column)
+        .limit(1);
+
+      if (cancelled) return false;
+
+      if (error && error.code === "42703") {
+        return false;
+      }
+
+      return true;
+    };
+
+    const detectExtraColumns = async () => {
+      const [hasCpeMeraki, hasCircuitoElsys] = await Promise.all([
+        checkColumn("cpe_meraki"),
+        checkColumn("circuito_elsys"),
+      ]);
+
+      if (cancelled) return;
+
+      extraSearchColumnsRef.current = [
+        ...(hasCpeMeraki ? ["cpe_meraki"] : []),
+        ...(hasCircuitoElsys ? ["circuito_elsys"] : []),
+      ];
+    };
+
+    void detectExtraColumns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchLotericas = useCallback(async () => {
     const term = search.trim();
@@ -248,7 +292,10 @@ const Dashboard = () => {
         }
       }
 
-      const orFilter = buildDashboardSearchFilter(term);
+      const orFilter = buildDashboardSearchFilter(
+        term,
+        extraSearchColumnsRef.current
+      );
       const query = supabase.from("lotericas").select("*", { count: "exact" }).or(orFilter);
 
       const { data, count, error } = await query
@@ -318,7 +365,10 @@ const Dashboard = () => {
         return;
       }
 
-      const orFilter = buildDashboardSearchFilter(singleTerm);
+      const orFilter = buildDashboardSearchFilter(
+        singleTerm,
+        extraSearchColumnsRef.current
+      );
       const { data, error } = await supabase
         .from("lotericas")
         .select("cod_ul")

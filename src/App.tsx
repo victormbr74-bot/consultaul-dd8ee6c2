@@ -72,7 +72,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <SidebarActionsProvider>
       <SidebarProvider>
-        <div className="flex h-dvh max-h-dvh w-full overflow-hidden">
+        <div className="flex h-dvh max-h-dvh w-full">
           <AppSidebar />
           <div className="flex-1 min-h-0 min-w-0 flex flex-col">
             <header className="sticky top-0 z-50 h-12 shrink-0 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4">
@@ -85,7 +85,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
               </div>
               <ThemeHeaderActions />
             </header>
-            <main className="min-h-0 flex-1 min-w-0 overflow-hidden">{children ?? <Outlet />}</main>
+            <main className="min-h-0 flex-1 min-w-0 overflow-y-auto">{children ?? <Outlet />}</main>
           </div>
         </div>
       </SidebarProvider>

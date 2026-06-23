@@ -21,13 +21,16 @@ export interface MascaraInput {
 
 export const STATUS_PADRAO = "2 horas para equipe diagnosticar a causa da falha e deslocar a equipe de campo.";
 
-export function proximoStatusLine(baseDate = new Date()): string {
-  const next = new Date(baseDate.getTime() + 2 * 60 * 60 * 1000);
+export const PROXIMO_STATUS_INTERVAL_HOURS = 4;
+
+export function proximoStatusLine(baseDate: Date = new Date()): string {
+  const next = new Date(baseDate.getTime() + PROXIMO_STATUS_INTERVAL_HOURS * 60 * 60 * 1000);
   const p = (n: number) => String(n).padStart(2, "0");
-  return `proximo status em ${p(next.getDate())}/${p(next.getMonth() + 1)}/${next.getFullYear()} as  ${p(next.getHours())}:${p(next.getMinutes())}:${p(next.getSeconds())}`;
+  return `Próximo Status em ${p(next.getDate())}/${p(next.getMonth() + 1)}/${next.getFullYear()} às ${p(next.getHours())}:${p(next.getMinutes())}:${p(next.getSeconds())}`;
 }
 
 export const proxStatus = proximoStatusLine;
+
 
 function valueFromMask(lines: string[], label: string): string {
   const found = lines.find((line) => line.trim().toLowerCase().startsWith(label.toLowerCase()));
@@ -42,18 +45,36 @@ function padMaskQty(value: string): string {
   return numeric ? numeric.padStart(2, "0") : cleanValue;
 }
 
+function formatIpList(items: Array<{ ip_loopback: string; designacao: string }>): string[] {
+  const maxIp = items.reduce((acc, l) => Math.max(acc, (l.ip_loopback ?? "").length), 0);
+  return items.map((l) => `${(l.ip_loopback ?? "").padEnd(maxIp + 3, " ")}${l.designacao ?? ""}`);
+}
+
+function alignIpLines(lines: string[]): string[] {
+  const parsed = lines
+    .map((line) => {
+      const m = line.match(/^\s*(\S+)[\s\t]+(.+)$/);
+      return m ? { ip_loopback: m[1], designacao: m[2].trim() } : null;
+    })
+    .filter((v): v is { ip_loopback: string; designacao: string } => !!v);
+  if (parsed.length === 0) return lines;
+  return formatIpList(parsed);
+}
+
 export function applyAtualizacaoToMascara(
   mascaraTexto: string | null | undefined,
   atualizacao: string,
+  baseDate: Date = new Date(),
 ): string {
-  const updateText = String(atualizacao ?? "").trim();
+  const updateText = String(atualizacao ?? "");
   const lines = String(mascaraTexto ?? "").split(/\r?\n/);
   const separator = "===============================";
   const separatorIndexes = lines
     .map((line, index) => (line.trim() === separator ? index : -1))
     .filter((index) => index >= 0);
   const lastSeparator = separatorIndexes.at(-1) ?? -1;
-  const links = lastSeparator >= 0 ? lines.slice(lastSeparator + 1).map((line) => line.trim()).filter(Boolean) : [];
+  const rawLinks = lastSeparator >= 0 ? lines.slice(lastSeparator + 1).map((line) => line.trim()).filter(Boolean) : [];
+  const links = alignIpLines(rawLinks);
   const oldCaso =
     valueFromMask(lines, "Caso:") ||
     lines.find((line) => /\|\s*Evento Massivo\s+/i.test(line) && !line.trim().startsWith("Caso:"))?.trim() ||
@@ -61,29 +82,27 @@ export function applyAtualizacaoToMascara(
 
   return [
     separator,
-    "CONSÓRCIO LOTÉRICAS ",
+    "CONSÓRCIO LOTÉRICAS",
     "Evento Massivo - ATUALIZAÇÃO",
     separator,
     `Cliente: ${valueFromMask(lines, "Cliente:") || "CAIXA ECONÔMICA"}`,
-    `Chamado interno : ${valueFromMask(lines, "Chamado interno") || "-"}`,
+    `Chamado interno: ${valueFromMask(lines, "Chamado interno") || "PENDENTE"}`,
     `Caso: ${oldCaso.replace(/\s*\|\s*NA\s*$/i, "")}`,
     `Tipo: ${valueFromMask(lines, "Tipo:") || "PRIMÁRIO"}`,
     `UF: ${valueFromMask(lines, "UF:") || "-"}`,
-    `Quantidade Isoladas:${padMaskQty(valueFromMask(lines, "Quantidade Isoladas:") || "0")}`,
+    `Quantidade Isoladas: ${padMaskQty(valueFromMask(lines, "Quantidade Isoladas:") || "0")}`,
     `Quantidade total: ${padMaskQty(valueFromMask(lines, "Quantidade total:") || "0")}`,
     `Horário da falha: ${valueFromMask(lines, "Horário da falha:") || "PENDENTE"}`,
     `Horário de Normalização: ${valueFromMask(lines, "Horário de Normalização:") || "PENDENTE"}`,
     `Causa/Solução: ${valueFromMask(lines, "Causa/Solução:") || "PENDENTE"}`,
     `Status: ${updateText}`,
-    `Horas: ${proximoStatusLine()}`,
+    `Horas: ${proximoStatusLine(baseDate)}`,
     separator,
     "",
     ...links,
-  ]
-    .join("\n")
-    .replace(/^Evento Massivo - .*$/m, "Evento Massivo - ATUALIZAÇÃO")
-    .replace(/^Chamado interno : -$/m, "Chamado interno : PENDENTE");
+  ].join("\n");
 }
+
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
@@ -175,29 +194,32 @@ export function buildMascaraTextoFromMassiva(
   });
   const tipoLabel = m.tipo_link === "SECUNDARIO" ? "SECUNDÁRIO" : "PRIMÁRIO";
   const tituloEvento = base.atualizacao ? "ATUALIZAÇÃO" : "ABERTURA";
+  const parsedFalha = base.horario_falha ? new Date(base.horario_falha) : null;
+  const horasBase = parsedFalha && !isNaN(parsedFalha.getTime()) ? parsedFalha : new Date();
 
   return [
     "===============================",
-    "CONSÓRCIO LOTÉRICAS ",
+    "CONSÓRCIO LOTÉRICAS",
     `Evento Massivo - ${tituloEvento}`,
     "===============================",
     `Cliente: ${base.cliente ?? ""}`,
-    `Chamado interno : ${base.chamado_interno}`,
+    `Chamado interno: ${base.chamado_interno}`,
     `Caso: ${base.caso}`,
     `Tipo: ${tipoLabel}`,
     `UF: ${base.uf_label}`,
-    `Quantidade Isoladas:${padQty(base.qtd_isoladas)}`,
+    `Quantidade Isoladas: ${padQty(base.qtd_isoladas)}`,
     `Quantidade total: ${padQty(base.qtd_total)}`,
     `Horário da falha: ${base.horario_falha}`,
     `Horário de Normalização: ${base.horario_normalizacao}`,
     `Causa/Solução: ${base.causa_solucao}`,
     `Status: ${base.atualizacao || base.status_texto || "PENDENTE"}`,
-    `Horas: ${proximoStatusLine()}`,
+    `Horas: ${proximoStatusLine(horasBase)}`,
     "===============================",
     "",
-    ...base.lotericas_isoladas.map((l) => `${l.ip_loopback}\t${l.designacao}`),
+    ...formatIpList(base.lotericas_isoladas),
   ].join("\n");
 }
+
 
 
 export function buildMascaraHtml(d: MascaraInput): string {

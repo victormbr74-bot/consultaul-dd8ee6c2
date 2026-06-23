@@ -224,7 +224,7 @@ export function buildMascaraTextoFromMassiva(
     `Horas: ${proximoStatusLine(horasBase)}`,
     "===============================",
     "",
-    ...formatIpList(base.lotericas_isoladas),
+    ...formatIpList(base.links_envolvidos.length ? base.links_envolvidos : base.lotericas_isoladas),
   ].join("\n");
 }
 

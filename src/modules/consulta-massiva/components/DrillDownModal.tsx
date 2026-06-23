@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +10,8 @@ import type { DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
 import { MassivaBadge } from "./MassivaBadge";
 import { SituacaoBadge } from "./SituacaoBadge";
 import { Sinalizacao60kmBadge } from "./Sinalizacao60kmBadge";
-import { MascaraOcorrenciaDialog } from "./MascaraOcorrenciaDialog";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Mail, Phone, ShieldAlert, AlertOctagon, MapPin, FileSignature } from "lucide-react";
+import { Download, FileText, Mail, Phone, ShieldAlert, AlertOctagon, MapPin } from "lucide-react";
 import { exportToPdf, exportToXlsx, processedRowsForExport } from "@/modules/consulta-massiva/lib/excel";
 import { SINALIZACAO_MSG } from "@/modules/consulta-massiva/lib/geo";
 
@@ -26,14 +24,12 @@ interface Props {
 }
 
 export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: Props) {
-  const [mascaraOpen, setMascaraOpen] = useState(false);
   if (!massiva) return null;
   const set = new Set(massiva.rowIds);
   const matching = rows.filter((r) => set.has(r.__rowId));
   const exportData = processedRowsForExport(matching);
 
   return (
-    <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
 
       <DialogContent className="max-w-[95vw] max-h-[92vh] flex flex-col p-0 gap-0">
@@ -45,9 +41,6 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
               {massiva.uf} · {massiva.operadora}
             </span>
             <div className="ml-auto flex gap-1">
-              <Button size="sm" onClick={() => setMascaraOpen(true)}>
-                <FileSignature className="h-4 w-4" /> Máscara
-              </Button>
               <Button size="sm" variant="outline" onClick={() => exportToXlsx(exportData, `${massiva.id_massiva}.xlsx`)}>
                 <Download className="h-4 w-4" /> XLSX
               </Button>
@@ -194,8 +187,6 @@ export function DrillDownModal({ open, onClose, massiva, rows, escalonamento }: 
         </div>
       </DialogContent>
     </Dialog>
-    <MascaraOcorrenciaDialog open={mascaraOpen} onClose={() => setMascaraOpen(false)} massiva={massiva} rows={rows} />
-    </>
   );
 }
 

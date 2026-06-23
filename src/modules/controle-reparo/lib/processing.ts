@@ -33,6 +33,7 @@ export const STATUS_PLANILHA_OPCOES = [
   "TROCA DO KIT ELSYS",
   "CABO DE REDE",
   "MUDANÇA DE ENDEREÇO",
+  "NÃO É REPARO",
 ] as const;
 
 const STATUS_PLANILHA_CANONICO = new Map(

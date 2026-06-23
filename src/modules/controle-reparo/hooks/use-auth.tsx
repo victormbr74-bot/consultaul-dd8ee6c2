@@ -12,7 +12,7 @@ export function useAuth() {
     role,
     nome: auth.profile?.name ?? auth.user?.email ?? null,
     loading: auth.loading,
-    canWrite: auth.isAdmin || role === "operacao",
+    canWrite: auth.isAdmin,
     isAdmin: auth.isAdmin,
     isAdminMaster: auth.isAdmin,
     signOut: auth.signOut,

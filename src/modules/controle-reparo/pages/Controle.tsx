@@ -331,9 +331,9 @@ const EDITABLE_FIELD_CONFIG: Record<string, EditableFieldConfig> = {
   status_zabbix: { dbField: "status_zabbix" },
 };
 
-function canEditField(field: string, canWrite: boolean, isAdmin: boolean): boolean {
-  if (isAdmin) return ADMIN_EDITABLE_IDS.has(field);
-  return canWrite && TREATMENT_EDITABLE_IDS.has(field);
+function canEditField(_field: string, _canWrite: boolean, isAdmin: boolean): boolean {
+  if (isAdmin) return true;
+  return TREATMENT_EDITABLE_IDS.has(_field);
 }
 
 function parseEditableValue(field: string, raw: string): EditableValue {

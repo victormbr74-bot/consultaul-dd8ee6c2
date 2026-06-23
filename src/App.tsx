@@ -72,7 +72,7 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <SidebarActionsProvider>
       <SidebarProvider>
-        <div className="min-h-screen flex w-full overflow-hidden">
+        <div className="flex h-dvh max-h-dvh w-full overflow-hidden">
           <AppSidebar />
           <div className="flex-1 min-h-0 min-w-0 flex flex-col">
             <header className="sticky top-0 z-50 h-12 shrink-0 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4">

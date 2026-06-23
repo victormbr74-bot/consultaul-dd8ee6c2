@@ -316,6 +316,12 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
   }
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
   body::before {
     content: "";
     position: fixed;

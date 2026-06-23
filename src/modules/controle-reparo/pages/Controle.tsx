@@ -1026,7 +1026,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
       </div>
 
       {/* Paginação (item 5 — página atual persistida) */}
-      <div className="shrink-0 border-t bg-card">
+      <div className="sticky bottom-0 z-20 shrink-0 border-t bg-card shadow-[0_-8px_18px_rgba(0,0,0,0.18)]">
       {filteredRows.length > PAGE_SIZE && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6">
           <span className="text-muted-foreground">

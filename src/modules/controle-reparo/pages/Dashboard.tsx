@@ -22,7 +22,7 @@ import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { isLinkBackup, normalizeIncidentValue } from "@/modules/controle-reparo/lib/processing";
 import type { Row } from "@/modules/controle-reparo/lib/parse";
 import { getVal, cleanText } from "@/modules/controle-reparo/lib/parse";
-import { FAIXAS, getFaixa } from "@/modules/controle-reparo/lib/tempo";
+import { FAIXAS, formatDataHora, getFaixa } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
 import { DrillDownDialog, type DrillData } from "@/modules/controle-reparo/components/controle/DrillDownDialog";
 import { Button } from "@/components/ui/button";
@@ -372,6 +372,13 @@ function Indicadores({
         rows={selectedMetric.rows}
         onOpen={onOpen}
       />
+
+      <ChamadosPanel
+        title="Chamados do Filtro"
+        subtitle={selectedMetric.label}
+        rows={selectedMetric.rows}
+        onOpen={onOpen}
+      />
     </div>
   );
 }
@@ -627,6 +634,101 @@ function FaixaPanel({
                   </div>
               </button>
             ))}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function ChamadosPanel({
+  title,
+  subtitle,
+  rows,
+  onOpen,
+}: {
+  title: string;
+  subtitle: string;
+  rows: ControleRow[];
+  onOpen: (title: string, rows: ControleRow[]) => void;
+}) {
+  const visibleRows = rows.slice(0, 12);
+
+  return (
+    <Panel title={title} subtitle={`Filtro: ${subtitle}`}>
+      <div className="min-w-0 overflow-hidden rounded-md border bg-background">
+        <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full border-separate border-spacing-0 text-xs">
+            <thead className="bg-secondary text-secondary-foreground">
+              <tr className="[&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
+                <th>Código</th>
+                <th>Lotérica</th>
+                <th>Tipo</th>
+                <th>UF</th>
+                <th>Chamado</th>
+                <th>Início</th>
+                <th>Situação</th>
+                <th>Responsável</th>
+                <th>Status Jira</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row, index) => (
+                <tr
+                  key={`${row.id ?? row.codigo_loterica}-${index}`}
+                  className="bg-card/40 hover:bg-muted/45 [&>td]:border-b [&>td]:border-r [&>td]:border-border/80 [&>td]:px-3 [&>td]:py-2 [&>td]:align-middle [&>td:last-child]:border-r-0"
+                >
+                  <td className="whitespace-nowrap font-semibold">{row.codigo_loterica}</td>
+                  <td className="max-w-[220px] truncate" title={row.loterica ?? undefined}>
+                    {row.loterica}
+                  </td>
+                  <td className="whitespace-nowrap">{row.tipo_link}</td>
+                  <td className="whitespace-nowrap">{row.uf}</td>
+                  <td className="whitespace-nowrap font-medium">{row.chamado || row.inc_snow || "—"}</td>
+                  <td className="whitespace-nowrap tabular-nums">{formatDataHora(row.data_hora_inicial)}</td>
+                  <td className="max-w-[190px] truncate" title={(row.situacao || row.ordem) ?? undefined}>
+                    {row.situacao || row.ordem}
+                  </td>
+                  <td className="max-w-[180px] truncate" title={row.responsavel ?? undefined}>
+                    {row.responsavel}
+                  </td>
+                  <td className="max-w-[160px] truncate" title={row.status_jira ?? undefined}>
+                    {row.status_jira}
+                  </td>
+                </tr>
+              ))}
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                    Nenhum chamado no filtro selecionado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            Mostrando {visibleRows.length} de {rows.length} registros
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={rows.length === 0}
+              onClick={() => exportControle(rows, "xlsx", `chamados_${slugify(subtitle)}`)}
+            >
+              <Download className="mr-2 h-4 w-4" /> Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={rows.length === 0}
+              onClick={() => onOpen(`${title} · ${subtitle}`, rows)}
+            >
+              Ver todos
+            </Button>
           </div>
         </div>
       </div>

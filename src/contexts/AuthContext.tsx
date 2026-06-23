@@ -16,6 +16,24 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_LOADING_TIMEOUT_MS = 8000;
 
+function isInvalidRefreshTokenError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes("invalid refresh token");
+}
+
+function clearSupabaseAuthStorage() {
+  try {
+    for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith("sb-") && key.endsWith("-auth-token")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* localStorage may be unavailable in private contexts */
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -105,7 +123,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         void applySession(currentSession);
       })
       .catch((error) => {
-        console.error("Failed to get auth session", error);
+        if (isInvalidRefreshTokenError(error)) {
+          clearSupabaseAuthStorage();
+        } else {
+          console.error("Failed to get auth session", error);
+        }
         if (active) {
           setUser(null);
           setSession(null);

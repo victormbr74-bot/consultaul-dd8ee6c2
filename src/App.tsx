@@ -110,7 +110,7 @@ const App = () => (
             {supabaseConfigError}
           </div>
         )}
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_relativeSplatPath: true }}>
           <ThemeProvider>
             <AuthProvider>
               <Routes>

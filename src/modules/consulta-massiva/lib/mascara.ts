@@ -45,18 +45,36 @@ function padMaskQty(value: string): string {
   return numeric ? numeric.padStart(2, "0") : cleanValue;
 }
 
+function formatIpList(items: Array<{ ip_loopback: string; designacao: string }>): string[] {
+  const maxIp = items.reduce((acc, l) => Math.max(acc, (l.ip_loopback ?? "").length), 0);
+  return items.map((l) => `${(l.ip_loopback ?? "").padEnd(maxIp + 3, " ")}${l.designacao ?? ""}`);
+}
+
+function alignIpLines(lines: string[]): string[] {
+  const parsed = lines
+    .map((line) => {
+      const m = line.match(/^\s*(\S+)[\s\t]+(.+)$/);
+      return m ? { ip_loopback: m[1], designacao: m[2].trim() } : null;
+    })
+    .filter((v): v is { ip_loopback: string; designacao: string } => !!v);
+  if (parsed.length === 0) return lines;
+  return formatIpList(parsed);
+}
+
 export function applyAtualizacaoToMascara(
   mascaraTexto: string | null | undefined,
   atualizacao: string,
+  baseDate: Date = new Date(),
 ): string {
-  const updateText = String(atualizacao ?? "").trim();
+  const updateText = String(atualizacao ?? "");
   const lines = String(mascaraTexto ?? "").split(/\r?\n/);
   const separator = "===============================";
   const separatorIndexes = lines
     .map((line, index) => (line.trim() === separator ? index : -1))
     .filter((index) => index >= 0);
   const lastSeparator = separatorIndexes.at(-1) ?? -1;
-  const links = lastSeparator >= 0 ? lines.slice(lastSeparator + 1).map((line) => line.trim()).filter(Boolean) : [];
+  const rawLinks = lastSeparator >= 0 ? lines.slice(lastSeparator + 1).map((line) => line.trim()).filter(Boolean) : [];
+  const links = alignIpLines(rawLinks);
   const oldCaso =
     valueFromMask(lines, "Caso:") ||
     lines.find((line) => /\|\s*Evento Massivo\s+/i.test(line) && !line.trim().startsWith("Caso:"))?.trim() ||
@@ -64,29 +82,27 @@ export function applyAtualizacaoToMascara(
 
   return [
     separator,
-    "CONSÓRCIO LOTÉRICAS ",
+    "CONSÓRCIO LOTÉRICAS",
     "Evento Massivo - ATUALIZAÇÃO",
     separator,
     `Cliente: ${valueFromMask(lines, "Cliente:") || "CAIXA ECONÔMICA"}`,
-    `Chamado interno : ${valueFromMask(lines, "Chamado interno") || "-"}`,
+    `Chamado interno: ${valueFromMask(lines, "Chamado interno") || "PENDENTE"}`,
     `Caso: ${oldCaso.replace(/\s*\|\s*NA\s*$/i, "")}`,
     `Tipo: ${valueFromMask(lines, "Tipo:") || "PRIMÁRIO"}`,
     `UF: ${valueFromMask(lines, "UF:") || "-"}`,
-    `Quantidade Isoladas:${padMaskQty(valueFromMask(lines, "Quantidade Isoladas:") || "0")}`,
+    `Quantidade Isoladas: ${padMaskQty(valueFromMask(lines, "Quantidade Isoladas:") || "0")}`,
     `Quantidade total: ${padMaskQty(valueFromMask(lines, "Quantidade total:") || "0")}`,
     `Horário da falha: ${valueFromMask(lines, "Horário da falha:") || "PENDENTE"}`,
     `Horário de Normalização: ${valueFromMask(lines, "Horário de Normalização:") || "PENDENTE"}`,
     `Causa/Solução: ${valueFromMask(lines, "Causa/Solução:") || "PENDENTE"}`,
     `Status: ${updateText}`,
-    `Horas: ${proximoStatusLine()}`,
+    `Horas: ${proximoStatusLine(baseDate)}`,
     separator,
     "",
     ...links,
-  ]
-    .join("\n")
-    .replace(/^Evento Massivo - .*$/m, "Evento Massivo - ATUALIZAÇÃO")
-    .replace(/^Chamado interno : -$/m, "Chamado interno : PENDENTE");
+  ].join("\n");
 }
+
 
 const clean = (value: unknown) => String(value ?? "").trim();
 

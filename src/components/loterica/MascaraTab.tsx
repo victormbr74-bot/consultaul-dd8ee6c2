@@ -91,6 +91,8 @@ const CAUSAS_ENCERRAMENTO = [
 
 const HORARIO_FUNCIONAMENTO_PADRAO = "Seg a Sex: 08h as 18h Sab: 08h as 12h";
 const HORARIO_ACESSO_PADRAO = "09h as 18h";
+const HORARIO_FUNCIONAMENTO_MAM_SCT = "Seg a Sex: 08h às 18h Sab: 08h às 12h";
+const HORARIO_ACESSO_MAM_SCT = "09h ás 18h";
 const CONTATO_VALIDACAO_PADRAO = "61 3464-9700";
 const MESES_BR: Record<string, number> = {
   jan: 0,
@@ -320,6 +322,8 @@ const MascaraTab = ({ form }: MascaraTabProps) => {
   const cep = String(raw["CEP"] || "");
   const cidade = String(form.cidade || raw["MUNICIPIO"] || "");
   const uf = form.uf || "";
+  const operadoraMamSct = vsat || operadora4g || operadora;
+  const simCardMamSct = simCard || "#N/D";
 
   const defeitoOempDesc = useMemo(
     () => DEFEITOS_OEMP.find((d) => d.value === defeitoOemp)?.desc || "",
@@ -461,20 +465,21 @@ NOME DA UL: ${nomeUl}
 CODIGO UL: ${codUl}
 CIRCUITO OI: ${designacaoOi}`;
 
-  const mascaraMamSct = `CODIGO UL: ${codUl}
+  const mascaraMamSct = `CÓDIGO UL: ${codUl}
 NOME DA UL: ${nomeUl}
-ENDERECO UL: ${endereco}
+ENDEREÇO UL: ${endereco}
 CONTATO: ${contato}
-HORARIO DE FUNCIONAMENTO: ${HORARIO_FUNCIONAMENTO_PADRAO}
-PROBLEMA: ${defeitoOemp}
-OPERADORA: ${operadora}
-SIM CARD: ${simCard}
-MODELO CPE: ${modeloRoteador}
+HORARIO DE FUNCIONAMENTO: ${HORARIO_FUNCIONAMENTO_MAM_SCT}
+DEFEITO RECLAMADO: ${defeitoOemp}
+OPERADORA: ${operadoraMamSct}
+SIM CARD: ${simCardMamSct}
+MODELO: ${modeloRoteador}
 CEP: ${cep}
 MUNICIPIO/ESTADO: ${cidade} ${uf}
-RECLAMACAO INICIAL: ${defeitoOempDesc}
-CONTATO DE VALIDACAO: ${CONTATO_VALIDACAO_PADRAO}
-HORARIO DE ACESSO: ${HORARIO_ACESSO_PADRAO}`;
+RECLAMAÇÃO INICIAL: ${defeitoOempDesc}
+CONTATO DE VALIDAÇÃO: ${CONTATO_VALIDACAO_PADRAO}
+HORÁRIO DE ACESSO: ${HORARIO_ACESSO_MAM_SCT}
+SEGUE LOG:`;
 
   const mascaraWtTelecom = `Designacao/VLAN: ${circuitoOemp} VLAN:
 Cliente Final: ${nomeUl}
@@ -528,20 +533,21 @@ Contato de Autorizacao: ${contatoEnc}`;
   ];
 
   const rowsMam: [string, string][] = [
-    ["CODIGO UL", codUl],
+    ["CÓDIGO UL", codUl],
     ["NOME DA UL", nomeUl],
-    ["ENDERECO UL", endereco],
+    ["ENDEREÇO UL", endereco],
     ["CONTATO", contato],
-    ["HORARIO DE FUNCIONAMENTO", HORARIO_FUNCIONAMENTO_PADRAO],
-    ["PROBLEMA", defeitoOemp],
-    ["OPERADORA", operadora],
-    ["SIM CARD", simCard],
-    ["MODELO CPE", modeloRoteador],
+    ["HORARIO DE FUNCIONAMENTO", HORARIO_FUNCIONAMENTO_MAM_SCT],
+    ["DEFEITO RECLAMADO", defeitoOemp],
+    ["OPERADORA", operadoraMamSct],
+    ["SIM CARD", simCardMamSct],
+    ["MODELO", modeloRoteador],
     ["CEP", cep],
     ["MUNICIPIO/ESTADO", `${cidade} ${uf}`],
-    ["RECLAMACAO INICIAL", defeitoOempDesc],
-    ["CONTATO DE VALIDACAO", CONTATO_VALIDACAO_PADRAO],
-    ["HORARIO DE ACESSO", HORARIO_ACESSO_PADRAO],
+    ["RECLAMAÇÃO INICIAL", defeitoOempDesc],
+    ["CONTATO DE VALIDAÇÃO", CONTATO_VALIDACAO_PADRAO],
+    ["HORÁRIO DE ACESSO", HORARIO_ACESSO_MAM_SCT],
+    ["SEGUE LOG", ""],
   ];
 
   const rowsWt: [string, string][] = [
@@ -831,7 +837,7 @@ Contato de Autorizacao: ${contatoEnc}`;
           </CardHeader>
           <CardContent className="space-y-3">
             <DefeitoSelectField
-              label="Problema"
+              label="Defeito Reclamado"
               options={DEFEITOS_OEMP}
               value={defeitoOemp}
               onChange={setDefeitoOemp}

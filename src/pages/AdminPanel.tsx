@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound, Webhook } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound, Webhook, Filter } from "lucide-react";
 import { notifyJirayab } from "@/lib/jirayabNotify";
 
 type AppRole = "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
@@ -87,7 +89,17 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [changesLoading, setChangesLoading] = useState(true);
   const [changesSaving, setChangesSaving] = useState(false);
   const [changesError, setChangesError] = useState<string | null>(null);
-  
+
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEditRole, setBulkEditRole] = useState<AppRole>("user");
+  const [bulkEditActive, setBulkEditActive] = useState<boolean | "keep">("keep");
+  const [bulkEditPassword, setBulkEditPassword] = useState("");
+
+  const [filterRole, setFilterRole] = useState<AppRole | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "ativo" | "inativo">("all");
+  const [filterSearch, setFilterSearch] = useState("");
+
   const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
   const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
   const [lotericaUpdatesLoading, setLotericaUpdatesLoading] = useState(true);
@@ -308,6 +320,150 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     () => [...users].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
     [users],
   );
+
+  const filteredUsers = useMemo(() => {
+    const q = filterSearch.trim().toLowerCase();
+    return sortedUsers.filter((u) => {
+      if (filterRole !== "all" && u.role !== filterRole) return false;
+      if (filterStatus === "ativo" && !u.active) return false;
+      if (filterStatus === "inativo" && u.active) return false;
+      if (q) {
+        const haystack = `${u.name} ${u.user_code || ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [sortedUsers, filterRole, filterStatus, filterSearch]);
+
+  const selectedUserCount = selectedUserIds.size;
+
+  const isUserSelected = (id: string) => selectedUserIds.has(id);
+  const allFilteredSelected = filteredUsers.length > 0 && selectedUserCount === filteredUsers.length;
+
+  const toggleUserSelect = (id: string, checked: boolean) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllUsers = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(new Set(filteredUsers.map((u) => u.id)));
+    } else {
+      setSelectedUserIds(new Set());
+    }
+  };
+
+  const openBulkEdit = () => {
+    setBulkEditRole("user");
+    setBulkEditActive("keep");
+    setBulkEditPassword("");
+    setBulkEditOpen(true);
+  };
+
+  const applyBulkEdit = async () => {
+    const selected = users.filter((u) => selectedUserIds.has(u.id));
+    if (selected.length === 0) return;
+    setSaving(true);
+    try {
+      await Promise.allSettled(
+        selected.map((u) =>
+          invokeAdminUsers({
+            action: "update_user",
+            payload: {
+              user_id: u.id,
+              role: bulkEditRole,
+              active: bulkEditActive === "keep" ? u.active : bulkEditActive,
+              password: bulkEditPassword || undefined,
+            },
+          }),
+        ),
+      );
+      setSelectedUserIds(new Set());
+      setBulkEditOpen(false);
+      await fetchUsers();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao editar usuários em massa.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const bulkDeleteSelected = async () => {
+    if (selectedUserCount === 0) return;
+    const selected = users.filter((u) => selectedUserIds.has(u.id));
+    const names = selected.map((u) => `${u.name} (${u.user_code || "-"})`).join("\n");
+    const confirmed = window.confirm(
+      `Excluir ${selectedUserCount} usuário(s) selecionado(s)?\n\n${names}`,
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    try {
+      const results = await Promise.allSettled(
+        selected.map((u) =>
+          invokeAdminUsers({
+            action: "delete_user",
+            payload: { user_id: u.id },
+          }),
+        ),
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        alert(`${selected.length - failed.length} excluídos. ${failed.length} falharam.`);
+      }
+      setSelectedUserIds(new Set());
+      await fetchUsers();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao excluir usuários em massa.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const bulkResetPassword = async () => {
+    if (selectedUserCount === 0) return;
+    const selected = users.filter((u) => selectedUserIds.has(u.id) && u.id !== user?.id);
+    if (selected.length === 0) {
+      alert("Selecione ao menos um usuário diferente do seu para resetar a senha.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Resetar senha de ${selected.length} usuário(s) selecionado(s) para ${DEFAULT_PASSWORD}?`,
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    try {
+      const results = await Promise.allSettled(
+        selected.map((u) =>
+          invokeAdminUsers({
+            action: "reset_passwords",
+            payload: { user_id: u.id, default_password: DEFAULT_PASSWORD },
+          }),
+        ),
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        alert(`${selected.length - failed.length} senhas resetadas. ${failed.length} falharam.`);
+      } else {
+        alert(`Reset concluído.\nTotal: ${selected.length}\nSenhas alteradas: ${selected.length}\nFalhas: 0`);
+      }
+      setSelectedUserIds(new Set());
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao resetar senhas em massa.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearUserFilters = () => {
+    setFilterSearch("");
+    setFilterRole("all");
+    setFilterStatus("all");
+  };
+
   const selectedChangeCount = selectedChangeIds.length;
   const allChangesSelected = changeRequests.length > 0 && selectedChangeCount === changeRequests.length;
 
@@ -1092,9 +1248,16 @@ ${failureDetails}`,
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" /> Gerenciamento de Usuários ({users.length})
-                </CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" /> Gerenciamento de Usuários
+                {filterSearch || filterRole !== "all" || filterStatus !== "all" ? (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({filteredUsers.length} de {users.length})
+                  </span>
+                ) : (
+                  <span className="text-xs font-normal text-muted-foreground">({users.length})</span>
+                )}
+              </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" onClick={seedDefaultUsers} disabled={seedLoading || saving || resetAllLoading}>
                     {seedLoading ? "Importando..." : "Importar Lista Base"}
@@ -1148,12 +1311,86 @@ ${failureDetails}`,
               </CardContent>
             </Card>
 
+            {selectedUserCount > 0 && (
+              <Card>
+                <CardContent className="py-3 flex items-center gap-3 flex-wrap">
+                  <Users className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">
+                    {selectedUserCount} usuário(s) selecionado(s)
+                  </span>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button size="sm" variant="secondary" onClick={openBulkEdit} disabled={saving}>
+                      <Pencil className="w-4 h-4 mr-1" /> Editar em Massa
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={bulkDeleteSelected} disabled={saving}>
+                      <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionados
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={bulkResetPassword} disabled={saving}>
+                      <KeyRound className="w-4 h-4 mr-1" /> Resetar Senha Selecionados
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedUserIds(new Set())} disabled={saving}>
+                      <X className="w-4 h-4 mr-1" /> Limpar Seleção
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Filter className="w-4 h-4" />
+                    <span>Filtros</span>
+                    {(filterSearch || filterRole !== "all" || filterStatus !== "all") && (
+                      <Badge variant="secondary" className="cursor-pointer" onClick={clearUserFilters}>
+                        Limpar filtros
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Input
+                      placeholder="Buscar por nome ou código..."
+                      value={filterSearch}
+                      onChange={(e) => setFilterSearch(e.target.value)}
+                      className="h-8 w-48 md:w-64 text-xs"
+                    />
+                    <Select value={filterRole} onValueChange={(v) => setFilterRole(v as AppRole | "all")}>
+                      <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Papel" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os papéis</SelectItem>
+                        <SelectItem value="administrador_master">ADM Master</SelectItem>
+                        <SelectItem value="administrador">Administrador</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="operacao">Operação</SelectItem>
+                        <SelectItem value="consulta">Consulta</SelectItem>
+                        <SelectItem value="user">Usuário</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as "all" | "ativo" | "inativo")}>
+                      <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="ativo">Ativo</SelectItem>
+                        <SelectItem value="inativo">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
+                        <th className="text-left p-3 w-10">
+                          <Checkbox
+                            checked={allFilteredSelected ? true : selectedUserCount > 0 ? "indeterminate" : false}
+                            onCheckedChange={(checked) => toggleSelectAllUsers(checked === true)}
+                            disabled={loading || filteredUsers.length === 0}
+                            aria-label="Selecionar todos os usuários"
+                          />
+                        </th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Nome</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Código</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Papel</th>
@@ -1163,94 +1400,180 @@ ${failureDetails}`,
                     </thead>
                     <tbody>
                       {loading ? (
-                        <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-                      ) : sortedUsers.length === 0 ? (
-                        <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum usuário encontrado.</td></tr>
-                      ) : sortedUsers.map((u) => (
-                        <tr key={u.id} className="border-b align-top">
-                          <td className="p-3">
-                            {editId === u.id ? (
-                              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-                            ) : (
-                              <span className="font-medium">{u.name}</span>
-                            )}
-                          </td>
-                          <td className="p-3 font-mono">
-                            {editId === u.id ? (
-                              <Input value={editCode} onChange={(e) => setEditCode(e.target.value.replace(/\D/g, ""))} />
-                            ) : (
-                              u.user_code || "-"
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {editId === u.id ? (
-                              <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
-                                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="user">Usuário</SelectItem>
-                                  <SelectItem value="consulta">Consulta</SelectItem>
-                                  <SelectItem value="operacao">Operação</SelectItem>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="administrador">Administrador</SelectItem>
-                                  <SelectItem value="administrador_master">ADM Master</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant={ROLE_VARIANT[u.role]}>{ROLE_LABEL[u.role]}</Badge>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {editId === u.id ? (
-                              <Select value={editActive ? "ativo" : "inativo"} onValueChange={(v) => setEditActive(v === "ativo")}>
-                                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="ativo">Ativo</SelectItem>
-                                  <SelectItem value="inativo">Inativo</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant={u.active ? "default" : "destructive"}>{u.active ? "Ativo" : "Inativo"}</Badge>
-                            )}
-                          </td>
-                          <td className="p-3 space-y-2">
-                            {editId === u.id ? (
-                              <>
-                                <Input
-                                  type="password"
-                                  placeholder="Nova senha (opcional)"
-                                  value={editPassword}
-                                  onChange={(e) => setEditPassword(e.target.value)}
-                                />
-                                <div className="flex items-center gap-2">
-                                  <Button size="sm" onClick={saveEdit} disabled={saving}>
-                                    <Save className="w-4 h-4 mr-1" /> Salvar
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={cancelEdit}>
-                                    <RotateCcw className="w-4 h-4 mr-1" /> Cancelar
-                                  </Button>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Button size="sm" variant="secondary" onClick={() => void resetSinglePassword(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
-                                  <KeyRound className="w-4 h-4 mr-1" /> {resetUserIdLoading === u.id ? "Resetando..." : "Resetar Senha"}
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => startEdit(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
-                                  <Pencil className="w-4 h-4 mr-1" /> Editar
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => removeUser(u)} disabled={resetAllLoading || resetUserIdLoading === u.id}>
-                                  <Trash2 className="w-4 h-4 mr-1" /> Excluir
-                                </Button>
-                              </div>
-                            )}
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                            Carregando...
                           </td>
                         </tr>
-                      ))}
+                      ) : filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                            Nenhum usuário encontrado com os filtros aplicados.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map((u) => (
+                          <tr key={u.id} className="border-b align-top">
+                            <td className="p-3 align-middle">
+                              <Checkbox
+                                checked={isUserSelected(u.id)}
+                                onCheckedChange={(checked) => toggleUserSelect(u.id, checked === true)}
+                                disabled={saving}
+                                aria-label={`Selecionar usuário ${u.name}`}
+                              />
+                            </td>
+                            <td className="p-3">
+                              {editId === u.id ? (
+                                <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                              ) : (
+                                <span className="font-medium">{u.name}</span>
+                              )}
+                            </td>
+                            <td className="p-3 font-mono">
+                              {editId === u.id ? (
+                                <Input value={editCode} onChange={(e) => setEditCode(e.target.value.replace(/\D/g, ""))} />
+                              ) : (
+                                u.user_code || "-"
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {editId === u.id ? (
+                                <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
+                                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="user">Usuário</SelectItem>
+                                    <SelectItem value="consulta">Consulta</SelectItem>
+                                    <SelectItem value="operacao">Operação</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="administrador">Administrador</SelectItem>
+                                    <SelectItem value="administrador_master">ADM Master</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Badge variant={ROLE_VARIANT[u.role]}>{ROLE_LABEL[u.role]}</Badge>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {editId === u.id ? (
+                                <Select value={editActive ? "ativo" : "inativo"} onValueChange={(v) => setEditActive(v === "ativo")}>
+                                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ativo">Ativo</SelectItem>
+                                    <SelectItem value="inativo">Inativo</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Badge variant={u.active ? "default" : "destructive"}>
+                                  {u.active ? "Ativo" : "Inativo"}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3 space-y-2">
+                              {editId === u.id ? (
+                                <>
+                                  <Input
+                                    type="password"
+                                    placeholder="Nova senha (opcional)"
+                                    value={editPassword}
+                                    onChange={(e) => setEditPassword(e.target.value)}
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <Button size="sm" onClick={saveEdit} disabled={saving}>
+                                      <Save className="w-4 h-4 mr-1" /> Salvar
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={cancelEdit}>
+                                      <RotateCcw className="w-4 h-4 mr-1" /> Cancelar
+                                    </Button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => void resetSinglePassword(u)}
+                                    disabled={resetAllLoading || resetUserIdLoading === u.id}
+                                  >
+                                    <KeyRound className="w-4 h-4 mr-1" />
+                                    {resetUserIdLoading === u.id ? "Resetando..." : "Resetar Senha"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => startEdit(u)}
+                                    disabled={resetAllLoading || resetUserIdLoading === u.id}
+                                  >
+                                    <Pencil className="w-4 h-4 mr-1" /> Editar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => removeUser(u)}
+                                    disabled={resetAllLoading || resetUserIdLoading === u.id}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" /> Excluir
+                                  </Button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </CardContent>
             </Card>
+
+            <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Editar Usuários em Massa ({selectedUserCount} selecionado(s))</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label>Papel</Label>
+                    <Select value={bulkEditRole} onValueChange={(v) => setBulkEditRole(v as AppRole)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">Usuário</SelectItem>
+                        <SelectItem value="consulta">Consulta</SelectItem>
+                        <SelectItem value="operacao">Operação</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="administrador">Administrador</SelectItem>
+                        <SelectItem value="administrador_master">ADM Master</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label>Status</Label>
+                    <Select value={bulkEditActive === "keep" ? "keep" : bulkEditActive ? "ativo" : "inativo"} onValueChange={(v) => setBulkEditActive(v === "keep" ? "keep" : v === "ativo")}>
+                      <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="keep">Manter atual</SelectItem>
+                        <SelectItem value="ativo">Ativo</SelectItem>
+                        <SelectItem value="inativo">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nova senha (opcional — deixe em branco para manter)</Label>
+                    <Input
+                      type="password"
+                      placeholder="Senha padrão para todos"
+                      value={bulkEditPassword}
+                      onChange={(e) => setBulkEditPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBulkEditOpen(false)} disabled={saving}>Cancelar</Button>
+                  <Button onClick={applyBulkEdit} disabled={saving}>
+                    <Save className="w-4 h-4 mr-1" /> {saving ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>

@@ -14,6 +14,7 @@ type MassivaRecord = {
   uf: string;
   operadora: string;
   qtd_circuitos: number;
+  qtd_lotericas_isoladas: number;
   mascara_texto: string | null;
   created_at: string;
 };
@@ -21,7 +22,7 @@ type MassivaRecord = {
 async function fetchMascaras(): Promise<MassivaRecord[]> {
   const { data, error } = await supabase
     .from("massivas")
-    .select("id,id_massiva,circuito_pai,tipo_massiva,uf,operadora,qtd_circuitos,mascara_texto,created_at")
+    .select("id,id_massiva,circuito_pai,tipo_massiva,uf,operadora,qtd_circuitos,qtd_lotericas_isoladas,mascara_texto,created_at")
     .not("mascara_texto", "is", null)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -37,6 +38,17 @@ function extractCircuitoPaiFromMascara(text: string | null): string {
 function displayCircuitoPai(m: MassivaRecord | null): string {
   if (!m) return "Mascara";
   return m.circuito_pai?.trim() || extractCircuitoPaiFromMascara(m.mascara_texto) || m.id_massiva;
+}
+
+function extractQtdIsoladas(text: string | null): number {
+  const line = (text ?? "").split(/\r?\n/).find((item) => item.trim().toLowerCase().startsWith("quantidade isoladas:"));
+  const value = line?.match(/\d+/)?.[0];
+  return value ? Number(value) : 0;
+}
+
+function displayQtdIsoladas(m: MassivaRecord): string {
+  const qtd = Number(m.qtd_lotericas_isoladas ?? 0) || extractQtdIsoladas(m.mascara_texto);
+  return String(qtd).padStart(2, "0");
 }
 
 export default function MascaraMassiva() {
@@ -113,9 +125,9 @@ export default function MascaraMassiva() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono font-semibold">{displayCircuitoPai(m)}</span>
-                  <span className="font-mono text-muted-foreground">{m.qtd_circuitos}</span>
+                  <span className="font-mono text-muted-foreground">{displayQtdIsoladas(m)}</span>
                 </div>
-                <div className="mt-1 text-muted-foreground">{m.tipo_massiva} | {m.uf} | {m.operadora}</div>
+                <div className="mt-1 text-muted-foreground">{m.tipo_massiva} | {m.uf} | {m.operadora} | {displayQtdIsoladas(m)}</div>
               </button>
             ))}
           </div>

@@ -83,7 +83,7 @@ export interface Massiva {
   janela_minutos: number;
   rowIds: string[];
   qtd_lotericas_isoladas?: number;
-  lotericas_isoladas?: Array<{ ip_loopback: string; designacao: string }>;
+  lotericas_isoladas?: Array<{ codigo_loterica: string; ip_loopback?: string; designacao?: string }>;
 
   // ----- 60 km informational geo-analysis (does NOT change status) -----
   sinalizacao_60km?: Sinalizacao60km;

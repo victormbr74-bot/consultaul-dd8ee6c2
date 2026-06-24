@@ -369,7 +369,7 @@ export default function Page() {
               tecnologia: pickRowText(row, "Tecnologia"),
               operadora: row.__operadora,
               tipo_empresa: row.__tipoEmp || row.__classificacao,
-              status: String(row["Status Massiva"] ?? ""),
+              status: row.__situacao,
             }));
           });
           for (let i = 0; i < circuitos.length; i += 500) {
@@ -593,8 +593,8 @@ export default function Page() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="grid gap-3 pb-2 md:grid-cols-2 lg:grid-cols-4">
-                  <StatCard label="Principal VTAL" value={extStats.vtal} icon={Flame} tone="red" />
-                  <StatCard label="Principal OEMP" value={extStats.oemp} icon={AlertTriangle} tone="yellow" />
+                  <StatCard label="Principal VTAL" value={extStats.vtal} icon={Flame} tone="blue" />
+                  <StatCard label="Principal OEMP" value={extStats.oemp} icon={AlertTriangle} tone="red" />
                   <StatCard label="Sec. UF" value={result.stats.secundarioUf} icon={Network} tone="yellow" />
                   <StatCard label="Sec. Nacional" value={result.stats.secundarioNacional} icon={Globe2} tone="blue" />
                 </div>
@@ -696,9 +696,9 @@ export default function Page() {
                         <td className="px-3 py-2 text-right font-mono">
                           {m.qtd_lotericas_isoladas ? (
                             <span className="inline-flex items-center justify-end gap-1 rounded bg-noc-yellow/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-yellow">
-                              <AlertOctagon className="h-3 w-3" />{m.qtd_lotericas_isoladas}
+                              <AlertOctagon className="h-3 w-3" />{String(m.qtd_lotericas_isoladas).padStart(2, "0")}
                             </span>
-                          ) : "0"}
+                          ) : "00"}
                         </td>
                         <td className="px-3 py-2"><Sinalizacao60kmBadge sinalizacao={m.sinalizacao_60km} /></td>
                         <td className="px-3 py-2 font-mono text-[11px]">{m.cidade_epicentro ? `${m.cidade_epicentro}/${m.uf_epicentro}` : "-"}</td>

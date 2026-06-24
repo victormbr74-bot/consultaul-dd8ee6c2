@@ -226,6 +226,31 @@ function codigoLotericaFromRow(row: GisRow): string {
   ).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
+function codigoLotericaDisplayFromRow(row: GisRow): string {
+  return firstText(
+    getCell(row, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "CÃƒÆ’Ã‚Â³d. da LotÃƒÆ’Ã‚Â©rica", "Cod. da Loterica", "Código da Lotérica", "CÃ³digo da LotÃ©rica", "CÃƒÂ³digo da LotÃƒÂ©rica", "Codigo da Loterica", "Codigo"),
+  );
+}
+
+function normalizeSituacao(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function isSituacaoIsolada(row: ProcessedRow): boolean {
+  return row.__situacao === "LOTERICA_ISOLADA" ||
+    normalizeSituacao(row.__situacao).includes("LOTERICA_ISOLADA") ||
+    normalizeSituacao(row["Situação"]).includes("LOTERICA ISOLADA") ||
+    normalizeSituacao(row["Situacao"]).includes("LOTERICA ISOLADA") ||
+    normalizeSituacao(row["Status"]).includes("LOTERICA ISOLADA") ||
+    normalizeSituacao(row["status"]).includes("LOTERICA ISOLADA") ||
+    (row as { isolada?: boolean }).isolada === true ||
+    (row as { isIsolada?: boolean }).isIsolada === true;
+}
+
 function nomeLotericaFromRow(row: GisRow): string {
   return firstText(
     getCell(row, "Lotérica", "LotÃ©rica", "LotÃƒÂ©rica", "Loterica", "Nome Lotérica", "Nome Loterica"),
@@ -559,7 +584,7 @@ export function processGis(
     }
     lotByMassiva.set(m.id_massiva, isolatedInMassiva);
     m.qtd_lotericas_isoladas = isolatedInMassiva.size;
-    m.lotericas_isoladas = Array.from(isolatedInMassiva, ([ip_loopback, designacao]) => ({ ip_loopback, designacao }));
+    m.lotericas_isoladas = [];
     for (const [ip_loopback, designacao] of isolatedInMassiva) {
       lotericasIsoladasDetalhe.push({ massiva: m.id_massiva, ip_loopback, designacao });
     }
@@ -574,6 +599,33 @@ export function processGis(
   }
 
   // ---- Análise geográfica (sinalização informativa de 60 km) ----
+  lotericasIsoladasDetalhe.length = 0;
+  for (const m of massivas) {
+    const isolatedByCodigo = new Map<string, { codigo_loterica: string; ip_loopback?: string; designacao?: string }>();
+    for (const rowId of m.rowIds) {
+      const r = rowById.get(rowId);
+      if (!r || !isSituacaoIsolada(r)) continue;
+      const codigo = codigoLotericaDisplayFromRow(r);
+      const key = codigoLotericaFromRow(r);
+      if (!codigo || !key || isolatedByCodigo.has(key)) continue;
+      isolatedByCodigo.set(key, {
+        codigo_loterica: codigo,
+        ip_loopback: clean(r["IP Loopback"] ?? r.__ipLoopback),
+        designacao: clean(r["DesignaÃ§Ã£o"] ?? r.__designacao),
+      });
+    }
+    const isoladas = Array.from(isolatedByCodigo.values());
+    m.qtd_lotericas_isoladas = isoladas.length;
+    m.lotericas_isoladas = isoladas;
+    for (const l of isoladas) {
+      lotericasIsoladasDetalhe.push({
+        massiva: m.id_massiva,
+        ip_loopback: l.ip_loopback ?? "",
+        designacao: l.codigo_loterica,
+      });
+    }
+  }
+
   const geoStats = applyGeoAnalysis(rows, massivas, cidadesLookup);
 
   const stats = {

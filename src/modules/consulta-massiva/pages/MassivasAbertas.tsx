@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { applyAtualizacaoToMascara, proximoStatusLine } from "@/modules/consulta-massiva/lib/mascara";
+import { SituacaoBadge } from "@/modules/consulta-massiva/components/SituacaoBadge";
+import type { Situacao } from "@/modules/consulta-massiva/lib/gis-types";
 
 type MassivaCircuito = {
   codigo_loterica: string | null;
@@ -161,13 +163,54 @@ function codigoLoterica(row: MassivaRecord): string {
   return row.massiva_circuitos?.find((circuito) => circuito.codigo_loterica)?.codigo_loterica ?? "-";
 }
 
+function normalizeSituacao(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function isCircuitoIsolado(circuito: MassivaCircuito): boolean {
+  const status = normalizeSituacao(circuito.status);
+  return status.includes("LOTERICA ISOLADA") ||
+    status.includes("LOTERICA_ISOLADA") ||
+    status === "ISOLADA";
+}
+
+function situacaoFromCircuito(circuito: MassivaCircuito): Situacao {
+  if (isCircuitoIsolado(circuito)) return "LOTERICA_ISOLADA";
+  return normalizeSituacao(circuito.status).includes("MASSIVA") ? "MASSIVA" : "ISOLADO";
+}
+
+function countIsoladas(row: MassivaRecord): number {
+  const codigos = new Set(
+    (row.massiva_circuitos ?? [])
+      .filter(isCircuitoIsolado)
+      .map((circuito) => normalizeSituacao(circuito.codigo_loterica))
+      .filter(Boolean),
+  );
+  return codigos.size || Number(row.qtd_lotericas_isoladas ?? 0);
+}
+
+function codigosIsoladas(row: MassivaRecord): string[] {
+  return Array.from(
+    new Set(
+      (row.massiva_circuitos ?? [])
+        .filter(isCircuitoIsolado)
+        .map((circuito) => circuito.codigo_loterica?.trim())
+        .filter((codigo): codigo is string => !!codigo),
+    ),
+  );
+}
+
 function editStateFrom(row: MassivaRecord): EditState {
   return {
     consorcio_ul: row.consorcio_ul ?? "CONSÓRCIO",
     tipo_link: row.tipo_link ?? (isBackup(row) ? "SECUNDÁRIO" : "PRIMÁRIO"),
     chamado: row.chamado ?? "",
     qtd_circuitos: String(row.qtd_circuitos ?? 0),
-    qtd_lotericas_isoladas: String(row.qtd_lotericas_isoladas ?? 0),
+    qtd_lotericas_isoladas: String(countIsoladas(row)),
     inc: row.inc ?? "",
     data_hora_abertura: toDateTimeLocal(row.data_hora_abertura ?? row.primeiro_alarme),
     status: normalizeMassivaStatus(row.status),
@@ -308,11 +351,7 @@ export default function MassivasAbertas() {
     const tipoEvento = m.tipo_link === "SECUNDARIO" ? "Secundario" : "Principal";
     const caso = `${m.inc ?? m.chamado ?? "PENDENTE"} | Evento Massivo ${tipoEvento} | | ${m.circuito_pai ?? "-"}`;
     const chamadoInterno = m.chamado ?? m.inc ?? "PENDENTE";
-    const isoladasRaw = (m.massiva_circuitos ?? [])
-      .filter((c) => c.ip_loopback)
-      .map((c) => ({ ip_loopback: c.ip_loopback ?? "", designacao: c.designacao ?? m.circuito_pai ?? "-" }));
-    const maxIp = isoladasRaw.reduce((acc, l) => Math.max(acc, l.ip_loopback.length), 0);
-    const isoladas = isoladasRaw.map((l) => `${l.ip_loopback.padEnd(maxIp + 3, " ")}${l.designacao}`);
+    const isoladas = codigosIsoladas(m);
 
     const text = [
       "===============================",
@@ -324,8 +363,8 @@ export default function MassivasAbertas() {
       `Caso: ${caso}`,
       `Tipo: ${tipoLabel}`,
       `UF: ${m.uf}`,
-      `Quantidade Isoladas: ${String(m.qtd_lotericas_isoladas).padStart(2, "0")}`,
-      `Quantidade total: ${String(m.qtd_circuitos).padStart(2, "0")}`,
+      `Quantidade Isoladas: ${String(countIsoladas(m)).padStart(2, "0")}`,
+      `Quantidade total: ${m.qtd_circuitos}`,
       `Horário da falha: ${m.primeiro_alarme ?? m.data_hora_abertura ?? "PENDENTE"}`,
       `Horário de Normalização: ${m.data_hora_normalizacao ?? "PENDENTE"}`,
       `Causa/Solução: PENDENTE`,
@@ -333,7 +372,9 @@ export default function MassivasAbertas() {
       `Horas: ${proximoStatusLine()}`,
       "===============================",
       "",
-      ...isoladas,
+      "LOTÉRICAS ISOLADAS",
+      "",
+      ...(isoladas.length ? isoladas : ["Nenhuma lotérica isolada identificada."]),
     ].join("\n");
     await navigator.clipboard.writeText(text);
     toast.success("Mascara copiada");
@@ -751,7 +792,7 @@ function MassivaUnitsDialog({ massiva, onClose }: { massiva: MassivaRecord | nul
                   <td className="px-3 py-2 font-mono">{circuito.tipo_link || "-"}</td>
                   <td className="px-3 py-2 font-mono">{circuito.operadora || "-"}</td>
                   <td className="px-3 py-2 font-mono">{circuito.tipo_empresa || "-"}</td>
-                  <td className="px-3 py-2 font-mono">{circuito.status || "-"}</td>
+                  <td className="px-3 py-2"><SituacaoBadge situacao={situacaoFromCircuito(circuito)} /></td>
                 </tr>
               ))}
             </tbody>

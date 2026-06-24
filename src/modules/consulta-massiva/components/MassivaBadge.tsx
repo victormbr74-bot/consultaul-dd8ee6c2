@@ -15,13 +15,13 @@ export function MassivaBadge({ tipo }: { tipo: TipoMassiva | string | null | und
       {parts.map((p, i) => {
         const cls =
           p === "PRINCIPAL_VTAL"
-            ? "border-noc-red/40 bg-noc-red/10 text-noc-red"
+            ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300"
             : p === "PRINCIPAL_OEMP"
-              ? "border-orange-500/40 bg-orange-500/10 text-orange-500"
+              ? "border-orange-500/50 bg-orange-500/10 text-orange-600 dark:text-orange-300"
               : p === "SECUNDARIO_UF"
-                ? "border-noc-yellow/40 bg-noc-yellow/10 text-noc-yellow"
+                ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300"
                 : p === "SECUNDARIO_NACIONAL"
-                  ? "border-noc-blue/40 bg-noc-blue/10 text-noc-blue"
+                  ? "border-purple-500/50 bg-purple-500/10 text-purple-700 dark:text-purple-300"
                   : "border-border bg-muted text-muted-foreground";
         return (
           <span

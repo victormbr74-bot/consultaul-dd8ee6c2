@@ -11,6 +11,7 @@ export interface LotericaLookupRow {
   ccto_oi: string | null;
   ccto_oemp: string | null;
   cpe_meraki: string | null;
+  circuito_meraki: string | null;
   circuito_elsys: string | null;
   designacao_nova: string | null;
   operadora: string | null;
@@ -162,7 +163,7 @@ const fetchByColumn = async (column: MatchField, terms: string[]) => {
     const { data, error } = await (supabase as any)
       .from("lotericas")
       .select(
-        "cod_ul,nome_loterica,ccto_oi,ccto_oemp,cpe_meraki,circuito_elsys,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data",
+        "cod_ul,nome_loterica,ccto_oi,ccto_oemp,designacao_nova,operadora,ip_nat,ip_wan,loopback_wan,loopback_lan,endereco,contato,cidade,uf,status,updated_at,raw_data",
       )
       .in(column, queryTerms);
 

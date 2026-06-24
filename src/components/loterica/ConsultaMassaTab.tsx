@@ -386,7 +386,7 @@ const FieldTile = ({ label, value, mono }: { label: string; value: string; mono?
 
 const MASS_UPDATE_FETCH_BATCH_SIZE = 150;
 const MASS_UPDATE_LOOKUP_SELECT =
-  "cod_ul,ccto_oi,ccto_oemp,cpe_meraki,circuito_elsys,designacao_nova,operadora,loopback_wan,loopback_lan,endereco,contato,status,cidade,uf,raw_data";
+  "cod_ul,ccto_oi,ccto_oemp,designacao_nova,operadora,loopback_wan,loopback_lan,endereco,contato,status,cidade,uf,raw_data";
 
 const summarizeCodes = (codes: string[], maxItems = 8) => {
   if (codes.length <= maxItems) return codes.join(", ");

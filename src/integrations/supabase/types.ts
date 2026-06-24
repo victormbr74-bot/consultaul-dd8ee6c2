@@ -1110,8 +1110,11 @@ export type Database = {
           ccto_oemp: string | null
           ccto_oi: string | null
           cidade: string | null
+          circuito_elsys: string | null
+          circuito_meraki: string | null
           cod_ul: string
           contato: string | null
+          cpe_meraki: string | null
           designacao_nova: string | null
           endereco: string | null
           ip_nat: string | null
@@ -1130,8 +1133,11 @@ export type Database = {
           ccto_oemp?: string | null
           ccto_oi?: string | null
           cidade?: string | null
+          circuito_elsys?: string | null
+          circuito_meraki?: string | null
           cod_ul: string
           contato?: string | null
+          cpe_meraki?: string | null
           designacao_nova?: string | null
           endereco?: string | null
           ip_nat?: string | null
@@ -1150,8 +1156,11 @@ export type Database = {
           ccto_oemp?: string | null
           ccto_oi?: string | null
           cidade?: string | null
+          circuito_elsys?: string | null
+          circuito_meraki?: string | null
           cod_ul?: string
           contato?: string | null
+          cpe_meraki?: string | null
           designacao_nova?: string | null
           endereco?: string | null
           ip_nat?: string | null

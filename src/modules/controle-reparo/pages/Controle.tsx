@@ -609,7 +609,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
 
     const onUp = () => {
       const ref = resizingRef.current;
-      if (ref?.frame !== null) {
+      if (ref && ref.frame !== null) {
         window.cancelAnimationFrame(ref.frame);
         tableRef.current?.style.setProperty(columnCssVar(ref.id), `${ref.latestWidth}px`);
       }

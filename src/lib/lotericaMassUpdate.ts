@@ -7,6 +7,7 @@ type ColumnFieldKey =
   | "ccto_oi"
   | "ccto_oemp"
   | "cpe_meraki"
+  | "circuito_meraki"
   | "circuito_elsys"
   | "loopback_wan"
   | "loopback_lan"
@@ -57,6 +58,7 @@ export interface MassUpdateExistingRow {
   ccto_oi?: string | null;
   ccto_oemp?: string | null;
   cpe_meraki?: string | null;
+  circuito_meraki?: string | null;
   circuito_elsys?: string | null;
   loopback_wan?: string | null;
   loopback_lan?: string | null;
@@ -123,7 +125,13 @@ const MASS_UPDATE_FIELDS: MassUpdateFieldSpec[] = [
     kind: "column",
     key: "cpe_meraki",
     label: "CPE Meraki",
-    aliases: ["CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "cpe_meraki"],
+    aliases: ["CPE MERAKI", "cpe_meraki"],
+  },
+  {
+    kind: "column",
+    key: "circuito_meraki",
+    label: "Circuito Meraki",
+    aliases: ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "circuito_meraki"],
   },
   {
     kind: "column",
@@ -427,6 +435,7 @@ export const createMassUpdateTemplateWorkbook = () => {
     { header: "LOOPBACK SECUNDARIO", key: "loopback_lan", width: 22, style: { numFmt: "@" } },
     { header: "CCTO OEMP", key: "ccto_oemp", width: 20, style: { numFmt: "@" } },
     { header: "CPE MERAKI", key: "cpe_meraki", width: 22, style: { numFmt: "@" } },
+    { header: "CIRCUITO MERAKI", key: "circuito_meraki", width: 24, style: { numFmt: "@" } },
     { header: "CIRCUITO ELSYS", key: "circuito_elsys", width: 22, style: { numFmt: "@" } },
     { header: "EMPRESA OEMP", key: "empresa_oemp", width: 20, style: { numFmt: "@" } },
     { header: "CIRCUITO OEMP", key: "circuito_oemp", width: 24, style: { numFmt: "@" } },
@@ -444,6 +453,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       loopback_lan: "10.10.20.1",
       ccto_oemp: "",
       cpe_meraki: "",
+      circuito_meraki: "",
       circuito_elsys: "",
       empresa_oemp: "",
       circuito_oemp: "",
@@ -459,6 +469,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       loopback_lan: "",
       ccto_oemp: "OEMP-123456",
       cpe_meraki: "MCO-123456",
+      circuito_meraki: "MERAKI-123456",
       circuito_elsys: "",
       empresa_oemp: "CLARO",
       circuito_oemp: "CLARO-123456",
@@ -474,6 +485,7 @@ export const createMassUpdateTemplateWorkbook = () => {
       loopback_lan: "",
       ccto_oemp: "",
       cpe_meraki: "",
+      circuito_meraki: "",
       circuito_elsys: "ELSYS-123456",
       empresa_oemp: "",
       circuito_oemp: "",

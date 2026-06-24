@@ -27,6 +27,7 @@ const EDITABLE_KEYS = [
   "ccto_oi",
   "ccto_oemp",
   "cpe_meraki",
+  "circuito_meraki",
   "circuito_elsys",
   "designacao_nova",
   "operadora",
@@ -108,13 +109,17 @@ const normalizeLotericaRecord = (row: any) => {
   const currentLoopbackLan = String(row?.loopback_lan || "").trim();
   const cpeMeraki =
     String(row?.cpe_meraki || "").trim() ||
-    String(getRawValueByAliases(raw, ["CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"]) || "").trim();
+    String(getRawValueByAliases(raw, ["CPE MERAKI"]) || "").trim();
+  const circuitoMeraki =
+    String(row?.circuito_meraki || "").trim() ||
+    String(getRawValueByAliases(raw, ["CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI"]) || "").trim();
   const circuitoElsys =
     String(row?.circuito_elsys || "").trim() ||
     String(getRawValueByAliases(raw, ["CIRCUITO ELSYS", "ELSYS"]) || "").trim();
   const normalized = {
     ...row,
     ...(cpeMeraki ? { cpe_meraki: cpeMeraki } : {}),
+    ...(circuitoMeraki ? { circuito_meraki: circuitoMeraki } : {}),
     ...(circuitoElsys ? { circuito_elsys: circuitoElsys } : {}),
   };
 

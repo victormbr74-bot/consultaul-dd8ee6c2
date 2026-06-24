@@ -268,14 +268,19 @@ export default function ImportacoesPage() {
       if (latestError) throw latestError;
       if (!latest || latest.length === 0) return [];
 
-      let query = supabase.from("staging_bases").select("linhas").eq("tipo", viewTipo!);
+      let query = supabase
+        .from("staging_bases")
+        .select("linhas")
+        .eq("tipo", viewTipo!)
+        .order("id", { ascending: true })
+        .range(0, 4);
       if (latest[0].importacao_id) {
         query = query.eq("importacao_id", latest[0].importacao_id);
       } else {
         query = query.eq("criado_em", latest[0].criado_em);
       }
 
-      const { data, error } = await query.order("criado_em", { ascending: true });
+      const { data, error } = await query;
       if (error) throw error;
       const linhas = (data ?? []).flatMap(
         (item) => (item.linhas as Record<string, unknown>[]) ?? [],

@@ -5,6 +5,7 @@ import type { Row } from "./parse";
 import { PROCESSING_TIMEZONE, processingDate, processingTimestamp } from "./date";
 
 const PAGE = 1000;
+const STAGING_CHUNK_PAGE = 25;
 let controleVersaoSupported: boolean | null = null;
 const PRESERVE_MANUAL_EDITS_FROM_HISTORY = false;
 
@@ -275,31 +276,43 @@ export async function getLatestStaging(tipo: Tipo): Promise<Row[]> {
   if (latestError) throw latestError;
   if (!latest || latest.length === 0) return [];
 
-  let query = supabase.from("staging_bases").select("linhas").eq("tipo", tipo);
-
   const latestImportacaoId = latest[0]?.importacao_id;
-  if (latestImportacaoId) {
-    query = query.eq("importacao_id", latestImportacaoId);
-  } else {
-    query = query.eq("criado_em", latest[0].criado_em);
-  }
-
-  const { data, error } = await query.order("criado_em", { ascending: true });
-
-  if (error) throw error;
-  if (!data || data.length === 0) return [];
-
   const out: Row[] = [];
-  for (const r of data) {
-    const rows = (r.linhas as Row[]) ?? [];
-    if (rows.length <= 500) {
-      out.push(...rows);
+  let from = 0;
+
+  while (true) {
+    let query = supabase
+      .from("staging_bases")
+      .select("linhas")
+      .eq("tipo", tipo)
+      .order("id", { ascending: true })
+      .range(from, from + STAGING_CHUNK_PAGE - 1);
+
+    if (latestImportacaoId) {
+      query = query.eq("importacao_id", latestImportacaoId);
     } else {
-      for (let i = 0; i < rows.length; i += 500) {
-        out.push(...rows.slice(i, i + 500));
+      query = query.eq("criado_em", latest[0].criado_em);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    for (const r of data) {
+      const rows = (r.linhas as Row[]) ?? [];
+      if (rows.length <= 500) {
+        out.push(...rows);
+      } else {
+        for (let i = 0; i < rows.length; i += 500) {
+          out.push(...rows.slice(i, i + 500));
+        }
       }
     }
+
+    if (data.length < STAGING_CHUNK_PAGE) break;
+    from += STAGING_CHUNK_PAGE;
   }
+
   return out;
 }
 

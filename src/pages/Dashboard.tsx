@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 const PAGE_SIZE = 20;
 const EXPORT_BATCH_SIZE = 1000;
 const PROFILE_EXPORT_BATCH_SIZE = 200;
+const PREVIEW_SELECT = "cod_ul,nome_loterica,ccto_oi,cidade,uf,operadora,status";
 
 const isFilled = (value: unknown) => {
   if (value === null || value === undefined) return false;
@@ -85,6 +86,23 @@ const buildDashboardSearchFilter = (
   }
 
   return [...filters].join(",");
+};
+
+const isShortCodeSearch = (value: string) => {
+  const compact = value.replace(/[^\d]/g, "");
+  return compact.length > 0 && compact.length <= 6 && /^[\d\s-]+$/.test(value);
+};
+
+const buildPreviewSearchFilter = (value: string, extraColumns: string[] = []) => {
+  if (isShortCodeSearch(value)) {
+    const filters = new Set<string>();
+    for (const candidate of buildCodUlSearchVariants(value)) {
+      filters.add(`cod_ul.ilike.%${candidate}%`);
+    }
+    return [...filters].join(",");
+  }
+
+  return buildDashboardSearchFilter(value, extraColumns);
 };
 
 const formatDateTimePtBr = (value: unknown) => {
@@ -235,7 +253,7 @@ const Dashboard = () => {
 
       if (cancelled) return false;
 
-      if (error && error.code === "42703") {
+      if (error) {
         return false;
       }
 
@@ -243,8 +261,9 @@ const Dashboard = () => {
     };
 
     const detectExtraColumns = async () => {
-      const [hasCpeMeraki, hasCircuitoElsys] = await Promise.all([
+      const [hasCpeMeraki, hasCircuitoMeraki, hasCircuitoElsys] = await Promise.all([
         checkColumn("cpe_meraki"),
+        checkColumn("circuito_meraki"),
         checkColumn("circuito_elsys"),
       ]);
 
@@ -252,6 +271,7 @@ const Dashboard = () => {
 
       extraSearchColumnsRef.current = [
         ...(hasCpeMeraki ? ["cpe_meraki"] : []),
+        ...(hasCircuitoMeraki ? ["circuito_meraki"] : []),
         ...(hasCircuitoElsys ? ["circuito_elsys"] : []),
       ];
     };
@@ -275,30 +295,30 @@ const Dashboard = () => {
     try {
       const exactCandidates = buildCodUlExactCandidates(term);
 
-      if (exactCandidates.length > 1 || (exactCandidates.length === 1 && exactCandidates[0] !== term.toUpperCase())) {
-        const { data, count, error } = await supabase
+      if (exactCandidates.length > 0) {
+        const { data, error } = await supabase
           .from("lotericas")
-          .select("*", { count: "exact" })
+          .select(PREVIEW_SELECT)
           .in("cod_ul", exactCandidates)
           .order("cod_ul")
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
         if (error) {
           console.error("Erro ao buscar lotericas por codigo", error);
-        } else if ((count || 0) > 0) {
-          setLotericas(data || []);
-          setTotal(count || 0);
+        } else if ((data || []).length > 0) {
+          setLotericas((data || []) as Tables<"lotericas">[]);
+          setTotal((data || []).length);
           return;
         }
       }
 
-      const orFilter = buildDashboardSearchFilter(
+      const orFilter = buildPreviewSearchFilter(
         term,
         extraSearchColumnsRef.current
       );
-      const query = supabase.from("lotericas").select("*", { count: "exact" }).or(orFilter);
+      const query = supabase.from("lotericas").select(PREVIEW_SELECT).or(orFilter);
 
-      const { data, count, error } = await query
+      const { data, error } = await query
         .order("cod_ul")
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
@@ -309,8 +329,8 @@ const Dashboard = () => {
         return;
       }
 
-      setLotericas(data || []);
-      setTotal(count || 0);
+      setLotericas((data || []) as Tables<"lotericas">[]);
+      setTotal((data || []).length < PAGE_SIZE && page === 0 ? (data || []).length : (page + 1) * PAGE_SIZE + ((data || []).length === PAGE_SIZE ? 1 : 0));
     } catch (error) {
       console.error("Falha inesperada ao buscar lotericas", error);
       setLotericas([]);
@@ -365,7 +385,7 @@ const Dashboard = () => {
         return;
       }
 
-      const orFilter = buildDashboardSearchFilter(
+      const orFilter = buildPreviewSearchFilter(
         singleTerm,
         extraSearchColumnsRef.current
       );
@@ -482,7 +502,8 @@ const Dashboard = () => {
         const nomeLoterica = firstFilled(row.nome_loterica, pickRaw("NOME UL", "nome_loterica"));
         const cctoOi = firstFilled(row.ccto_oi, pickRaw("CCTO OI", "ccto_oi"));
         const cctoOemp = firstFilled(row.ccto_oemp, pickRaw("CCTO OEMP", "ccto_oemp"));
-        const cpeMeraki = firstFilled(row.cpe_meraki, pickRaw("CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "cpe_meraki"));
+        const cpeMeraki = firstFilled(row.cpe_meraki, pickRaw("CPE MERAKI", "cpe_meraki"));
+        const circuitoMeraki = firstFilled(row.circuito_meraki, pickRaw("CIRCUITO MERAKI", "CIRCUITOS MERAKI", "MERAKI", "circuito_meraki"));
         const circuitoElsys = firstFilled(row.circuito_elsys, pickRaw("CIRCUITO ELSYS", "ELSYS", "circuito_elsys"));
         const designacaoNova = firstFilled(row.designacao_nova, pickRaw("DESIGINACAO NOVA", "DESIGNAÇÃO NOVA", "designacao_nova"));
         const operadora = firstFilled(row.operadora, pickRaw("OPERADORA 4G", "operadora"));
@@ -534,7 +555,8 @@ const Dashboard = () => {
           "STATUS UL": status,
           "SIM CARD 4G": pickRaw("SIM CARD 4G"),
           TECNOLOGIA: pickRaw("TECNOLOGIA"),
-          MERAKI: firstFilled(cpeMeraki, pickRaw("MERAKI", "CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI")),
+          "CPE MERAKI": cpeMeraki,
+          "CIRCUITO MERAKI": circuitoMeraki,
           "IP NAT": ipNat,
           "IP WAN": ipWan,
           "IP SWITCH": pickRaw("IP SWITCH", "LOOPBACK SWITCH"),

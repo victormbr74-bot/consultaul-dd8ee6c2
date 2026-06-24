@@ -105,6 +105,33 @@ const buildPreviewSearchFilter = (value: string, extraColumns: string[] = []) =>
   return buildDashboardSearchFilter(value, extraColumns);
 };
 
+const getErrorMessage = (error: unknown) => {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || "");
+  }
+  return String(error);
+};
+
+const isTransientFetchError = (error: unknown) => {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("err_failed") ||
+    message.includes("522")
+  );
+};
+
+const logUnexpectedQueryError = (label: string, error: unknown) => {
+  if (!isTransientFetchError(error)) {
+    console.error(label, error);
+  }
+};
+
 const formatDateTimePtBr = (value: unknown) => {
   const text = asString(value);
   if (!text) return "";
@@ -304,7 +331,7 @@ const Dashboard = () => {
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
         if (error) {
-          console.error("Erro ao buscar lotericas por codigo", error);
+          logUnexpectedQueryError("Erro ao buscar lotericas por codigo", error);
         } else if ((data || []).length > 0) {
           setLotericas((data || []) as Tables<"lotericas">[]);
           setTotal((data || []).length);
@@ -323,7 +350,7 @@ const Dashboard = () => {
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (error) {
-        console.error("Erro ao buscar lotericas", error);
+        logUnexpectedQueryError("Erro ao buscar lotericas", error);
         setLotericas([]);
         setTotal(0);
         return;
@@ -332,7 +359,7 @@ const Dashboard = () => {
       setLotericas((data || []) as Tables<"lotericas">[]);
       setTotal((data || []).length < PAGE_SIZE && page === 0 ? (data || []).length : (page + 1) * PAGE_SIZE + ((data || []).length === PAGE_SIZE ? 1 : 0));
     } catch (error) {
-      console.error("Falha inesperada ao buscar lotericas", error);
+      logUnexpectedQueryError("Falha inesperada ao buscar lotericas", error);
       setLotericas([]);
       setTotal(0);
     } finally {
@@ -373,7 +400,7 @@ const Dashboard = () => {
           .limit(1);
 
         if (exactError) {
-          console.error("Erro ao buscar loterica por codigo", exactError);
+          logUnexpectedQueryError("Erro ao buscar loterica por codigo", exactError);
         } else {
           codUl = exactRows?.[0]?.cod_ul;
         }
@@ -397,8 +424,8 @@ const Dashboard = () => {
         .limit(1);
 
       if (error) {
-        console.error("Erro ao buscar lotericas (atalho Enter)", error);
-        alert("Erro ao buscar lot\u00E9ricas.");
+        logUnexpectedQueryError("Erro ao buscar lotericas (atalho Enter)", error);
+        alert("Nao foi possivel consultar as lotericas agora. Tente novamente em instantes.");
         return;
       }
 
@@ -411,8 +438,8 @@ const Dashboard = () => {
       setLotericaTab("consulta");
       navigate(`/loterica/${encodeURIComponent(first)}`);
     } catch (error) {
-      console.error("Falha inesperada ao buscar lotericas (atalho Enter)", error);
-      alert("Falha inesperada ao buscar lot\u00E9ricas.");
+      logUnexpectedQueryError("Falha inesperada ao buscar lotericas (atalho Enter)", error);
+      alert("Nao foi possivel consultar as lotericas agora. Tente novamente em instantes.");
     }
   }, [navigate, search, setLotericaTab]);
 

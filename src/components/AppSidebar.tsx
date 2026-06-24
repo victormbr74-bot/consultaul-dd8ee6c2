@@ -50,6 +50,27 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
+const getErrorMessage = (error: unknown) => {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || "");
+  }
+  return String(error);
+};
+
+const isTransientFetchError = (error: unknown) => {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("err_failed") ||
+    message.includes("522")
+  );
+};
+
 export function AppSidebar() {
   const appVersionLabel = `v${__APP_VERSION__}`;
   const location = useLocation();
@@ -168,12 +189,11 @@ export function AppSidebar() {
         .eq("status", "pending");
 
       if (error) {
-        const msg =
-          error && typeof error === "object" && "message" in error
-            ? String((error as { message?: string }).message || "")
-            : "";
+        const msg = getErrorMessage(error);
         if (!(msg.includes("loterica_change_requests") && msg.includes("Could not find the table"))) {
-          console.error("Erro ao carregar pendencias de alteracao", error);
+          if (!isTransientFetchError(error)) {
+            console.error("Erro ao carregar pendencias de alteracao", error);
+          }
         }
         setPendingChangeCount(0);
         return;
@@ -181,7 +201,9 @@ export function AppSidebar() {
 
       setPendingChangeCount(count || 0);
     } catch (error) {
-      console.error("Falha inesperada ao carregar pendencias de alteracao", error);
+      if (!isTransientFetchError(error)) {
+        console.error("Falha inesperada ao carregar pendencias de alteracao", error);
+      }
       setPendingChangeCount(0);
     }
   }, [isAdmin]);

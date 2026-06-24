@@ -504,84 +504,95 @@ const Dashboard = () => {
         const updaterProfile = updatedBy ? profileById.get(updatedBy) : undefined;
         const updatedByDisplay = [updaterProfile?.user_code, updaterProfile?.name].filter(Boolean).join(" - ");
 
-        const baseData: Record<(typeof LEGACY_EXPORT_HEADERS)[number], unknown> = {
-          "Código UL": codUl,
-          "Nome Lotérica": nomeLoterica,
+        const baseData: Record<string, unknown> = {
+          cod_ul: codUl,
+          "DESIGINACAO NOVA": designacaoNova,
           "CCTO OI": cctoOi,
+          "BASE UN": pickRaw("BASE UN"),
           "CCTO OEMP": cctoOemp,
-          "Designação Nova": designacaoNova,
-          "Operadora": operadora,
+          "Ponto Lógico / Designação": firstFilled(
+            pickRaw("Ponto Lógico / Designação", "PONTO LOGICO DESIGNACAO", "PONTO LOGICO"),
+            designacaoNova,
+            codUl,
+          ),
+          "NOME UL": nomeLoterica,
+          CONTATO: contato,
+          "ENDEREÇO": endereco,
+          UF: uf,
+          HOMOLOGADO: pickRaw("HOMOLOGADO"),
+          "MIGRAÇÃO": pickRaw("MIGRACAO", "MIGRAÇÃO"),
+          OWNER: pickRaw("OWNER"),
+          "RESP BACKUP": pickRaw("RESP BACKUP"),
+          "OPERADORA 4G": firstFilled(pickRaw("OPERADORA 4G"), operadora),
+          "TIPO LOTERICA": pickRaw("TIPO LOTERICA", "TIPO UL"),
+          TFL: pickRaw("TFL", "TFLs", "TFLS"),
+          "EMPRESA OEMP": pickRaw("EMPRESA OEMP"),
+          "CIRCUITO OEMP": pickRaw("CIRCUITO OEMP"),
+          "LOOPBACK PRINCIPAL": loopbackPrincipal,
+          "LOOPBACK SECUNDARIO": loopbackSecundario,
+          "REDE LAN": firstFilled(pickRaw("REDE LAN", "REDE_LAN"), row.loopback_lan),
+          "STATUS UL": status,
+          "SIM CARD 4G": pickRaw("SIM CARD 4G"),
+          TECNOLOGIA: pickRaw("TECNOLOGIA"),
+          MERAKI: firstFilled(cpeMeraki, pickRaw("MERAKI", "CPE MERAKI", "CIRCUITO MERAKI", "CIRCUITOS MERAKI")),
           "IP NAT": ipNat,
           "IP WAN": ipWan,
-          "Loopback Principal": loopbackPrincipal,
-          "Loopback Secundário": loopbackSecundario,
-          "Rede LAN": firstFilled(pickRaw("REDE LAN", "REDE_LAN"), row.loopback_lan),
-          "Endereço": endereco,
-          "Contato": contato,
-          "Status": status,
-          "Cidade": cidade,
-          UF: uf,
-          "IP Switch": pickRaw("IP SWITCH", "LOOPBACK SWITCH"),
-          TFL: pickRaw("TFL", "TFLs", "TFLS"),
-          "Circuito OEMP": pickRaw("CIRCUITO OEMP"),
-          "CPE Meraki": cpeMeraki,
-          "Circuito Elsys": circuitoElsys,
-          "Empresa OEMP": pickRaw("EMPRESA OEMP"),
-          "Tipo UL": pickRaw("TIPO LOTERICA", "TIPO UL"),
-          "Perímetro": pickRaw("PERIMETRO", "PERÍMETRO"),
-          Tecnologia: pickRaw("TECNOLOGIA"),
-          "Modelo Roteador": pickRaw("MODELO ROTEADOR"),
-          "Circuito Backup": pickRaw("CIRCUITO BACKUP"),
-          "SIM Card 4G": pickRaw("SIM CARD 4G"),
-          Owner: pickRaw("OWNER"),
-          "Resp. Backup": pickRaw("RESP BACKUP"),
-          "Região": pickRaw("REGIAO", "REGIÃO"),
+          "IP SWITCH": pickRaw("IP SWITCH", "LOOPBACK SWITCH"),
+          "REGIÃO": pickRaw("REGIAO", "REGIÃO"),
           CEP: pickRaw("CEP"),
-          "Migração": pickRaw("MIGRACAO", "MIGRAÇÃO"),
-          Homologado: pickRaw("HOMOLOGADO"),
-          "Atualizado em": formatDateTimePtBr(updatedAtRaw),
+          "MODELO ROTEADOR": pickRaw("MODELO ROTEADOR"),
+          MUNICIPIO: cidade,
+          PERIMETRO: pickRaw("PERIMETRO", "PERÍMETRO"),
         };
 
-        const userData: Record<(typeof USER_EXPORT_HEADERS)[number], unknown> = {
-          "Usuário que alterou": updatedByDisplay || updatedBy,
-          "Código usuário que alterou": updaterProfile?.user_code ?? "",
-          "Nome usuário que alterou": updaterProfile?.name ?? "",
-        };
-
-        return { raw, rawByNormalized, baseData, userData };
+        return { raw, rawByNormalized, baseData };
       });
 
-      const extraHeaders: Array<{ label: string; normalized: string }> = [];
-      const seenExtra = new Set<string>();
+      const EXPORT_COLUMNS: string[] = [
+        "cod_ul",
+        "DESIGINACAO NOVA",
+        "CCTO OI",
+        "BASE UN",
+        "CCTO OEMP",
+        "Ponto Lógico / Designação",
+        "NOME UL",
+        "CONTATO",
+        "ENDEREÇO",
+        "UF",
+        "HOMOLOGADO",
+        "MIGRAÇÃO",
+        "OWNER",
+        "RESP BACKUP",
+        "OPERADORA 4G",
+        "TIPO LOTERICA",
+        "TFL",
+        "EMPRESA OEMP",
+        "CIRCUITO OEMP",
+        "LOOPBACK PRINCIPAL",
+        "LOOPBACK SECUNDARIO",
+        "REDE LAN",
+        "STATUS UL",
+        "SIM CARD 4G",
+        "TECNOLOGIA",
+        "Ponto Lógico / Designação",
+        "MERAKI",
+        "IP NAT",
+        "IP WAN",
+        "IP SWITCH",
+        "REGIÃO",
+        "CEP",
+        "MODELO ROTEADOR",
+        "MUNICIPIO",
+        "PERIMETRO",
+      ];
 
-      preparedRows.forEach(({ raw }) => {
-        Object.keys(raw).forEach((key) => {
-          const normalized = normalizeHeaderKey(key);
-          if (!normalized || BASE_NORMALIZED_HEADER_KEYS.has(normalized) || seenExtra.has(normalized)) return;
-          seenExtra.add(normalized);
-          extraHeaders.push({ label: key, normalized });
-        });
-      });
+      const exportRows = preparedRows.map(({ baseData }) =>
+        EXPORT_COLUMNS.map((header) => baseData[header] ?? ""),
+      );
 
-      const exportData = preparedRows.map(({ rawByNormalized, baseData, userData }) => {
-        const orderedRow: Record<string, unknown> = {};
-
-        LEGACY_EXPORT_HEADERS.forEach((header) => {
-          orderedRow[header] = baseData[header] ?? "";
-        });
-
-        extraHeaders.forEach(({ label, normalized }) => {
-          orderedRow[label] = firstFilled(rawByNormalized.get(normalized), "");
-        });
-
-        USER_EXPORT_HEADERS.forEach((header) => {
-          orderedRow[header] = userData[header] ?? "";
-        });
-
-        return orderedRow;
-      });
-
-      const wb = jsonToWorkbook([{ name: "Lotéricas", data: exportData }]);
+      const wb = arraysToWorkbook([
+        { name: "Lotéricas", headers: EXPORT_COLUMNS, rows: exportRows },
+      ]);
       await writeFile(wb, "lotericas_export.xlsx");
     } catch (error) {
       console.error("Falha inesperada ao exportar lotericas", error);

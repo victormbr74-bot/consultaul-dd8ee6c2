@@ -163,6 +163,18 @@ export function jsonToWorkbook(
   return wb;
 }
 
+export function arraysToWorkbook(
+  sheets: { name: string; headers: string[]; rows: unknown[][] }[],
+): ExcelJS.Workbook {
+  const wb = new ExcelJS.Workbook();
+  for (const { name, headers, rows } of sheets) {
+    const ws = wb.addWorksheet(name);
+    ws.addRow(headers);
+    for (const r of rows) ws.addRow(r);
+  }
+  return wb;
+}
+
 export async function writeFile(wb: ExcelJS.Workbook, filename: string): Promise<void> {
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

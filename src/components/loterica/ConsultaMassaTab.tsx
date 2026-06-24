@@ -689,14 +689,14 @@ const ConsultaMassaTab = () => {
 
       for (let index = 0; index < requestedCodes.length; index += MASS_UPDATE_FETCH_BATCH_SIZE) {
         const batch = requestedCodes.slice(index, index + MASS_UPDATE_FETCH_BATCH_SIZE);
-        const { data, error: fetchError } = await supabase
+        const { data, error: fetchError } = await (supabase as any)
           .from("lotericas")
           .select(MASS_UPDATE_LOOKUP_SELECT)
           .in("cod_ul", batch);
 
         if (fetchError) throw new Error(fetchError.message || "Falha ao carregar as ULs informadas na planilha.");
 
-        (data || []).forEach((row) => {
+        (data || []).forEach((row: any) => {
           const code = normalizeText(row.cod_ul).toUpperCase();
           if (code) existingByCode.set(code, row as MassUpdateExistingRow);
         });

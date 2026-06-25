@@ -77,10 +77,12 @@ function minuteIso(value: number | string | null | undefined): string {
 
 function dayRangeFor(ts: number) {
   const d = new Date(ts);
-  d.setHours(0, 0, 0, 0);
-  const start = d.toISOString();
-  d.setHours(23, 59, 59, 999);
-  return { start, end: d.toISOString() };
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+  return {
+    start: start.toISOString(),
+    end: new Date(end.getTime() - 1).toISOString(),
+  };
 }
 
 function rowCircuitKey(row: ProcessedRow): string {
@@ -292,6 +294,37 @@ export default function Page() {
       setResult(r);
       setProcessing(false);
 
+      const validTsRows = r.rows.filter((row) => Number.isFinite(row.__ts));
+      const timestamps = validTsRows.map((row) => row.__ts);
+      const menorData = timestamps.length ? new Date(Math.min(...timestamps)).toISOString() : null;
+      const maiorData = timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null;
+      const registrosPorData: Record<string, number> = {};
+      for (const row of validTsRows) {
+        const d = new Date(row.__ts);
+        const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        registrosPorData[key] = (registrosPorData[key] ?? 0) + 1;
+      }
+      const qtdPrincipal = validTsRows.filter((row) => row.__tipoLink === "PRINCIPAL").length;
+      const qtdSecundario = validTsRows.filter((row) => row.__tipoLink === "SECUNDARIO").length;
+      const auditDetails: Record<string, unknown> = {
+        total_registros_gs: all.length,
+        total_registros_valida_data: validTsRows.length,
+        menor_data_hora: menorData,
+        maior_data_hora: maiorData,
+        registros_por_data: registrosPorData,
+        qtd_principal: qtdPrincipal,
+        qtd_secundario: qtdSecundario,
+        qtd_principal_vtal: r.stats.principalVtal,
+        qtd_principal_oemp: r.stats.principalOemp,
+        qtd_secundario_uf: r.stats.secundarioUf,
+        qtd_secundario_nacional: r.stats.secundarioNacional,
+        massivas_detectadas: r.massivas.length,
+        circuitos_impactados: r.stats.circuitosImpactados,
+        ufs_impactadas: r.stats.ufsImpactadas,
+      };
+      console.info("[consulta-massiva] auditoria analise", auditDetails);
+      void logAudit("EXECUTAR_ANALISE", "analises", auditDetails);
+
       // Persist analise + massivas (best-effort)
       try {
         const { data: userData } = await supabase.auth.getUser();
@@ -407,6 +440,8 @@ export default function Page() {
         }
         await logAudit("EXECUTAR_ANALISE", "analises", {
           massivas: r.massivas.length,
+          massivas_salvas: (persistedMassivas ?? []).length,
+          massivas_duplicadas: r.massivas.length - massivasParaInserir.length,
           registros: r.stats.totalRegistros,
           lotericas_isoladas: r.stats.lotericasIsoladas,
           geo: r.stats.geo,

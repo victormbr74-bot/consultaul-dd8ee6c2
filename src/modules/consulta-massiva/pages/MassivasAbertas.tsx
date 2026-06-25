@@ -84,13 +84,33 @@ const MASSIVA_SELECT =
   "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
 
 async function fetchMassivas(): Promise<MassivaRecord[]> {
-  const { data, error } = await supabase
-    .from("massivas")
-    .select(MASSIVA_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(500);
-  if (error) throw error;
-  return (data ?? []) as MassivaRecord[];
+  const pageSize = 1000;
+  const out: MassivaRecord[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("massivas")
+      .select(MASSIVA_SELECT)
+      .order("data_hora_abertura", { ascending: false, nullsFirst: false })
+      .order("primeiro_alarme", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...((data ?? []) as MassivaRecord[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  console.info("[consulta-massiva] massivas retornadas pelo controle", {
+    total: out.length,
+    menorDataAlarme: out.length
+      ? new Date(Math.min(...out.map((m) => eventDate(m).getTime()).filter(Number.isFinite))).toISOString()
+      : null,
+    maiorDataAlarme: out.length
+      ? new Date(Math.max(...out.map((m) => eventDate(m).getTime()).filter(Number.isFinite))).toISOString()
+      : null,
+  });
+  return out;
 }
 
 function eventDate(m: MassivaRecord): Date {

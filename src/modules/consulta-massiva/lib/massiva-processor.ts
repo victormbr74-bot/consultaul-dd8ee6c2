@@ -94,7 +94,7 @@ function dedupeInputRows(input: InputRow[]): InputRow[] {
       getCell(row, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo"),
       getCell(row, "Designação", "DesignaÃ§Ã£o", "Designacao", "DESIGNACAO"),
       getCell(row, "IP Loopback", "IP LOOPBACK", "IP_LOOPBACK", "Loopback"),
-      getCell(row, "Data e Hora Incial", "Data e Hora Inicial", "Data e Hora", "Data/Hora", "DataHora"),
+      getCell(row, "Data e Hora Incial", "Data e Hora Inicial", "Data/Hora Inicial", "Data e Hora", "Data/Hora", "DataHora", "Data", "Hora", "Data e Hora do Alarme", "Data/Hora do Alarme", "Data Inicial", "Hora Inicial"),
     ]
       .map((value) => normalizeLookup(value))
       .join("|");
@@ -376,14 +376,14 @@ export function processGis(
   const rows: ProcessedRow[] = inputRows.map((r, i) => {
     const tipoRawOrig = getCell(r, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo");
     const tipoUpper = tipoRawOrig.toUpperCase().trim();
-    // Normaliza variações: PRINCIPAL/PRI/MAIN, SECUNDARIO/SEC/BACKUP/BKP
+    const tipoKey = normKey(tipoUpper);
     let tipoRaw = tipoUpper;
-    if (/^(PRINC|PRI|MAIN|PRIMARIO|PRIMÁRIO)/.test(tipoUpper)) tipoRaw = "PRINCIPAL";
-    else if (/^(SEC|BACKUP|BKP|BKO|BK\b)/.test(tipoUpper)) tipoRaw = "SECUNDARIO";
-    const uf = getCell(r, "UF", "Uf", "ESTADO", "Estado").toUpperCase().trim();
+    if (!tipoKey || tipoKey === "linkfora" || /(PRINC|PRI|MAIN|PRIMARIO|PRIMÁRIO|PRINCIPAL)/.test(tipoUpper)) tipoRaw = "PRINCIPAL";
+    else if (/(SEC|BACKUP|BKP|BKO|BK|SECUNDARIO|SECUNDÁRIO)/.test(tipoUpper)) tipoRaw = "SECUNDARIO";
+    const uf = getCell(r, "UF", "Uf", "ESTADO", "Estado", "Unidade Federativa", "Sigla UF").toUpperCase().trim();
     const desig = getCell(r, "Designação", "DesignaÃ§Ã£o", "Designacao", "DESIGNACAO");
     const ip = getCell(r, "IP Loopback", "IP LOOPBACK", "IP_LOOPBACK", "Loopback");
-    const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial", "Data e Hora", "Data/Hora", "DataHora");
+    const dataHoraRaw = getCell(r, "Data e Hora Incial", "Data e Hora Inicial", "Data/Hora Inicial", "Data e Hora", "Data/Hora", "DataHora", "Data", "Hora", "Data e Hora do Alarme", "Data/Hora do Alarme", "Data Inicial", "Hora Inicial");
     const correctedTs = parseDateBR(dataHoraRaw);
     const correctedCodigo = getCell(r, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "Cod. da Loterica", "Código da Lotérica", "Codigo da Loterica", "Codigo");
     const lotericaRef = findLoterica(correctedCodigo, desig, ip, lotericasLookup);
@@ -434,14 +434,17 @@ export function processGis(
     const tipoCounts: Record<string, number> = {};
     let invalidTs = 0;
     let semUf = 0;
+    const classificacaoCounts: Record<string, number> = {};
     for (const r of rows) {
       const k = r.__tipoLink || "(vazio)";
       tipoCounts[k] = (tipoCounts[k] ?? 0) + 1;
-      if (isNaN(r.__ts)) invalidTs++;
+      if (Number.isNaN(r.__ts)) invalidTs++;
       if (!r.__uf) semUf++;
+      const c = r.__classificacao || "(vazio)";
+      classificacaoCounts[c] = (classificacaoCounts[c] ?? 0) + 1;
     }
     console.info("[massiva] colunas:", Object.keys(input[0] ?? {}));
-    console.info("[massiva] tipoLink:", tipoCounts, "| ts inválidos:", invalidTs, "| sem UF:", semUf, "| total:", rows.length);
+    console.info("[massiva] tipoLink:", tipoCounts, "| classificacao:", classificacaoCounts, "| ts inválidos:", invalidTs, "| sem UF:", semUf, "| total:", rows.length);
   }
 
   const ts = rows.map((r) => r.__ts);

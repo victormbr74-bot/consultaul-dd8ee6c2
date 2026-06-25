@@ -86,6 +86,15 @@ function formatProcessingReport(report: ProcessReport): string {
     : "nenhum";
   const r = report.resultado;
   const resp = report.responsaveis;
+  const planta = report.planta;
+  const plantaExemplos = planta.exemplosEnriquecidos.length
+    ? planta.exemplosEnriquecidos
+        .map(
+          (e) =>
+            `${e.codigo_loterica}/${e.tipo_link ?? "-"}: Empresa=${e.empresa ?? "-"}, Parceiro=${e.designacao_parceiro ?? "-"}, Novo=${e.novo_circuito ?? "-"}, 4G=${e.responsavel_backup ?? "-"}`,
+        )
+        .join(" | ")
+    : "nenhum";
   const dist = (m: Record<string, number>) =>
     Object.entries(m)
       .map(([k, v]) => `${k}: ${v}`)
@@ -101,6 +110,8 @@ function formatProcessingReport(report: ProcessReport): string {
       ? "INC Snow: coluna real não localizada na base Jira; campo não preenchido para evitar dado incorreto."
       : "INC Snow: preenchido somente pela coluna Snow detectada, sem fallback para Chave.",
     `Grafana: cruzados por Circuito ${report.grafana.cruzados}; com Postos ${report.grafana.comPostos}; coluna Posto usada ${postoOrigin}; exemplos ${grafanaExemplos}.`,
+    `Planta: origem ${planta.origem}; registros lidos ${planta.total}; cruzados ${planta.cruzados}; Empresa preenchida ${planta.empresaPreenchida}; Desig. Parceiro preenchida ${planta.designacaoParceiroPreenchida}; Novo Circuito preenchido ${planta.novoCircuitoPreenchido}; Operadora localizada ${planta.operadoraPreenchida}; OPERADORA 4G/Resp. Backup preenchida ${planta.operadora4gPreenchida}; sem correspondencia ${planta.semCorrespondencia}.`,
+    `Planta exemplos: ${plantaExemplos}.`,
     `Responsáveis Secundário (${resp.secundarioTotal}): ${dist(resp.secundario)} | preservados D-1 ${resp.secundarioPreservadoD1}.`,
     `Responsáveis OI/OI Legado (${resp.oiTotal}): ${dist(resp.oi)} | preservados D-1 ${resp.oiPreservadoD1}.`,
     `Responsáveis OEMP Principal (${resp.oempTotal} | distribuídos ${resp.oempDistribuidos}): ${dist(resp.oemp)}.`,

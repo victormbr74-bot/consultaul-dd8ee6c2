@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fetchLotericasExportRows } from "@/lib/lotericasExport";
 import type { ControleRow, ImplantacaoRow } from "./processing";
 import { processControle } from "./processing";
 import type { Row } from "./parse";
@@ -246,7 +247,7 @@ async function requireControleVersaoColumn(): Promise<void> {
   );
 }
 
-type Tipo = "gis1" | "gis2" | "controle_d1" | "jira" | "grafana" | "planta";
+type Tipo = "gis1" | "gis2" | "controle_d1" | "jira" | "grafana";
 
 function toControleInsertPayload(row: ControleRow): Omit<ControleRow, "id"> {
   const payload = { ...(row as unknown as Record<string, unknown>) };
@@ -331,12 +332,17 @@ export async function runDailyProcessing(): Promise<{
     getLatestStaging("controle_d1"),
     getLatestStaging("jira"),
     getLatestStaging("grafana"),
-    getLatestStaging("planta"),
+    fetchLotericasExportRows(),
     fetchProfileNames(),
   ]);
 
   if (gis1.length === 0 && gis2.length === 0) {
     throw new Error("Importe ao menos uma base GIS antes de processar.");
+  }
+  if (planta.length === 0) {
+    throw new Error(
+      "Nao foi possivel localizar os dados automaticos do Consulta UL / lotericas_export para enriquecimento da Planta.",
+    );
   }
 
   await requireControleVersaoColumn();

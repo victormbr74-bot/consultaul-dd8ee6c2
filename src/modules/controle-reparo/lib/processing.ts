@@ -208,6 +208,25 @@ export interface ProcessReport {
     colunaPosto: string | null;
     exemplosPosto: string[];
   };
+  planta: {
+    origem: string;
+    total: number;
+    cruzados: number;
+    empresaPreenchida: number;
+    designacaoParceiroPreenchida: number;
+    novoCircuitoPreenchido: number;
+    operadoraPreenchida: number;
+    operadora4gPreenchida: number;
+    semCorrespondencia: number;
+    exemplosEnriquecidos: Array<{
+      codigo_loterica: string;
+      tipo_link: string | null;
+      empresa: string | null;
+      designacao_parceiro: string | null;
+      novo_circuito: string | null;
+      responsavel_backup: string | null;
+    }>;
+  };
   responsaveis: {
     secundarioTotal: number;
     secundario: Record<string, number>;
@@ -1135,6 +1154,13 @@ export function processControle(input: ProcessInput): ProcessResult {
   let ordemConvertidaReparo = 0;
   let statusPlanilhaCec = 0;
   let oempTotal = 0;
+  let plantaCruzados = 0;
+  let plantaEmpresaPreenchida = 0;
+  let plantaDesignacaoParceiroPreenchida = 0;
+  let plantaNovoCircuitoPreenchido = 0;
+  let plantaOperadoraPreenchida = 0;
+  let plantaOperadora4gPreenchida = 0;
+  const plantaExemplos: ProcessReport["planta"]["exemplosEnriquecidos"] = [];
   const semIncAte24hKeys = new Set<string>();
   const filaJiraVaziaExemplos: ProcessReport["jira"]["filaJiraVaziaExemplos"] = [];
 
@@ -1331,6 +1357,13 @@ export function processControle(input: ProcessInput): ProcessResult {
       gisCodeCountsByKey,
     );
     if (plCols) {
+      plantaCruzados++;
+      const beforePlanta = {
+        empresa: row.empresa,
+        designacao_parceiro: row.designacao_parceiro,
+        novo_circuito: row.novo_circuito,
+        responsavel_backup: row.responsavel_backup,
+      };
       row.empresa =
         plCols.get("empresacef") ||
         plCols.get("empresaoemp") ||
@@ -1345,6 +1378,23 @@ export function processControle(input: ProcessInput): ProcessResult {
       if (!row.novo_circuito && plantaNovoCircuito) row.novo_circuito = plantaNovoCircuito;
       if (isLinkBackup(row.tipo_link)) {
         row.responsavel_backup = plCols.get("operadora4g") || row.responsavel_backup;
+      }
+      if (!beforePlanta.empresa && row.empresa) plantaEmpresaPreenchida++;
+      if (!beforePlanta.designacao_parceiro && row.designacao_parceiro) {
+        plantaDesignacaoParceiroPreenchida++;
+      }
+      if (!beforePlanta.novo_circuito && row.novo_circuito) plantaNovoCircuitoPreenchido++;
+      if (plCols.get("operadora")) plantaOperadoraPreenchida++;
+      if (!beforePlanta.responsavel_backup && row.responsavel_backup) plantaOperadora4gPreenchida++;
+      if (plantaExemplos.length < 5) {
+        plantaExemplos.push({
+          codigo_loterica: row.codigo_loterica,
+          tipo_link: row.tipo_link,
+          empresa: row.empresa,
+          designacao_parceiro: row.designacao_parceiro,
+          novo_circuito: row.novo_circuito,
+          responsavel_backup: row.responsavel_backup,
+        });
       }
     }
 
@@ -1585,6 +1635,18 @@ export function processControle(input: ProcessInput): ProcessResult {
       colunaPosto: Object.entries(grafanaPostoColumns).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
       exemplosPosto: grafanaPostoExamples,
     },
+    planta: {
+      origem: "Consulta UL / lotericas_export automatico",
+      total: plantaAll.length,
+      cruzados: plantaCruzados,
+      empresaPreenchida: plantaEmpresaPreenchida,
+      designacaoParceiroPreenchida: plantaDesignacaoParceiroPreenchida,
+      novoCircuitoPreenchido: plantaNovoCircuitoPreenchido,
+      operadoraPreenchida: plantaOperadoraPreenchida,
+      operadora4gPreenchida: plantaOperadora4gPreenchida,
+      semCorrespondencia: Math.max(0, finalAtivos - plantaCruzados),
+      exemplosEnriquecidos: plantaExemplos,
+    },
     responsaveis: {
       secundarioTotal: secTotal,
       secundario: distSecundario,
@@ -1633,7 +1695,6 @@ export const TIPOS_BASE = [
   { tipo: "controle_d1", label: "Controle D-1", obrigatorio: false },
   { tipo: "jira", label: "Jira", obrigatorio: false },
   { tipo: "grafana", label: "Grafana", obrigatorio: false },
-  { tipo: "planta", label: "Extração Planta", obrigatorio: false },
 ] as const;
 
 export type TipoBase = (typeof TIPOS_BASE)[number]["tipo"];

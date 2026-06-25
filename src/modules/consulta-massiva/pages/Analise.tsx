@@ -144,6 +144,30 @@ function massivaControlFields(m: Massiva, rows: ProcessedRow[]) {
   };
 }
 
+function isolatedTone(count: number | null | undefined): "critical" | "muted" {
+  return Number(count ?? 0) > 0 ? "critical" : "muted";
+}
+
+function radiusTone(radiusKm: number | null | undefined, sinalizacao?: string | null): "green" | "yellow" | "red" | "muted" {
+  if (sinalizacao === "SEM_GEO" || radiusKm == null || !Number.isFinite(radiusKm)) return "muted";
+  if (radiusKm <= 60) return "green";
+  if (radiusKm <= 200) return "yellow";
+  return "red";
+}
+
+function radiusBadgeClass(radiusKm: number | null | undefined, sinalizacao?: string | null): string {
+  const tone = radiusTone(radiusKm, sinalizacao);
+  if (tone === "green") return "border-emerald-400/50 bg-emerald-500/15 text-emerald-200 shadow-[0_0_14px_rgba(52,211,153,0.18)]";
+  if (tone === "yellow") return "border-amber-300/50 bg-amber-400/15 text-amber-200 shadow-[0_0_14px_rgba(251,191,36,0.16)]";
+  if (tone === "red") return "border-red-400/60 bg-red-500/15 text-red-200 shadow-[0_0_16px_rgba(248,113,113,0.22)]";
+  return "border-border bg-muted text-muted-foreground";
+}
+
+function formatRadius(radiusKm: number | null | undefined, sinalizacao?: string | null): string {
+  if (sinalizacao === "SEM_GEO" || radiusKm == null || !Number.isFinite(radiusKm)) return "-";
+  return `${radiusKm} km`;
+}
+
 async function fetchEscalonamentos(): Promise<DbEscalonamento[]> {
   const { data, error } = await supabase.from("escalonamentos").select("*").eq("ativo", true);
   if (error) throw error;
@@ -612,8 +636,8 @@ export default function Page() {
                   <StatCard label="Não Identificados" value={result.stats.naoIdentificados} icon={HelpCircle} tone="muted" sub="circuitos sem operadora" />
                   <StatCard label="Sem Chamado" value={extStats.semChamado} icon={XCircle} tone="red" sub="circuitos impactados" />
                   <StatCard label="Com Chamado" value={extStats.comChamado} icon={CheckCircle2} tone="blue" sub="circuitos impactados" />
-                  <StatCard label="Lotéricas Isoladas" value={result.stats.lotericasIsoladas} icon={AlertOctagon} tone="yellow" sub="dentro de massivas" />
-                  <StatCard label="Circuitos Isolados" value={result.stats.circuitosIsolados} icon={RadioTower} tone="muted" sub="fora de massivas" />
+                  <StatCard label="Lotéricas Isoladas" value={result.stats.lotericasIsoladas} icon={AlertOctagon} tone={result.stats.lotericasIsoladas > 0 ? "critical" : "yellow"} sub="dentro de massivas" />
+                  <StatCard label="Circuitos Isolados" value={result.stats.circuitosIsolados} icon={RadioTower} tone={result.stats.circuitosIsolados > 0 ? "critical" : "muted"} sub="fora de massivas" />
                   <StatCard label="Operadoras Afetadas" value={extStats.operadorasAfetadas} icon={Building2} tone="muted" />
                   <StatCard label="Parceiras Afetadas" value={extStats.parceirasAfetadas} icon={Network} tone="muted" />
                   <StatCard label="Escalon. Disponíveis" value={extStats.escDisponiveis} icon={Shield} tone="blue" sub="massivas com matriz" />
@@ -695,12 +719,12 @@ export default function Page() {
                         <td className="px-3 py-2 text-right font-mono">{m.qtd_circuitos}</td>
                         <td className="px-3 py-2 text-right font-mono">
                           {m.qtd_lotericas_isoladas ? (
-                            <span className="inline-flex items-center justify-end gap-1 rounded bg-noc-yellow/15 px-1.5 py-0.5 text-[10px] font-semibold text-noc-yellow">
+                            <span className="inline-flex items-center justify-end gap-1 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200 border border-red-400/60 shadow-[0_0_16px_rgba(248,113,113,0.22)]">
                               <AlertOctagon className="h-3 w-3" />{String(m.qtd_lotericas_isoladas).padStart(2, "0")}
                             </span>
                           ) : "00"}
                         </td>
-                        <td className="px-3 py-2"><Sinalizacao60kmBadge sinalizacao={m.sinalizacao_60km} /></td>
+                        <td className="px-3 py-2"><Sinalizacao60kmBadge sinalizacao={m.sinalizacao_60km} raioKm={m.raio_maximo_km} /></td>
                         <td className="px-3 py-2 font-mono text-[11px]">{m.cidade_epicentro ? `${m.cidade_epicentro}/${m.uf_epicentro}` : "-"}</td>
                         <td className="px-3 py-2 text-right font-mono">{m.sinalizacao_60km === "SEM_GEO" ? "-" : `${m.raio_maximo_km ?? 0} km`}</td>
                         <td className="px-3 py-2 text-right font-mono">{m.sinalizacao_60km === "SEM_GEO" ? "-" : `${m.percentual_dentro_60km ?? 0}%`}</td>

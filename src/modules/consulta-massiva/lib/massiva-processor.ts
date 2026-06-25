@@ -548,49 +548,7 @@ export function processGis(
 
   const rowById = new Map(rows.map((r) => [r.__rowId, r]));
   const lotericasIsoladasDetalhe: Array<{ massiva: string; ip_loopback: string; designacao: string }> = [];
-  const lotByMassiva = new Map<string, Map<string, string>>();
 
-  for (const m of massivas) {
-    const isolatedInMassiva = new Map<string, string>();
-    const rowIds = new Set(m.rowIds);
-    for (const rowId of m.rowIds) {
-      const r = rowById.get(rowId);
-      if (!r) continue;
-      const ip = clean(r["IP Loopback"] ?? r.__ipLoopback);
-      const desig = clean(r["Designação"] ?? r.__designacao);
-      if (!ip) continue;
-      if (false && ((m.tipo_link === "PRINCIPAL" && isPrincipalOut(r)) || (m.tipo_link === "SECUNDARIO" && isBackupOut(r)))) {
-        if (desig && !isolatedInMassiva.has(ip)) isolatedInMassiva.set(ip, desig);
-      }
-    }
-    for (const [cod, links] of lotericaLinks) {
-      if (isolatedInMassiva.has(cod)) continue;
-      const massivaIdxs = m.tipo_link === "PRINCIPAL" ? links.principal : links.backup;
-      const hasThisLinkInMassiva = Array.from(massivaIdxs).some((idx) => rowIds.has(rows[idx]?.__rowId));
-      if (!hasThisLinkInMassiva) continue;
-      const candidateIdxs = m.tipo_link === "PRINCIPAL" ? links.backup : links.principal;
-      const matchIdx = Array.from(candidateIdxs).find((idx) => {
-        const r = rows[idx];
-        if (!r || r.__uf !== m.uf) return false;
-        if (rowIds.has(r.__rowId)) return false;
-        return Number.isFinite(r.__ts) && r.__ts >= m.primeiro_ts && r.__ts <= m.ultimo_ts;
-      });
-      if (matchIdx != null) {
-        const rr = rows[matchIdx];
-        const ip = clean(rr["IP Loopback"] ?? rr.__ipLoopback);
-        const desig = clean(rr["Designação"] ?? rr.__designacao);
-        if (ip) isolatedInMassiva.set(ip, desig || ip);
-      }
-    }
-    lotByMassiva.set(m.id_massiva, isolatedInMassiva);
-    m.qtd_lotericas_isoladas = isolatedInMassiva.size;
-    m.lotericas_isoladas = [];
-    for (const [ip_loopback, designacao] of isolatedInMassiva) {
-      lotericasIsoladasDetalhe.push({ massiva: m.id_massiva, ip_loopback, designacao });
-    }
-  }
-
-  // Aplica __situacao em cada row.
   for (const r of rows) {
     const cod = codigoLotericaFromRow(r);
     if (cod && codigosIsolados.has(cod)) r.__situacao = "LOTERICA_ISOLADA";
@@ -598,31 +556,46 @@ export function processGis(
     else r.__situacao = "ISOLADO";
   }
 
-  // ---- Análise geográfica (sinalização informativa de 60 km) ----
-  lotericasIsoladasDetalhe.length = 0;
   for (const m of massivas) {
+    const rowIds = new Set(m.rowIds);
     const isolatedByCodigo = new Map<string, { codigo_loterica: string; ip_loopback?: string; designacao?: string }>();
+
     for (const rowId of m.rowIds) {
       const r = rowById.get(rowId);
-      if (!r || !isSituacaoIsolada(r)) continue;
-      const codigo = codigoLotericaDisplayFromRow(r);
-      const key = codigoLotericaFromRow(r);
-      if (!codigo || !key || isolatedByCodigo.has(key)) continue;
-      isolatedByCodigo.set(key, {
-        codigo_loterica: codigo,
-        ip_loopback: clean(r["IP Loopback"] ?? r.__ipLoopback),
-        designacao: clean(r["DesignaÃ§Ã£o"] ?? r.__designacao),
-      });
+      if (!r) continue;
+      const cod = codigoLotericaFromRow(r);
+      if (!cod) continue;
+      const displayCod = codigoLotericaDisplayFromRow(r) || cod;
+      const ip = clean(r["IP Loopback"] ?? r.__ipLoopback);
+      const desig = clean(r["Designação"] ?? r.__designacao);
+
+      if (isSituacaoIsolada(r)) {
+        if (!isolatedByCodigo.has(cod)) {
+          isolatedByCodigo.set(cod, { codigo_loterica: displayCod, ip_loopback: ip || undefined, designacao: desig || undefined });
+        }
+        continue;
+      }
+
+      if (isolatedByCodigo.has(cod)) continue;
+      const entry = lotericaLinks.get(cod);
+      if (!entry) continue;
+      const myLink = m.tipo_link === "PRINCIPAL" ? entry.principal : entry.backup;
+      const hasMyLinkInMassiva = Array.from(myLink).some((idx) => rowIds.has(rows[idx]?.__rowId));
+      if (!hasMyLinkInMassiva) continue;
+      const otherLink = m.tipo_link === "PRINCIPAL" ? entry.backup : entry.principal;
+      if (otherLink.size === 0) continue;
+      const anyOther = otherLink.values().next().value;
+      if (anyOther == null) continue;
+      const rr = rows[anyOther];
+      const otherIp = clean(rr["IP Loopback"] ?? rr.__ipLoopback);
+      const otherDesig = clean(rr["Designação"] ?? rr.__designacao);
+      isolatedByCodigo.set(cod, { codigo_loterica: displayCod, ip_loopback: otherIp || undefined, designacao: otherDesig || undefined });
     }
-    const isoladas = Array.from(isolatedByCodigo.values());
-    m.qtd_lotericas_isoladas = isoladas.length;
-    m.lotericas_isoladas = isoladas;
-    for (const l of isoladas) {
-      lotericasIsoladasDetalhe.push({
-        massiva: m.id_massiva,
-        ip_loopback: l.ip_loopback ?? "",
-        designacao: l.codigo_loterica,
-      });
+
+    m.qtd_lotericas_isoladas = isolatedByCodigo.size;
+    m.lotericas_isoladas = Array.from(isolatedByCodigo.values());
+    for (const l of m.lotericas_isoladas) {
+      lotericasIsoladasDetalhe.push({ massiva: m.id_massiva, ip_loopback: l.ip_loopback ?? "", designacao: l.codigo_loterica });
     }
   }
 

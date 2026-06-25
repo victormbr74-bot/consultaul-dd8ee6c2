@@ -376,9 +376,9 @@ export function processGis(
   const rows: ProcessedRow[] = inputRows.map((r, i) => {
     const tipoRawOrig = getCell(r, "Tipo de Link", "Tipo do Link", "TIPO DE LINK", "Tipo Link", "Tipo");
     const tipoUpper = tipoRawOrig.toUpperCase().trim();
-    const tipoKey = normKey(tipoUpper);
+    const semTipoValido = !tipoUpper || /\bLINK\s+FORA\b/.test(tipoUpper);
     let tipoRaw = tipoUpper;
-    if (!tipoKey || tipoKey === "linkfora" || /(PRINC|PRI|MAIN|PRIMARIO|PRIMÁRIO|PRINCIPAL)/.test(tipoUpper)) tipoRaw = "PRINCIPAL";
+    if (semTipoValido || /(PRINC|PRI|MAIN|PRIMARIO|PRIMÁRIO|PRINCIPAL)/.test(tipoUpper)) tipoRaw = "PRINCIPAL";
     else if (/(SEC|BACKUP|BKP|BKO|BK|SECUNDARIO|SECUNDÁRIO)/.test(tipoUpper)) tipoRaw = "SECUNDARIO";
     const uf = getCell(r, "UF", "Uf", "ESTADO", "Estado", "Unidade Federativa", "Sigla UF").toUpperCase().trim();
     const desig = getCell(r, "Designação", "DesignaÃ§Ã£o", "Designacao", "DESIGNACAO");

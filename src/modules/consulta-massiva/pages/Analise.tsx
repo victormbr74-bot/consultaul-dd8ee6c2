@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -222,11 +222,135 @@ export default function Page() {
   const [processing, setProcessing] = useState(false);
   const { user } = useAuth();
   const [analiseUsuario, setAnaliseUsuario] = useState<string | null>(null);
+  const [analiseId, setAnaliseId] = useState<string | null>(null);
 
   const lotQ = useQuery({ queryKey: ["lotericas-massiva-ref"], queryFn: fetchAllLotericas, staleTime: 5 * 60_000 });
   const operadorasQ = useQuery({ queryKey: ["operadoras-massiva-ref"], queryFn: fetchAllOperadoras, staleTime: 5 * 60_000 });
   const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
   const cidadesQ = useQuery({ queryKey: ["base_cidades-lookup"], queryFn: loadCidadesLookup, staleTime: 5 * 60_000 });
+
+  const massivasTabelaQ = useQuery({
+    queryKey: ["massivas-tabela", analiseId],
+    queryFn: async () => {
+      if (!analiseId) return [];
+      const out: Array<{
+        id: string;
+        id_massiva: string;
+        chamado: string | null;
+        atualizacao: string | null;
+        mascara_texto: string | null;
+        status: string;
+        data_hora_normalizacao: string | null;
+        inc: string | null;
+        consorcio_ul: string;
+        tipo_link: string | null;
+        qtd_circuitos: number;
+        qtd_lotericas_isoladas: number;
+        operadora: string;
+      }> = [];
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("massivas")
+          .select("id,id_massiva,chamado,atualizacao,mascara_texto,status,data_hora_normalizacao,inc,consorcio_ul,tipo_link,qtd_circuitos,qtd_lotericas_isoladas,operadora")
+          .eq("analise_id", analiseId)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data?.length) break;
+        out.push(...(data as typeof out));
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return out;
+    },
+    enabled: !!analiseId,
+    staleTime: 30_000,
+  });
+
+  const resultRef = useRef(result);
+  resultRef.current = result;
+
+  const massivasTabelaMap = useMemo(() => {
+    const map = new Map<string, typeof massivasTabelaQ.data[number]>();
+    for (const m of massivasTabelaQ.data ?? []) map.set(m.id_massiva, m);
+    return map;
+  }, [massivasTabelaQ]);
+
+  useEffect(() => {
+    if (!analiseId || !massivasTabelaQ.data) return;
+    const current = resultRef.current;
+    if (!current) return;
+
+    const tabelaIds = new Set(massivasTabelaQ.data.map(t => t.id_massiva));
+    const massivaMap = new Map(current.massivas.map(m => [m.id_massiva, m]));
+    const rowMap = new Map(current.rows.map(r => [r.__rowId, r]));
+    let anyChange = false;
+
+    for (const t of massivasTabelaQ.data) {
+      const m = massivaMap.get(t.id_massiva);
+      if (!m) continue;
+
+      const updatedMassiva = { ...m } as Massiva;
+      const changedFields: string[] = [];
+      const fields = ["chamado", "atualizacao", "status", "data_hora_normalizacao", "inc", "consorcio_ul", "tipo_link", "qtd_circuitos", "qtd_lotericas_isoladas", "operadora", "mascara_texto"] as const;
+      for (const f of fields) {
+        const tv = (t as Record<string, unknown>)[f];
+        const mv = (m as Record<string, unknown>)[f];
+        if (tv !== undefined && tv !== null && tv !== mv) {
+          (updatedMassiva as Record<string, unknown>)[f] = tv;
+          changedFields.push(f);
+        }
+      }
+      if (changedFields.length > 0) {
+        massivaMap.set(t.id_massiva, updatedMassiva);
+        anyChange = true;
+      }
+
+      for (const rowId of m.rowIds) {
+        const row = rowMap.get(rowId);
+        if (!row) continue;
+        const updatedRow = { ...row } as ProcessedRow;
+        const rowChangedFields: string[] = [];
+        if (changedFields.includes("chamado")) { updatedRow["Chamado"] = t.chamado; rowChangedFields.push("Chamado"); }
+        if (changedFields.includes("inc")) { updatedRow["Nº REQ Caixa"] = t.inc; rowChangedFields.push("Nº REQ Caixa"); }
+        if (changedFields.includes("status")) {
+          updatedRow["Status Massiva"] = t.status === "MASSIVA" ? "MASSIVA" : "NAO_MASSIVA";
+          updatedRow.__situacao = t.status === "MASSIVA" ? "MASSIVA" : (t.status === "NORMALIZADO" ? "ISOLADO" : updatedRow.__situacao);
+          rowChangedFields.push("Status Massiva");
+        }
+        if (changedFields.includes("atualizacao")) { updatedRow["Atualização"] = t.atualizacao; rowChangedFields.push("Atualização"); }
+        if (rowChangedFields.length > 0) {
+          rowMap.set(rowId, updatedRow);
+          anyChange = true;
+        }
+      }
+    }
+
+    const removidas = current.massivas.filter(m => !tabelaIds.has(m.id_massiva));
+    if (removidas.length > 0) {
+      for (const m of removidas) {
+        massivaMap.delete(m.id_massiva);
+        for (const rowId of m.rowIds) {
+          const row = rowMap.get(rowId);
+          if (!row) continue;
+          const updatedRow = { ...row } as ProcessedRow;
+          updatedRow["Status Massiva"] = "NAO_MASSIVA";
+          if (updatedRow.__situacao === "MASSIVA") updatedRow.__situacao = "ISOLADO";
+          rowMap.set(rowId, updatedRow);
+        }
+      }
+      anyChange = true;
+    }
+
+    if (anyChange) {
+      setResult({
+        ...current,
+        massivas: Array.from(massivaMap.values()),
+        rows: Array.from(rowMap.values()),
+      });
+    }
+  }, [analiseId, massivasTabelaQ.data]);
 
   const operadorasConsultaUl = useMemo(() => {
     const fromLotericas = operadorasFromLotericas(lotQ.data ?? []);
@@ -244,10 +368,12 @@ export default function Page() {
         file2?: LoadedFile;
         result?: ProcessResult | null;
         filters?: Filters;
+        analiseId?: string | null;
       };
       setFile1(parsed.file1 ?? null);
       setFile2(parsed.file2 ?? null);
       setResult(parsed.result ?? null);
+      setAnaliseId(parsed.analiseId ?? null);
       setFilters(parsed.filters ?? emptyFilters);
     };
 
@@ -352,14 +478,6 @@ export default function Page() {
       try {
         const { data: userData } = await supabase.auth.getUser();
         setAnaliseUsuario(userData.user?.user_metadata?.name ?? userData.user?.email ?? null);
-        const currentPayload = { file1, file2, result: r, filters };
-        localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify(currentPayload));
-        await (supabase as any).from("analise_resultado_atual").upsert({
-          id: "current",
-          payload: currentPayload,
-          updated_by: userData.user?.id ?? null,
-          updated_at: new Date().toISOString(),
-        });
         const { data: analise } = await supabase.from("analises").insert({
           executado_por: userData.user?.id ?? null,
           total_registros: r.stats.totalRegistros,
@@ -372,6 +490,14 @@ export default function Page() {
           arquivo_1link: file1?.name ?? null,
           arquivo_2links: file2?.name ?? null,
         }).select("id").single();
+        const currentPayload = { file1, file2, result: r, filters, analiseId: analise?.id ?? null };
+        localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify(currentPayload));
+        await (supabase as any).from("analise_resultado_atual").upsert({
+          id: "current",
+          payload: currentPayload,
+          updated_by: userData.user?.id ?? null,
+          updated_at: new Date().toISOString(),
+        });
         let persistedMassivas: { id: string; id_massiva: string }[] | null = null;
         let massivasParaInserir: Massiva[] = r.massivas;
         if (analise && r.massivas.length) {
@@ -605,6 +731,7 @@ export default function Page() {
     setFile1(null);
     setFile2(null);
     setResult(null);
+    setAnaliseId(null);
     setFilters(emptyFilters);
     localStorage.removeItem(ANALISE_STORAGE_KEY);
     void (supabase as any).from("analise_resultado_atual").delete().eq("id", "current");

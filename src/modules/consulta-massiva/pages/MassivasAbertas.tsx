@@ -327,6 +327,7 @@ export default function MassivasAbertas() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["massivas-controle"] });
+      await queryClient.invalidateQueries({ queryKey: ["massivas-tabela"] });
       setPending({});
       setEditingCell(null);
       toast.success("Alterações salvas");
@@ -341,6 +342,7 @@ export default function MassivasAbertas() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["massivas-controle"] });
+      await queryClient.invalidateQueries({ queryKey: ["massivas-tabela"] });
       toast.success("Massiva excluída");
     },
     onError: (error) => toast.error("Falha ao excluir massiva: " + (error as Error).message),
@@ -353,8 +355,9 @@ export default function MassivasAbertas() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["massivas-controle"] });
+      await queryClient.invalidateQueries({ queryKey: ["massivas-tabela"] });
       setSelectedIds([]);
-      toast.success("Massivas excluÃ­das");
+      toast.success("Massivas excluídas");
     },
     onError: (error) => toast.error("Falha ao excluir massivas: " + (error as Error).message),
   });

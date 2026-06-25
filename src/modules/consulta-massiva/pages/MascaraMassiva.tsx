@@ -85,6 +85,7 @@ export default function MascaraMassiva() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["passagem-turno-mascaras"] });
       await queryClient.invalidateQueries({ queryKey: ["massivas-controle"] });
+      await queryClient.invalidateQueries({ queryKey: ["massivas-tabela"] });
       toast.success("Mascara salva");
     },
     onError: (error) => toast.error("Falha ao salvar mascara: " + (error as Error).message),

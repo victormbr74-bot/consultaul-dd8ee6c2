@@ -23,7 +23,7 @@ import { isLinkBackup, normalizeIncidentValue } from "@/modules/controle-reparo/
 import type { Row } from "@/modules/controle-reparo/lib/parse";
 import { getVal, cleanText } from "@/modules/controle-reparo/lib/parse";
 import { FAIXAS, formatDataHora, getFaixa } from "@/modules/controle-reparo/lib/tempo";
-import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
+import { exportControle, exportGenericRows } from "@/modules/controle-reparo/lib/controleExport";
 import { DrillDownDialog, type DrillData } from "@/modules/controle-reparo/components/controle/DrillDownDialog";
 import { useAuth } from "@/modules/controle-reparo/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ import {
 type Metric = {
   key: string;
   label: string;
-  rows: ControleRow[];
+  rows: ControleRow[] | Row[];
   icon: ComponentType<{ className?: string }>;
   tone: keyof typeof TONES;
 };
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     return Number.isFinite(stored) && stored > 0 ? stored : null;
   });
   const [drill, setDrill] = useState<DrillData | null>(null);
-  const open = (title: string, rows: ControleRow[]) => setDrill({ title, rows });
+  const open = (title: string, rows: ControleRow[] | Row[]) => setDrill({ title, rows: rows as Row[] });
 
   const { data: datas } = useQuery({
     queryKey: ["controle-datas"],
@@ -205,7 +205,7 @@ export default function DashboardPage() {
         </div>
 
         <TabsContent value="operacional" className="mt-4">
-          <Indicadores rows={rows} fullRows={rows} versao={versao ?? 1} showLinks onOpen={open} jiraIncStatusMap={jiraIncStatusMap} />
+          <Indicadores rows={rows} fullRows={rows} versao={versao ?? 1} showLinks onOpen={open} jiraIncStatusMap={jiraIncStatusMap} jiraRows={jiraRows} />
         </TabsContent>
 
         <TabsContent value="principal" className="mt-4">
@@ -215,11 +215,12 @@ export default function DashboardPage() {
             versao={versao ?? 1}
             onOpen={open}
             jiraIncStatusMap={jiraIncStatusMap}
+            jiraRows={jiraRows}
           />
         </TabsContent>
 
         <TabsContent value="backup" className="mt-4">
-          <Indicadores rows={backupRows} fullRows={backupRows} versao={versao ?? 1} onOpen={open} jiraIncStatusMap={jiraIncStatusMap} />
+          <Indicadores rows={backupRows} fullRows={backupRows} versao={versao ?? 1} onOpen={open} jiraIncStatusMap={jiraIncStatusMap} jiraRows={jiraRows} />
         </TabsContent>
       </Tabs>
 
@@ -235,16 +236,66 @@ function Indicadores({
   showLinks,
   onOpen,
   jiraIncStatusMap,
+  jiraRows,
 }: {
   rows: ControleRow[];
   fullRows: ControleRow[];
   versao: number;
   showLinks?: boolean;
-  onOpen: (title: string, rows: ControleRow[]) => void;
+  onOpen: (title: string, rows: ControleRow[] | Row[]) => void;
   jiraIncStatusMap: Map<string, string>;
+  jiraRows: Row[];
 }) {
   const g = useMemo(() => computeGroups(rows, fullRows, jiraIncStatusMap), [rows, fullRows, jiraIncStatusMap]);
   const [selectedMetricKey, setSelectedMetricKey] = useState("ativos");
+
+  const controleIncs = useMemo(() => {
+    const incs = new Set<string>();
+    for (const r of fullRows) {
+      const inc = normalizeIncidentValue(r.chamado) || normalizeIncidentValue(r.inc_snow);
+      if (inc) incs.add(inc);
+    }
+    return incs;
+  }, [fullRows]);
+
+  const jiraAlarmRows = useMemo(() => {
+    if (!jiraRows.length) return [] as Row[];
+    const termos = ["LINK PRINCIPAL INOPERANTE", "LINK BACKUP INOPERANTE"];
+    return jiraRows.filter((row) => {
+      const texto = alarmNorm(
+        getVal(
+          row,
+          "Resumo",
+          "Summary",
+          "Título",
+          "Titulo",
+          "Assunto",
+          "Descrição",
+          "Descricao",
+          "Descripcion",
+          "Mensagem",
+          "Tipo",
+          "Chamado",
+          "Chave",
+          "Key",
+          "Descrição do problema",
+          "Descrição do Problema",
+        ),
+      );
+      return termos.some((term) => texto.includes(term));
+    });
+  }, [jiraRows]);
+
+  const incSemAlarmeRows = useMemo(() => {
+    if (!jiraAlarmRows.length) return [] as Row[];
+    return jiraAlarmRows.filter((row) => {
+      const inc = normalizeIncidentValue(
+        getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
+      );
+      if (!inc) return false;
+      return !controleIncs.has(inc);
+    });
+  }, [jiraAlarmRows, controleIncs]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [
@@ -258,9 +309,9 @@ function Indicadores({
         tone: "ok",
       },
       {
-        key: "normalizadosComInc",
-        label: "NORMALIZADOS COM INC",
-        rows: g.normalizadosComInc,
+        key: "incSemAlarmeJira",
+        label: "INC SEM ALARME - GIS",
+        rows: incSemAlarmeRows,
         icon: AlertTriangle,
         tone: "atencao",
       },
@@ -319,20 +370,30 @@ function Indicadores({
         icon: Radio,
         tone: "ok",
       },
+      {
+        key: "alarmesJira",
+        label: "Alarmes do Jira",
+        rows: jiraAlarmRows,
+        icon: AlertTriangle,
+        tone: "atencao",
+      },
     ];
-  }, [g, showLinks]);
+  }, [g, showLinks, jiraAlarmRows, incSemAlarmeRows]);
 
   const selectedMetric = metrics.find((metric) => metric.key === selectedMetricKey) ?? metrics[0];
   const exportRows = selectedMetric.rows;
   const exportFileBase = `dashboard_${slugify(selectedMetric.label)}_v${versao}`;
+  const isJiraMetric = selectedMetricKey === "alarmesJira" || selectedMetricKey === "incSemAlarmeJira";
 
   return (
     <div className="grid min-w-0 gap-4">
-      <DashboardToolbar
-        selectedLabel={selectedMetric.label}
-        exportRows={exportRows}
-        exportFileBase={exportFileBase}
-      />
+      {!isJiraMetric && (
+        <DashboardToolbar
+          selectedLabel={selectedMetric.label}
+          exportRows={exportRows}
+          exportFileBase={exportFileBase}
+        />
+      )}
 
       <Panel title="Indicadores Gerais" subtitle="Cards clicáveis aplicam filtro no gráfico">
         <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
@@ -368,20 +429,156 @@ function Indicadores({
         </Panel>
       )}
 
-      <FaixaPanel
-        title="Faixas de Tempo"
-        subtitle={selectedMetric.label}
-        rows={selectedMetric.rows}
-        onOpen={onOpen}
-      />
+      {isJiraMetric ? (
+        <JiraPanel
+          title={selectedMetric.label}
+          rows={exportRows as Row[]}
+          onOpen={(title, rows) => onOpen(title, rows as Row[])}
+          controleIncs={controleIncs}
+        />
+      ) : (
+        <>
+          <FaixaPanel
+            title="Faixas de Tempo"
+            subtitle={selectedMetric.label}
+            rows={exportRows as ControleRow[]}
+            onOpen={onOpen}
+          />
 
-      <ChamadosPanel
-        title="Chamados do Filtro"
-        subtitle={selectedMetric.label}
-        rows={selectedMetric.rows}
-        onOpen={onOpen}
-      />
+          <ChamadosPanel
+            title="Chamados do Filtro"
+            subtitle={selectedMetric.label}
+            rows={exportRows as ControleRow[]}
+            onOpen={onOpen}
+          />
+        </>
+      )}
     </div>
+  );
+}
+
+function JiraPanel({
+  title,
+  rows,
+  onOpen,
+  controleIncs,
+}: {
+  title: string;
+  rows: Row[];
+  onOpen: (title: string, rows: Row[]) => void;
+  controleIncs: Set<string>;
+}) {
+  const visibleRows = rows.slice(0, 12);
+
+  return (
+    <Panel title={title} subtitle="Base Jira importada">
+      <div className="min-w-0 overflow-hidden rounded-md border bg-background">
+        <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full border-separate border-spacing-0 text-xs">
+            <thead className="bg-secondary text-secondary-foreground">
+              <tr className="[&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
+                <th>INC / Chave</th>
+                <th>Status Jira</th>
+                <th>Tipo do Alarme</th>
+                <th>Resumo / Descrição</th>
+                <th>Fila Jira</th>
+                <th>Tipo de Falha</th>
+                <th>Último Comentário Cliente</th>
+                <th>Último Comentário Interno</th>
+                <th>Sem Correspondência</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row, index) => {
+                const inc = getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc");
+                const texto = alarmNorm(
+                  getVal(
+                    row,
+                    "Resumo",
+                    "Summary",
+                    "Título",
+                    "Titulo",
+                    "Assunto",
+                    "Descrição",
+                    "Descricao",
+                    "Descripcion",
+                    "Mensagem",
+                    "Tipo",
+                    "Chamado",
+                    "Chave",
+                    "Key",
+                    "Descrição do problema",
+                    "Descrição do Problema",
+                  ),
+                );
+                const tipoAlarme = texto.includes("LINK PRINCIPAL INOPERANTE")
+                  ? "LINK PRINCIPAL INOPERANTE"
+                  : texto.includes("LINK BACKUP INOPERANTE")
+                    ? "LINK BACKUP INOPERANTE"
+                    : "—";
+                const semCorrespondencia = !controleIncs.has(inc);
+
+                return (
+                  <tr
+                    key={`${inc ?? String(index)}-${index}`}
+                    className="bg-card/40 hover:bg-muted/45 [&>td]:border-b [&>td]:border-r [&>td]:border-border/80 [&>td]:px-3 [&>td]:py-2 [&>td]:align-middle [&>td:last-child]:border-r-0"
+                  >
+                    <td className="whitespace-nowrap font-semibold">{inc || "—"}</td>
+                    <td className="max-w-[160px] truncate" title={String(getVal(row, "Status") ?? "")}>
+                      {getVal(row, "Status")}
+                    </td>
+                    <td className="whitespace-nowrap">{tipoAlarme}</td>
+                    <td className="max-w-[260px] truncate" title={String(texto)}>
+                      {getVal(row, "Resumo", "Summary", "Descrição", "Descricao")}
+                    </td>
+                    <td className="max-w-[160px] truncate">{getVal(row, "Fila", "Fila Jira")}</td>
+                    <td className="max-w-[160px] truncate">{getVal(row, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")}</td>
+                    <td className="max-w-[260px] truncate whitespace-pre-wrap break-words">
+                      {getVal(row, "Último Comentário", "Ultimo Comentario")}
+                    </td>
+                    <td className="max-w-[260px] truncate whitespace-pre-wrap break-words">
+                      {getVal(row, "Último Comentário Interno", "Ultimo Comentario Interno")}
+                    </td>
+                    <td className="whitespace-nowrap">{semCorrespondencia ? "SIM" : "NÃO"}</td>
+                  </tr>
+                );
+              })}
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                    Nenhum alarme Jira encontrado no filtro selecionado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            Mostrando {visibleRows.length} de {rows.length} registros
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={rows.length === 0}
+              onClick={() => exportGenericRows(rows, "xlsx", `jira_${slugify(title)}`)}
+            >
+              <Download className="mr-2 h-4 w-4" /> Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={rows.length === 0}
+              onClick={() => exportGenericRows(rows, "csv", `jira_${slugify(title)}`)}
+            >
+              <Download className="mr-2 h-4 w-4" /> CSV
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -785,6 +982,41 @@ function normTxt(v: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toUpperCase();
+}
+
+function alarmNorm(v: string | null | undefined): string {
+  return (v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function isJiraAlarmRow(row: Row): boolean {
+  const texto = alarmNorm(
+    getVal(
+      row,
+      "Resumo",
+      "Summary",
+      "Título",
+      "Titulo",
+      "Assunto",
+      "Descrição",
+      "Descricao",
+      "Descripcion",
+      "Mensagem",
+      "Tipo",
+      "Chamado",
+      "Chave",
+      "Key",
+      "Descrição do problema",
+      "Descrição do Problema",
+    ),
+  );
+  return (
+    texto.includes("LINK PRINCIPAL INOPERANTE") || texto.includes("LINK BACKUP INOPERANTE")
+  );
 }
 
 function ordemKey(v: string | null | undefined): string {

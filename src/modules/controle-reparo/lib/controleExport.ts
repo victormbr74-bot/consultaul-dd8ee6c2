@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { ControleRow } from "./processing";
 import { getFaixa, formatHoras, formatDataHora } from "./tempo";
+import type { Row } from "./parse";
 
 /** Monta as linhas de exportação preservando o layout operacional. */
 export function buildExportRows(rows: ControleRow[]) {
@@ -36,6 +37,7 @@ export function buildExportRows(rows: ControleRow[]) {
       "Nº Incidente MAM": r.incidente_mam,
       "Status Zabbix": r.status_zabbix,
       "Status Normalização": r.status_normalizacao,
+      "Tipo de Falha": r.tipo_falha,
     };
   });
 }
@@ -46,5 +48,19 @@ export function exportControle(rows: ControleRow[], fmt: "xlsx" | "csv", fileBas
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Controle");
+  XLSX.writeFile(wb, `${fileBase}.${fmt}`, { bookType: fmt });
+}
+
+/** Exportação genérica para linhas do Jira (Row[]) quando o layout operacional não se aplica. */
+export function exportGenericRows(rows: Row[], fmt: "xlsx" | "csv", fileBase: string) {
+  const headers = Object.keys(rows[0] ?? {});
+  const data = rows.map((r) => {
+    const out: Record<string, unknown> = {};
+    for (const h of headers) out[h] = r[h] ?? "";
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Jira");
   XLSX.writeFile(wb, `${fileBase}.${fmt}`, { bookType: fmt });
 }

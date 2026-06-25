@@ -11,18 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
-import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
+import type { Row } from "@/modules/controle-reparo/lib/parse";
+import { exportControle, exportGenericRows } from "@/modules/controle-reparo/lib/controleExport";
 import { getFaixa, formatHoras, formatDataHora } from "@/modules/controle-reparo/lib/tempo";
 
 export interface DrillData {
   title: string;
-  rows: ControleRow[];
+  rows: ControleRow[] | Row[];
+  dataType?: "controle" | "jira";
 }
 
 interface DrillColumn {
   header: string;
   className?: string;
-  render: (row: ControleRow) => ReactNode;
+  render: (row: ControleRow | Row) => ReactNode;
 }
 
 function text(value: ReactNode): ReactNode {
@@ -30,21 +32,21 @@ function text(value: ReactNode): ReactNode {
 }
 
 const DRILL_COLUMNS: DrillColumn[] = [
-  { header: "Código", className: "font-medium", render: (r) => r.codigo_loterica },
-  { header: "Lotérica", className: "max-w-[220px] truncate", render: (r) => r.loterica },
-  { header: "Tipo", render: (r) => r.tipo_link },
-  { header: "UF", render: (r) => r.uf },
-  { header: "Designação", render: (r) => r.designacao },
-  { header: "IP Loopback", render: (r) => r.ip_loopback },
+  { header: "Código", className: "font-medium", render: (r) => (r as ControleRow).codigo_loterica },
+  { header: "Lotérica", className: "max-w-[220px] truncate", render: (r) => (r as ControleRow).loterica },
+  { header: "Tipo", render: (r) => (r as ControleRow).tipo_link },
+  { header: "UF", render: (r) => (r as ControleRow).uf },
+  { header: "Designação", render: (r) => (r as ControleRow).designacao },
+  { header: "IP Loopback", render: (r) => (r as ControleRow).ip_loopback },
   {
     header: "Início",
     className: "tabular-nums",
-    render: (r) => formatDataHora(r.data_hora_inicial),
+    render: (r) => formatDataHora((r as ControleRow).data_hora_inicial),
   },
   {
     header: "Tempo",
     render: (r) => {
-      const fx = getFaixa(r.data_hora_inicial, r.duracao_h);
+      const fx = getFaixa((r as ControleRow).data_hora_inicial, (r as ControleRow).duracao_h);
       return (
         <Badge className={`${fx.badgeClass} tabular-nums`}>
           {formatHoras(fx.horas)}
@@ -52,45 +54,50 @@ const DRILL_COLUMNS: DrillColumn[] = [
       );
     },
   },
-  { header: "Chamado", render: (r) => r.chamado },
+  { header: "Chamado", render: (r) => (r as ControleRow).chamado },
   {
     header: "Previsão",
     className: "tabular-nums",
-    render: (r) => formatDataHora(r.previsao_atendimento),
+    render: (r) => formatDataHora((r as ControleRow).previsao_atendimento),
   },
   {
     header: "Último Comentário",
     className: "max-w-[420px] whitespace-pre-wrap break-words",
-    render: (r) => r.ultimo_comentario,
+    render: (r) => (r as ControleRow).ultimo_comentario,
   },
-  { header: "Ordem", render: (r) => r.ordem },
-  { header: "Novo Circuito", render: (r) => r.novo_circuito },
+  { header: "Ordem", render: (r) => (r as ControleRow).ordem },
+  { header: "Novo Circuito", render: (r) => (r as ControleRow).novo_circuito },
   {
     header: "Grafana",
-    render: (r) => r.grafana ? <Badge variant="secondary">{r.grafana}</Badge> : "",
+    render: (r) => (r as ControleRow).grafana ? <Badge variant="secondary">{(r as ControleRow).grafana}</Badge> : "",
   },
-  { header: "Empresa", render: (r) => r.empresa },
-  { header: "Desig. Parceiro", render: (r) => r.designacao_parceiro },
-  { header: "Responsável Backup", render: (r) => r.responsavel_backup },
-  { header: "Situação", render: (r) => r.situacao },
+  { header: "Empresa", render: (r) => (r as ControleRow).empresa },
+  { header: "Desig. Parceiro", render: (r) => (r as ControleRow).designacao_parceiro },
+  { header: "Responsável Backup", render: (r) => (r as ControleRow).responsavel_backup },
+  { header: "Situação", render: (r) => (r as ControleRow).situacao },
   {
     header: "Status Planilha",
     className: "max-w-[260px] truncate",
-    render: (r) => r.status_planilha,
+    render: (r) => (r as ControleRow).status_planilha,
   },
-  { header: "Status Jira", render: (r) => r.status_jira },
-  {
-    header: "Obs",
-    className: "max-w-[360px] whitespace-pre-wrap break-words",
-    render: (r) => r.obs,
-  },
-  { header: "Responsável", render: (r) => r.responsavel },
-  { header: "Fila Jira", render: (r) => r.fila_jira },
-  { header: "INC Snow", render: (r) => r.inc_snow },
-  { header: "Incid. MAM", render: (r) => r.incidente_mam },
-  { header: "Status Zabbix", render: (r) => r.status_zabbix },
-  { header: "Status Normalização", render: (r) => r.status_normalizacao },
-  { header: "Normalizado em", render: (r) => formatDataHora(r.normalizado_em) },
+  { header: "Tipo de Falha", render: (r) => (r as ControleRow).tipo_falha ?? "" },
+];
+
+const JIRA_DRILL_COLUMNS: DrillColumn[] = [
+  { header: "INC / Chave", className: "font-medium", render: (r) => (r as Row)["Chave"] ?? (r as Row)["Key"] ?? (r as Row)["Chamado"] ?? (r as Row)["INC"] ?? "" },
+  { header: "Status Jira", render: (r) => (r as Row)["Status"] ?? "" },
+  { header: "Tipo do Alarme", render: (r) => {
+    const texto = String((r as Row)["Resumo"] ?? (r as Row)["Summary"] ?? (r as Row)["Descrição"] ?? (r as Row)["Descricao"] ?? "").toUpperCase();
+    if (texto.includes("LINK PRINCIPAL INOPERANTE")) return "LINK PRINCIPAL INOPERANTE";
+    if (texto.includes("LINK BACKUP INOPERANTE")) return "LINK BACKUP INOPERANTE";
+    return "—";
+  }},
+  { header: "Resumo / Descrição", className: "max-w-[420px] truncate", render: (r) => String((r as Row)["Resumo"] ?? (r as Row)["Summary"] ?? (r as Row)["Descrição"] ?? (r as Row)["Descricao"] ?? "") },
+  { header: "Fila Jira", render: (r) => (r as Row)["Fila"] ?? (r as Row)["Fila Jira"] ?? "" },
+  { header: "Tipo de Falha", render: (r) => (r as Row)["Tipo de Falha"] ?? (r as Row)["Tipo Falha"] ?? (r as Row)["TIPO DE FALHA"] ?? "" },
+  { header: "Último Comentário Cliente", className: "max-w-[360px] whitespace-pre-wrap break-words", render: (r) => (r as Row)["Último Comentário"] ?? (r as Row)["Ultimo Comentario"] ?? "" },
+  { header: "Último Comentário Interno", className: "max-w-[360px] whitespace-pre-wrap break-words", render: (r) => (r as Row)["Último Comentário Interno"] ?? (r as Row)["Ultimo Comentario Interno"] ?? "" },
+  { header: "Sem Correspondência", render: (r) => (r as Row)["_sem_correspondencia"] ? "SIM" : "NÃO" },
 ];
 
 export function DrillDownDialog({
@@ -121,6 +128,15 @@ export function DrillDownDialog({
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
 
+  const columns = data?.dataType === "jira" ? JIRA_DRILL_COLUMNS : DRILL_COLUMNS;
+  const handleExport = (fmt: "xlsx" | "csv") => {
+    if (data?.dataType === "jira") {
+      exportGenericRows(allRows as Row[], fmt, slug);
+    } else {
+      exportControle(allRows as ControleRow[], fmt, slug);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[85vh] max-w-5xl overflow-hidden">
@@ -140,7 +156,7 @@ export function DrillDownDialog({
               variant="outline"
               size="sm"
               disabled={allRows.length === 0}
-              onClick={() => exportControle(rows, "xlsx", `${slug}`)}
+              onClick={() => handleExport("xlsx")}
             >
               <Download className="mr-2 h-4 w-4" /> Excel
             </Button>
@@ -148,7 +164,7 @@ export function DrillDownDialog({
               variant="outline"
               size="sm"
               disabled={allRows.length === 0}
-              onClick={() => exportControle(rows, "csv", `${slug}`)}
+              onClick={() => handleExport("csv")}
             >
               <Download className="mr-2 h-4 w-4" /> CSV
             </Button>
@@ -164,7 +180,7 @@ export function DrillDownDialog({
           <table className="w-max min-w-full border-separate border-spacing-0 border border-border text-xs">
             <thead className="sticky top-0 z-10 bg-secondary text-secondary-foreground">
               <tr className="[&>th]:whitespace-nowrap [&>th]:border-b [&>th]:border-r [&>th]:border-border [&>th]:px-2 [&>th]:py-1.5 [&>th]:text-left [&>th]:font-semibold [&>th:last-child]:border-r-0">
-                {DRILL_COLUMNS.map((column) => (
+                {columns.map((column) => (
                   <th key={column.header}>{column.header}</th>
                 ))}
               </tr>
@@ -172,10 +188,10 @@ export function DrillDownDialog({
             <tbody>
               {rows.map((r, i) => (
                 <tr
-                  key={`${r.id ?? r.codigo_loterica}-${safePage}-${i}`}
+                  key={`${(r as ControleRow).id ?? (r as ControleRow).codigo_loterica ?? (r as Row)[Object.keys(r as Row)[0] ?? ""]}-${safePage}-${i}`}
                   className="border-b [&>td]:border-b [&>td]:border-r [&>td]:border-border/80 [&>td]:px-2 [&>td]:py-1 [&>td]:align-top [&>td:last-child]:border-r-0"
                 >
-                  {DRILL_COLUMNS.map((column) => {
+                  {columns.map((column) => {
                     const value = column.render(r);
                     return (
                       <td

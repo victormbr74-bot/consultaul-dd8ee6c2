@@ -19,7 +19,7 @@ import { processGis, type ProcessResult } from "@/modules/consulta-massiva/lib/m
 import { exportToCsv, exportToPdf, exportToXlsx, processedRowsForExport, readGisFile } from "@/modules/consulta-massiva/lib/excel";
 import { buildEscalonamentoMap, operadorasFromLotericas } from "@/modules/consulta-massiva/lib/operadoras";
 import type { GisRow, Massiva, ProcessedRow } from "@/modules/consulta-massiva/lib/gis-types";
-import type { DbLoterica, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
+import type { DbLoterica, DbEscalonamento, DbOperadora } from "@/modules/consulta-massiva/lib/db-types";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/modules/consulta-massiva/lib/audit";
 import { loadCidadesLookup } from "@/modules/consulta-massiva/lib/base-cidades";
@@ -69,12 +69,6 @@ function pickRowText(row: ProcessedRow | undefined, ...keys: string[]): string {
   return "";
 }
 
-function minuteIso(value: number | string | null | undefined): string {
-  const ts = typeof value === "number" ? value : value ? new Date(value).getTime() : NaN;
-  if (!Number.isFinite(ts)) return "";
-  return new Date(Math.floor(ts / 60000) * 60000).toISOString();
-}
-
 function dayRangeFor(ts: number) {
   const d = new Date(ts);
   const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -97,13 +91,15 @@ function massivaFingerprintFromRows(m: Massiva, rows: ProcessedRow[]): string {
     .filter(Boolean)
     .sort()
     .join(",");
+  const primeiroIso = Number.isFinite(m.primeiro_ts) ? new Date(m.primeiro_ts).toISOString() : "";
+  const ultimoIso = Number.isFinite(m.ultimo_ts) ? new Date(m.ultimo_ts).toISOString() : "";
   return [
     m.tipo_massiva,
     m.uf,
     m.operadora,
     m.qtd_circuitos,
-    minuteIso(m.primeiro_ts),
-    minuteIso(m.ultimo_ts),
+    primeiroIso,
+    ultimoIso,
     circuitos,
   ].join("|");
 }
@@ -114,13 +110,15 @@ function massivaFingerprintFromDb(row: PersistedMassivaForDedupe): string {
     .filter(Boolean)
     .sort()
     .join(",");
+  const primeiroIso = row.primeiro_alarme ?? row.data_hora_abertura ?? "";
+  const ultimoIso = row.ultimo_alarme ?? "";
   return [
     row.tipo_massiva,
     row.uf,
     row.operadora,
     row.qtd_circuitos,
-    minuteIso(row.primeiro_alarme ?? row.data_hora_abertura),
-    minuteIso(row.ultimo_alarme),
+    primeiroIso,
+    ultimoIso,
     circuitos || row.circuito_pai || "",
   ].join("|");
 }
@@ -194,6 +192,25 @@ async function fetchAllLotericas(): Promise<DbLoterica[]> {
   return out;
 }
 
+async function fetchAllOperadoras(): Promise<DbOperadora[]> {
+  const out: DbOperadora[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("operadoras")
+      .select("*")
+      .eq("ativo", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbOperadora[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 export default function Page() {
   const [file1, setFile1] = useState<LoadedFile>(null);
   const [file2, setFile2] = useState<LoadedFile>(null);
@@ -207,10 +224,15 @@ export default function Page() {
   const [analiseUsuario, setAnaliseUsuario] = useState<string | null>(null);
 
   const lotQ = useQuery({ queryKey: ["lotericas-massiva-ref"], queryFn: fetchAllLotericas, staleTime: 5 * 60_000 });
+  const operadorasQ = useQuery({ queryKey: ["operadoras-massiva-ref"], queryFn: fetchAllOperadoras, staleTime: 5 * 60_000 });
   const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
   const cidadesQ = useQuery({ queryKey: ["base_cidades-lookup"], queryFn: loadCidadesLookup, staleTime: 5 * 60_000 });
 
-  const operadorasConsultaUl = useMemo(() => operadorasFromLotericas(lotQ.data ?? []), [lotQ.data]);
+  const operadorasConsultaUl = useMemo(() => {
+    const fromLotericas = operadorasFromLotericas(lotQ.data ?? []);
+    const fromTabela = operadorasQ.data ?? [];
+    return [...fromLotericas, ...fromTabela];
+  }, [lotQ.data, operadorasQ.data]);
   const escMap = useMemo(() => buildEscalonamentoMap(escQ.data ?? []), [escQ.data]);
 
   useEffect(() => {
@@ -282,6 +304,7 @@ export default function Page() {
   const runAnalysis = async () => {
     if (!file1 && !file2) { toast.error("Carregue pelo menos um arquivo GIS."); return; }
     if (!lotQ.data) { toast.error("Base de lotéricas ainda carregando."); return; }
+    if (!operadorasQ.data) { toast.error("Base de operadoras ainda carregando."); return; }
     setProcessing(true);
     setTimeout(async () => {
       const all: GisRow[] = [...(file1?.rows ?? []), ...(file2?.rows ?? [])];
@@ -349,22 +372,33 @@ export default function Page() {
           arquivo_1link: file1?.name ?? null,
           arquivo_2links: file2?.name ?? null,
         }).select("id").single();
+        let persistedMassivas: { id: string; id_massiva: string }[] | null = null;
+        let massivasParaInserir: Massiva[] = r.massivas;
         if (analise && r.massivas.length) {
           const minTs = Math.min(...r.massivas.map((m) => m.primeiro_ts));
           const maxTs = Math.max(...r.massivas.map((m) => m.primeiro_ts));
           const startRange = dayRangeFor(minTs).start;
           const endRange = dayRangeFor(maxTs).end;
-          const { data: existingMassivas, error: existingError } = await supabase
-            .from("massivas")
-            .select("id,tipo_massiva,operadora,uf,qtd_circuitos,primeiro_alarme,ultimo_alarme,data_hora_abertura,circuito_pai,massiva_circuitos(codigo_loterica,designacao,ip_loopback)")
-            .gte("data_hora_abertura", startRange)
-            .lte("data_hora_abertura", endRange);
-          if (existingError) throw existingError;
-
-          const existingRows = (existingMassivas ?? []) as PersistedMassivaForDedupe[];
+          const allExisting: PersistedMassivaForDedupe[] = [];
+          let from = 0;
+          const pageSize = 1000;
+          while (true) {
+            const { data, error } = await supabase
+              .from("massivas")
+              .select("id,tipo_massiva,operadora,uf,qtd_circuitos,primeiro_alarme,ultimo_alarme,data_hora_abertura,circuito_pai,massiva_circuitos(codigo_loterica,designacao,ip_loopback)")
+              .gte("data_hora_abertura", startRange)
+              .lte("data_hora_abertura", endRange)
+              .range(from, from + pageSize - 1);
+            if (error) throw error;
+            if (!data?.length) break;
+            allExisting.push(...(data as PersistedMassivaForDedupe[]));
+            if (data.length < pageSize) break;
+            from += pageSize;
+          }
+          const existingRows = allExisting;
           const existingKeys = new Set(existingRows.map(massivaFingerprintFromDb));
           const batchKeys = new Set<string>();
-          const massivasParaInserir = r.massivas.filter((m) => {
+          massivasParaInserir = r.massivas.filter((m) => {
             const key = massivaFingerprintFromRows(m, r.rows);
             if (
               existingKeys.has(key) ||
@@ -374,10 +408,17 @@ export default function Page() {
             return true;
           });
 
+          console.info("[consulta-massiva] deduplicacao", {
+            detectadas: r.massivas.length,
+            existentes_encontradas: existingRows.length,
+            para_inserir: massivasParaInserir.length,
+            duplicatas: r.massivas.length - massivasParaInserir.length,
+          });
+
           if (massivasParaInserir.length === 0) {
             toast.info(`${r.massivas.length} massiva(s) duplicada(s) ignorada(s) no controle.`);
           } else {
-            const { data: persistedMassivas, error: massivasError } = await supabase.from("massivas").insert(massivasParaInserir.map((m) => {
+            const { data: persistedData, error: massivasError } = await supabase.from("massivas").insert(massivasParaInserir.map((m) => {
             const control = massivaControlFields(m, r.rows);
             return {
               analise_id: analise.id,
@@ -403,6 +444,7 @@ export default function Page() {
             };
           })).select("id,id_massiva");
           if (massivasError) throw massivasError;
+          persistedMassivas = persistedData;
 
           const massivaDbIdByPublicId = new Map((persistedMassivas ?? []).map((m) => [m.id_massiva, m.id]));
           const circuitos = massivasParaInserir.flatMap((m) => {

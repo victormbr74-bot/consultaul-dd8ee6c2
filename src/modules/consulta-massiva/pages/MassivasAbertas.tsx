@@ -84,7 +84,7 @@ const MASSIVA_SELECT =
   "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
 
 async function fetchMassivas(): Promise<MassivaRecord[]> {
-  const pageSize = 1000;
+  const pageSize = 200;
   const out: MassivaRecord[] = [];
   let from = 0;
   while (true) {
@@ -94,6 +94,7 @@ async function fetchMassivas(): Promise<MassivaRecord[]> {
       .order("data_hora_abertura", { ascending: false, nullsFirst: false })
       .order("primeiro_alarme", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;

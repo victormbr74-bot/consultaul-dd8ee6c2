@@ -96,6 +96,7 @@ export interface ControleRow {
   normalizado_em: string | null;
   pendente_enriquecimento: boolean;
   tem_os_reparo: boolean;
+  tipo_falha: string | null;
 }
 
 export interface ImplantacaoRow {
@@ -1229,6 +1230,7 @@ export function processControle(input: ProcessInput): ProcessResult {
       normalizado_em: null,
       pendente_enriquecimento: false,
       tem_os_reparo: false,
+      tipo_falha: null,
     };
 
     // Item 2: OS/Reparo removida do fluxo — não enriquece mais o Controle Operacional.
@@ -1315,6 +1317,7 @@ export function processControle(input: ProcessInput): ProcessResult {
       } else {
         jiraIncSnowVazio++;
       }
+      row.tipo_falha = cleanText(getVal(jr, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")) || null;
       const jiraStatusJira =
         cleanVal(getVal(jr, "Último comentário Cliente", "Ultimo comentario Cliente")) || null;
       const jiraObs = cleanJiraObs(

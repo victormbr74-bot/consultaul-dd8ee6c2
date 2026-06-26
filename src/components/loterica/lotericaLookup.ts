@@ -66,6 +66,12 @@ export const normalizeText = (value: unknown) => String(value ?? "").trim();
 
 const normalizeKey = (value: unknown) => normalizeText(value).toUpperCase();
 const normalizeLooseKey = (value: unknown) => normalizeKey(value).replace(/[^A-Z0-9]/g, "");
+const normalizeRawKey = (value: unknown) =>
+  normalizeText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 
 const toRawObject = (value: unknown): Record<string, unknown> => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -75,9 +81,22 @@ const toRawObject = (value: unknown): Record<string, unknown> => {
 };
 
 const getRawString = (raw: Record<string, unknown>, keys: readonly string[]) => {
+  const looseRaw = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(raw)) {
+    const normalized = normalizeRawKey(key);
+    if (normalized && !looseRaw.has(normalized)) {
+      looseRaw.set(normalized, value);
+    }
+  }
+
   for (const key of keys) {
-    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
-    const value = normalizeText(raw[key]);
+    if (Object.prototype.hasOwnProperty.call(raw, key)) {
+      const value = normalizeText(raw[key]);
+      if (value) return value;
+    }
+
+    const looseValue = looseRaw.get(normalizeRawKey(key));
+    const value = normalizeText(looseValue);
     if (value) return value;
   }
   return "";

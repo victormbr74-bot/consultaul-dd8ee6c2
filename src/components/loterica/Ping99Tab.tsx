@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Wifi } from "lucide-react";
-import { fetchLookupRows, resolveMatches } from "@/components/loterica/lotericaLookup";
+import { fetchLookupRows, getRedeLanValue, resolveMatches, type MatchField } from "@/components/loterica/lotericaLookup";
 import PingExecutionPanel from "./PingExecutionPanel";
 
 interface Ping99TabProps {
@@ -35,6 +35,7 @@ const SOURCE_INTERFACE = "gigabitEthernet0/0/1.1090";
 const PING99_REPEAT = 1;
 const REDE_LAN_KEYS = ["REDE LAN", "REDE_LAN", "rede lan", "rede_lan", "REDELAN", "LAN"] as const;
 const TFL_KEYS = ["TFL", "TFLs"] as const;
+const LOOKUP_FIELD_PRIORITY: MatchField[][] = [["cod_ul"], ["ccto_oi"], ["ccto_oemp"], ["designacao_nova"]];
 
 const padOctet = (value: string) => value.padStart(3, "0");
 const normalizeText = (value: unknown) => String(value ?? "").trim();
@@ -132,7 +133,7 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const [pingResultInput, setPingResultInput] = useState("");
   const [upRows, setUpRows] = useState<ParsedPingMetrics[]>([]);
   const [analysisRan, setAnalysisRan] = useState(false);
-  const autoLookupDoneRef = useRef(false);
+  const lastAutoLookupTermRef = useRef("");
 
   const raw = useMemo(
     () => ((form?.raw_data && typeof form.raw_data === "object") ? form.raw_data as Record<string, unknown> : {}),
@@ -195,9 +196,23 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
   const loadFromConsulta = useCallback(async (term: string) => {
     const query = normalizeText(term);
     if (!query) return;
+
+    setManualCodUl("");
+    setManualRedeLan("");
+    setManualTfl("");
+
     try {
-      const rows = await fetchLookupRows([query]);
-      const [match] = resolveMatches([query], rows);
+      let match = null;
+
+      for (const fields of LOOKUP_FIELD_PRIORITY) {
+        const rows = await fetchLookupRows([query], { fields });
+        const [candidate] = resolveMatches([query], rows, { fields });
+        if (candidate?.row) {
+          match = candidate;
+          break;
+        }
+      }
+
       if (!match?.row) return;
 
       const row = match.row;
@@ -205,7 +220,7 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
         row.raw_data && typeof row.raw_data === "object" ? (row.raw_data as Record<string, unknown>) : {};
 
       setManualCodUl(normalizeText(row.cod_ul));
-      setManualRedeLan(getRawString(rowRaw, REDE_LAN_KEYS));
+      setManualRedeLan(getRedeLanValue(row));
       setManualTfl(getRawString(rowRaw, TFL_KEYS));
     } catch (error) {
       console.error("Falha ao consultar dados para Ping99", error);
@@ -214,10 +229,16 @@ const Ping99Tab = ({ form, autoLookupTerm }: Ping99TabProps) => {
 
   useEffect(() => {
     if (!isStandalone) return;
-    if (autoLookupDoneRef.current) return;
     const term = normalizeText(autoLookupTerm);
-    if (!term) return;
-    autoLookupDoneRef.current = true;
+    if (!term) {
+      lastAutoLookupTermRef.current = "";
+      setManualCodUl("");
+      setManualRedeLan("");
+      setManualTfl("");
+      return;
+    }
+    if (lastAutoLookupTermRef.current === term) return;
+    lastAutoLookupTermRef.current = term;
     void loadFromConsulta(term);
   }, [autoLookupTerm, isStandalone, loadFromConsulta]);
 

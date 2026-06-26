@@ -1238,13 +1238,7 @@ export function processControle(input: ProcessInput): ProcessResult {
 
     // Etapa 3: edicoes manuais do dia atual + Controle D-1 por Codigo + Tipo.
     const inheritedCurrent = currentByChave.get(key);
-    const manualFields = new Set(
-      manualEditFieldsByChave[key]?.length
-        ? manualEditFieldsByChave[key]
-        : inheritedCurrent
-          ? MANUAIS_PRESERVAVEIS
-          : [],
-    );
+    const manualFields = new Set(manualEditFieldsByChave[key] ?? []);
     const inheritedD1 =
       gid.codeTypeKey && d1CodeTypeCounts.get(gid.codeTypeKey) === 1
         ? d1ByCodeType.get(gid.codeTypeKey)
@@ -1254,7 +1248,6 @@ export function processControle(input: ProcessInput): ProcessResult {
     }
     let appliedD1Situacao = false;
     for (const f of MANUAIS_PRESERVAVEIS) {
-      if (f === STATUS_PLANILHA_FIELD) continue;
       if (!inheritedCurrent || !manualFields.has(f)) continue;
       const currentValue = inheritedCurrent[f] as unknown;
       (row as unknown as Record<string, unknown>)[f] =
@@ -1283,12 +1276,11 @@ export function processControle(input: ProcessInput): ProcessResult {
     const jr = inc ? jiraByInc.get(inc) : undefined;
     let jiraFound = false;
     if (!inc) {
-      // Item 7: Chamado sem INC válida — não cruzar com Jira
       semIncTotal++;
-      row.fila_jira = SEM_INC;
-      row.inc_snow = null;
-      row.obs = SEM_INC;
-      row.responsavel = SEM_INC;
+      if (!manualFields.has("fila_jira")) row.fila_jira = SEM_INC;
+      if (!manualFields.has("inc_snow")) row.inc_snow = null;
+      if (!manualFields.has("obs")) row.obs = SEM_INC;
+      if (!manualFields.has("responsavel")) row.responsavel = SEM_INC;
       if (isSemIncAte24h(row, processadoEm)) {
         semIncAte24hKeys.add(row.chave);
       }
@@ -1296,35 +1288,36 @@ export function processControle(input: ProcessInput): ProcessResult {
       incValidosTotal++;
       jiraFound = true;
       comJira++;
-      row.fila_jira = cleanText(getVal(jr, "Status")) || null;
-      if (!row.fila_jira) {
-        filaJiraVazia++;
-        if (filaJiraVaziaExemplos.length < 10) {
-          filaJiraVaziaExemplos.push({
-            codigo_loterica: row.codigo_loterica,
-            chamado: row.chamado,
-            motivo: "INC encontrada no Jira, mas coluna Status vazia.",
-          });
+      if (!manualFields.has("fila_jira")) row.fila_jira = cleanText(getVal(jr, "Status")) || null;
+      if (!manualFields.has("fila_jira")) {
+        if (!row.fila_jira) {
+          filaJiraVazia++;
+          if (filaJiraVaziaExemplos.length < 10) {
+            filaJiraVaziaExemplos.push({
+              codigo_loterica: row.codigo_loterica,
+              chamado: row.chamado,
+              motivo: "INC encontrada no Jira, mas coluna Status vazia.",
+            });
+          }
         }
       }
-      row.incidente_mam = cleanText(getVal(jr, "Nº Incidente MAM", "Incidente MAM")) || null;
+      if (!manualFields.has("incidente_mam")) row.incidente_mam = cleanText(getVal(jr, "Nº Incidente MAM", "Incidente MAM")) || null;
       const incSnow = pickIncSnowFromJira(jr);
-      row.inc_snow = incSnow.value;
-      jiraIncSnowIgnoradoInvalido += incSnow.invalidIgnored;
-      if (incSnow.value) {
+      if (!manualFields.has("inc_snow")) row.inc_snow = incSnow.value;
+      if (!manualFields.has("inc_snow") && incSnow.value) {
         jiraIncSnowPreenchido++;
         if (incSnow.sourceColumn) addDistribution(jiraIncSnowColumnUsage, incSnow.sourceColumn);
-      } else {
+      } else if (!manualFields.has("inc_snow")) {
         jiraIncSnowVazio++;
       }
-      row.tipo_falha = cleanText(getVal(jr, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")) || null;
+      if (!manualFields.has("tipo_falha")) row.tipo_falha = cleanText(getVal(jr, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")) || null;
       const jiraStatusJira =
         cleanVal(getVal(jr, "Último comentário Cliente", "Ultimo comentario Cliente")) || null;
       const jiraObs = cleanJiraObs(
         getVal(jr, "Último comentário Interno", "Ultimo comentario Interno"),
       );
-      if (jiraStatusJira) row.status_jira = jiraStatusJira;
-      if (jiraObs) row.obs = jiraObs;
+      if (!manualFields.has("status_jira") && jiraStatusJira) row.status_jira = jiraStatusJira;
+      if (!manualFields.has("obs") && jiraObs) row.obs = jiraObs;
     } else {
       incValidosTotal++;
       filaJiraVazia++;
@@ -1367,19 +1360,25 @@ export function processControle(input: ProcessInput): ProcessResult {
         novo_circuito: row.novo_circuito,
         responsavel_backup: row.responsavel_backup,
       };
-      row.empresa =
-        plCols.get("empresacef") ||
-        plCols.get("empresaoemp") ||
-        plCols.get("operadora") ||
-        row.empresa;
-      row.designacao_parceiro = plCols.get("circuitooemp") || row.designacao_parceiro;
+      if (!manualFields.has("empresa")) {
+        row.empresa =
+          plCols.get("empresacef") ||
+          plCols.get("empresaoemp") ||
+          plCols.get("operadora") ||
+          row.empresa;
+      }
+      if (!manualFields.has("designacao_parceiro")) {
+        row.designacao_parceiro = plCols.get("circuitooemp") || row.designacao_parceiro;
+      }
       const plantaNovoCircuito =
         plCols.get("designação nova") ||
         plCols.get("designacao nova") ||
         plCols.get("designacaonova") ||
         null;
-      if (!row.novo_circuito && plantaNovoCircuito) row.novo_circuito = plantaNovoCircuito;
-      if (isLinkBackup(row.tipo_link)) {
+      if (!manualFields.has("novo_circuito") && !row.novo_circuito && plantaNovoCircuito) {
+        row.novo_circuito = plantaNovoCircuito;
+      }
+      if (isLinkBackup(row.tipo_link) && !manualFields.has("responsavel_backup")) {
         row.responsavel_backup = plCols.get("operadora4g") || row.responsavel_backup;
       }
       if (!beforePlanta.empresa && row.empresa) plantaEmpresaPreenchida++;
@@ -1413,8 +1412,10 @@ export function processControle(input: ProcessInput): ProcessResult {
       ordemConvertidaReparo++;
     }
 
-    // Status Planilha vem exclusivamente do D-1; ausente ou inválido vira CEC ANALISANDO.
-    row.status_planilha = inheritedD1?.status_planilha ?? STATUS_PLANILHA_PADRAO;
+    // Status Planilha vem do D-1 quando não houver edição manual; ausente ou inválido vira CEC ANALISANDO.
+    if (!manualFields.has("status_planilha")) {
+      row.status_planilha = inheritedD1?.status_planilha ?? STATUS_PLANILHA_PADRAO;
+    }
     if (semIncAte24hKeys.has(row.chave)) {
       row.status_planilha = STATUS_PLANILHA_PADRAO;
     }

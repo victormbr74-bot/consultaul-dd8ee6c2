@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import type { ControleRow } from "./processing";
 import { getFaixa, formatHoras, formatDataHora } from "./tempo";
 import type { Row } from "./parse";
+import { logAuditEvent } from "@/lib/audit";
 
 /** Monta as linhas de exportação preservando o layout operacional. */
 export function buildExportRows(rows: ControleRow[]) {
@@ -44,6 +45,15 @@ export function buildExportRows(rows: ControleRow[]) {
 
 /** Exporta um conjunto de linhas em Excel ou CSV (reusado por tabela e dashboard). */
 export function exportControle(rows: ControleRow[], fmt: "xlsx" | "csv", fileBase: string) {
+  void logAuditEvent({
+    action: "export_performed",
+    module: "controle-reparo",
+    entity: "controle_diario",
+    newValues: { format: fmt, fileBase, rows: rows.length },
+    message: "Exportacao de Controle de Reparo realizada.",
+    observation: "Usuario baixou um arquivo de dados do sistema Controle de Reparo.",
+  });
+
   const data = buildExportRows(rows);
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
@@ -53,6 +63,15 @@ export function exportControle(rows: ControleRow[], fmt: "xlsx" | "csv", fileBas
 
 /** Exportação genérica para linhas do Jira (Row[]) quando o layout operacional não se aplica. */
 export function exportGenericRows(rows: Row[], fmt: "xlsx" | "csv", fileBase: string) {
+  void logAuditEvent({
+    action: "export_performed",
+    module: "controle-reparo",
+    entity: "jira",
+    newValues: { format: fmt, fileBase, rows: rows.length },
+    message: "Exportacao generica de Controle de Reparo realizada.",
+    observation: "Usuario baixou um arquivo de dados do sistema Controle de Reparo.",
+  });
+
   const headers = Object.keys(rows[0] ?? {});
   const data = rows.map((r) => {
     const out: Record<string, unknown> = {};

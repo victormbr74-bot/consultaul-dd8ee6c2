@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MapPin, User } from "lucide-react";
 
 const normalizeUserCode = (value: string) => value.replace(/\D/g, "");
@@ -110,6 +111,37 @@ const AuthPage = () => {
             </form>
           </CardContent>
         </Card>
+
+        <footer className="mt-4 text-center text-xs text-muted-foreground">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="link" className="h-auto p-0 text-xs">
+                Termos de Uso e Politica de Privacidade
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Termos de Uso e Politica de Privacidade</DialogTitle>
+              </DialogHeader>
+              <div className="max-h-[65vh] space-y-4 overflow-auto text-sm leading-6">
+                <p>
+                  O Consulta Lotericas deve ser usado apenas para finalidades operacionais autorizadas. O uso do sistema e as acoes realizadas por
+                  usuarios autenticados podem ser auditados para seguranca, rastreabilidade, prevencao de abuso, apuracao de incidentes e
+                  cumprimento de obrigacoes legais.
+                </p>
+                <p>
+                  Coletamos dados necessarios para autenticacao, operacao e auditoria, incluindo usuario, data e hora, IP quando disponivel,
+                  User-Agent, navegador, sistema operacional, tipo de dispositivo e eventos como login, aceite, importacoes, exportacoes,
+                  visualizacoes e alteracoes de registros.
+                </p>
+                <p>
+                  Senhas, tokens e segredos nao devem ser registrados em logs. Apos o login, o sistema exibira o aceite obrigatorio quando nao
+                  houver aceite vigente ou quando uma nova versao dos termos for publicada.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </footer>
       </div>
     </div>
   );

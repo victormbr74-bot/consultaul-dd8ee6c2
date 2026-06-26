@@ -54,6 +54,10 @@ const buildEmail = (userCode: string) => `${userCode}@colaborador.lotericas.com`
 const isMissingTableError = (message: string) =>
   message.includes("Could not find the table") ||
   (message.toLowerCase().includes("relation") && message.toLowerCase().includes("does not exist"));
+const getClientIp = (req: Request) => {
+  const forwarded = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "";
+  return forwarded.split(",")[0]?.trim() || null;
+};
 
 // deno-lint-ignore no-explicit-any
 const upsertProfile = async (adminClient: any, userId: string, data: { name: string; user_code: string; active?: boolean }) => {
@@ -205,6 +209,35 @@ Deno.serve(async (req) => {
     if (!action) return json({ error: "Ação não informada." }, 400);
 
     const adminClient = createClient(supabaseUrl, serviceKey);
+    const writeAudit = async (event: {
+      action: string;
+      entity_id?: string;
+      old_values?: Record<string, unknown> | null;
+      new_values?: Record<string, unknown> | null;
+      status?: "success" | "error" | "denied";
+      message?: string;
+      observation?: string;
+    }) => {
+      await adminClient.from("audit_logs").insert({
+        user_id: authData.user.id,
+        user_name: authData.user.user_metadata?.name ?? null,
+        user_email: authData.user.email ?? null,
+        action: event.action,
+        module: "admin",
+        entity: "users",
+        entity_id: event.entity_id ?? null,
+        old_values: event.old_values ?? null,
+        new_values: event.new_values ?? null,
+        ip_address: getClientIp(req),
+        user_agent: req.headers.get("user-agent"),
+        request_method: req.method,
+        request_path: new URL(req.url).pathname,
+        status: event.status ?? "success",
+        message: event.message ?? null,
+        observation: event.observation ?? null,
+        origin: req.headers.get("origin"),
+      });
+    };
 
     if (action === "create_user") {
       const p = payload as UserPayload;
@@ -233,6 +266,13 @@ Deno.serve(async (req) => {
       const userId = created.user.id;
       await upsertProfile(adminClient, userId, { name, user_code: userCode, active: true });
       await applyRole(adminClient, userId, role);
+      await writeAudit({
+        action: "user_created",
+        entity_id: userId,
+        new_values: { name, user_code: userCode, role, active: true },
+        message: "Usuario criado por administrador.",
+        observation: `Administrador criou o usuario ${userCode}.`,
+      });
 
       return json({ success: true, user_id: userId, email });
     }
@@ -266,6 +306,13 @@ Deno.serve(async (req) => {
         });
         if (passError) return json({ error: passError.message }, 400);
       }
+      await writeAudit({
+        action: "user_updated",
+        entity_id: userId,
+        new_values: { ...updates, role: p.role },
+        message: "Usuario/permissoes atualizados por administrador.",
+        observation: `Administrador alterou dados ou permissoes do usuario ${userId}.`,
+      });
 
       return json({ success: true });
     }
@@ -298,6 +345,12 @@ Deno.serve(async (req) => {
 
       const { error } = await adminClient.auth.admin.deleteUser(userId);
       if (error) return json({ error: error.message }, 400);
+      await writeAudit({
+        action: "user_deleted",
+        entity_id: userId,
+        message: "Usuario excluido por administrador.",
+        observation: `Administrador excluiu o usuario ${userId}.`,
+      });
       return json({ success: true });
     }
 

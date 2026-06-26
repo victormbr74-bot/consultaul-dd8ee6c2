@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SidebarActionsProvider } from "@/contexts/SidebarActionsContext";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ConsentGate } from "@/components/ConsentGate";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ThemeHeaderActions from "@/components/ThemeHeaderActions";
 import HeaderConsultaSearch from "@/components/HeaderConsultaSearch";
@@ -43,6 +44,8 @@ import ImportNatIps from "./pages/ImportNatIps";
 import RouterConfigsReport from "./pages/RouterConfigsReport";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ProjectModuleFrame from "./pages/ProjectModuleFrame";
+import TermsPrivacy from "./pages/TermsPrivacy";
+import AuditLogs from "./pages/AuditLogs";
 
 
 const queryClient = new QueryClient();
@@ -95,7 +98,9 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
 
 const ProtectedLayout = () => (
   <ProtectedRoute>
-    <AppLayout />
+    <ConsentGate>
+      <AppLayout />
+    </ConsentGate>
   </ProtectedRoute>
 );
 
@@ -140,9 +145,11 @@ const App = () => (
                   <Route path="/admin/dados" element={<AdminPanel section="data" />} />
                   <Route path="/admin/usuarios" element={<AdminPanel section="users" />} />
                   <Route path="/admin/import-nat" element={<ImportNatIps />} />
+                  <Route path="/admin/auditoria" element={<AdminOnlyRoute><AuditLogs /></AdminOnlyRoute>} />
                   <Route path="/relatorio-roteador" element={<RouterConfigsReport />} />
                   <Route path="/base-conhecimento" element={<KnowledgeBase />} />
                   <Route path="/projetos/:projectId/:itemId" element={<ProjectModuleFrame />} />
+                  <Route path="/termos-privacidade" element={<TermsPrivacy />} />
                   <Route path="/senha" element={<ChangePassword />} />
                   <Route path="/aparencia" element={<Appearance />} />
                   <Route path="/temas" element={<Appearance />} />

@@ -20,6 +20,8 @@ import {
   BookOpen,
   PlusCircle,
   Wrench,
+  ShieldCheck,
+  ScrollText,
   ChevronDown,
   Layers,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import { projectModules } from "@/lib/projectModules";
 import { WORLD_CUP_2026_TEAM_BY_ID } from "@/data/worldCup2026Teams";
 import { BRASILEIRAO_SERIE_A_TEAM_BY_ID } from "@/data/brasileiraoSerieATeams";
 import { supabase } from "@/integrations/supabase/client";
+import { logAuditEvent } from "@/lib/audit";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
@@ -130,6 +133,14 @@ export function AppSidebar() {
   }, [isLotericaRoute, navigate, setLotericaTab]);
 
   const handleGlobalImport = useCallback(() => {
+    void logAuditEvent({
+      action: "import_requested",
+      module: "global",
+      entity: "lotericas",
+      message: "Usuario acionou importacao global pela sidebar.",
+      observation: "Usuario importou um arquivo de dados para o sistema.",
+    });
+
     if (onImportClick) {
       onImportClick();
       return;
@@ -143,6 +154,14 @@ export function AppSidebar() {
   }, [navigate, onImportClick, setLotericaTab]);
 
   const handleGlobalExport = useCallback(() => {
+    void logAuditEvent({
+      action: "export_requested",
+      module: "global",
+      entity: "lotericas",
+      message: "Usuario acionou exportacao global pela sidebar.",
+      observation: "Usuario baixou um arquivo de dados do sistema.",
+    });
+
     if (onExport) {
       onExport();
       return;
@@ -494,6 +513,14 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin/auditoria" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      <span>Auditoria</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -508,6 +535,14 @@ export function AppSidebar() {
                   <NavLink to="/temas" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                     <Palette className="mr-2 h-4 w-4" />
                     <span>Aparencia</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/termos-privacidade" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                    <ScrollText className="mr-2 h-4 w-4" />
+                    <span>Termos e Privacidade</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

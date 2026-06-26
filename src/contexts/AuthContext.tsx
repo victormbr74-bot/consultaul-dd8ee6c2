@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { logAuditEvent } from "@/lib/audit";
 
 interface AuthContextType {
   user: User | null;
@@ -146,6 +147,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      await logAuditEvent({
+        action: "login_failed",
+        module: "auth",
+        entity: "auth.users",
+        status: "denied",
+        message: error.message,
+        observation: "Usuario tentou acessar o sistema com credenciais invalidas.",
+        newValues: { email },
+      });
+    } else {
+      await logAuditEvent({
+        action: "login_success",
+        module: "auth",
+        entity: "auth.users",
+        message: "Login realizado com sucesso.",
+        observation: "Usuario entrou no sistema.",
+        newValues: { email },
+      });
+    }
     return { error: error?.message ?? null };
   };
 
@@ -158,6 +179,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    await logAuditEvent({
+      action: "logout",
+      module: "auth",
+      entity: "auth.users",
+      entityId: user?.id,
+      message: "Logout realizado pelo usuario.",
+      observation: "Usuario saiu do sistema.",
+    });
     await supabase.auth.signOut();
   };
 

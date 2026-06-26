@@ -887,6 +887,7 @@ const LotericaDetail = () => {
           <>
             {lotericaTab === "consulta" && (
               <ConsultaTab
+                key={activeCode}
                 form={activeForm}
                 saveButton={saveButton}
                 setForm={(nextForm) => {

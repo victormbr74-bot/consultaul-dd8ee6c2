@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import TestesTab from "@/components/loterica/TestesTab";
 
 type MainField = {
@@ -20,7 +22,7 @@ type MainField = {
 
 const LOTERICA_FIELDS: MainField[] = [
   { key: "nome_loterica", label: "Nome", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
-  { key: "endereco", label: "Endere\u00E7o", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
+  { key: "endereco", label: "Endereço", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
   { key: "contato", label: "Contato", multiline: true, rows: 1, compactExpandable: true, noWrap: true },
   { key: "status", label: "Status" },
   { key: "cidade", label: "Cidade" },
@@ -28,16 +30,16 @@ const LOTERICA_FIELDS: MainField[] = [
   { label: "TFL", rawKeys: ["TFL", "TFLs"], mono: true },
   { label: "Owner", rawKeys: ["OWNER"] },
   { label: "Tipo UL", rawKeys: ["TIPO LOTERICA", "TIPO UL"] },
-  { label: "Regi\u00E3o", rawKeys: ["REGIAO", "REGI\u00C3O"] },
+  { label: "Região", rawKeys: ["REGIAO", "REGIÃO"] },
   { label: "CEP", rawKeys: ["CEP"], mono: true },
-  { label: "Migra\u00E7\u00E3o", rawKeys: ["MIGRACAO", "MIGRA\u00C7\u00C3O"] },
+  { label: "Migração", rawKeys: ["MIGRACAO", "MIGRAÇÃO"] },
   { label: "Homologado", rawKeys: ["HOMOLOGADO"] },
 ];
 
 const PRINCIPAL_FIELDS: MainField[] = [
   { key: "ccto_oi", label: "CCTO OI" },
   { label: "CPE OI", rawKeys: ["CPE OI", "CPE_OI"], mono: true },
-  { key: "designacao_nova", label: "Designa\u00E7\u00E3o Nova" },
+  { key: "designacao_nova", label: "Designação Nova" },
   { key: "circuito_meraki", label: "Circuito Meraki" },
   { key: "cpe_meraki", label: "CPE Meraki" },
   { key: "ccto_oemp", label: "CCTO OEMP" },
@@ -46,13 +48,13 @@ const PRINCIPAL_FIELDS: MainField[] = [
   { key: "ip_wan", label: "IP WAN", mono: true },
   { key: "loopback_wan", label: "Loopback Principal", mono: true },
   { label: "Rede LAN", rawKeys: ["REDE LAN"], mono: true },
-  { label: "Per\u00EDmetro", rawKeys: ["PERIMETRO", "PER\u00CDMETRO"] },
+  { label: "Perímetro", rawKeys: ["PERIMETRO", "PERÍMETRO"] },
 ];
 
 const BACKUP_FIELDS: MainField[] = [
   { label: "Circuito Backup", rawKeys: ["CIRCUITO BACKUP"], mono: true },
   { key: "circuito_elsys", label: "Circuito Elsys" },
-  { key: "loopback_lan", label: "Loopback Secund\u00E1rio", mono: true },
+  { key: "loopback_lan", label: "Loopback Secundário", mono: true },
   { label: "Tecnologia", rawKeys: ["TECNOLOGIA"] },
   { key: "operadora", label: "Operadora" },
   { label: "SIM Card 4G", rawKeys: ["SIM CARD 4G"], mono: true },
@@ -68,62 +70,99 @@ interface ConsultaTabProps {
 }
 
 const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
-  const raw = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
+  const allFields = useMemo(() => [...PRINCIPAL_FIELDS, ...BACKUP_FIELDS, ...LOTERICA_FIELDS], []);
 
-  const getRawValue = (keys: string[]) => {
-    for (const k of keys) {
-      if (Object.prototype.hasOwnProperty.call(raw, k)) return raw[k];
+  const buildDraft = useCallback((formData: any) => {
+    const rawData = formData?.raw_data && typeof formData.raw_data === "object" ? formData.raw_data : {};
+    const next: Record<string, string> = {};
+    for (const f of allFields) {
+      if (f.key) {
+        next[f.label] = formData?.[f.key] || "";
+      } else if (f.rawKeys) {
+        let found = false;
+        for (const k of f.rawKeys) {
+          if (Object.prototype.hasOwnProperty.call(rawData, k)) {
+            next[f.label] = String(rawData[k] || "");
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          next[f.label] = "";
+        }
+      }
     }
-    return undefined;
+    return next;
+  }, [allFields]);
+
+  const [draft, setDraft] = useState<Record<string, string>>(() => buildDraft(form));
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  useEffect(() => {
+    const expected = buildDraft(form);
+    const current = draftRef.current;
+    const hasUncommitted = Object.keys(expected).some((label) => current[label] !== expected[label]);
+    if (!hasUncommitted) {
+      const isSame =
+        Object.keys(expected).length === Object.keys(current).length &&
+        Object.keys(expected).every((label) => current[label] === expected[label]);
+      if (!isSame) {
+        setDraft(expected);
+      }
+    }
+  }, [form, buildDraft]);
+
+  const commitField = (f: MainField) => {
+    const value = draftRef.current[f.label] || "";
+    if (f.key) {
+      setForm({ ...form, [f.key]: value });
+    } else if (f.rawKeys) {
+      const current = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
+      const next: Record<string, unknown> = { ...current };
+      const targetKey = f.rawKeys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || f.rawKeys[0];
+      next[targetKey] = value;
+      setForm({ ...form, raw_data: next });
+    }
   };
 
-  const setRawValue = (keys: string[], value: string) => {
-    const current = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
-    const next: Record<string, unknown> = { ...current };
-    const targetKey = keys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || keys[0];
-    next[targetKey] = value;
-    setForm({ ...form, raw_data: next });
-  };
+  const renderField = (f: MainField) => {
+    const value = draft[f.label] ?? "";
 
-  const renderField = (f: MainField) => (
-    <div
-      key={f.key || f.label}
-      className={cn("space-y-1.5", f.wide ? "md:col-span-2 2xl:col-span-3" : "")}
-    >
-      <Label className="text-xs text-muted-foreground">{f.label}</Label>
-      {f.multiline ? (
-        <Textarea
-          rows={f.rows || 3}
-          wrap={f.noWrap ? "off" : undefined}
-          className={cn(
-            f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
-            f.mono ? "font-mono text-xs" : "",
-          )}
-          value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
-          onChange={(e) => {
-            if (f.key) {
-              setForm({ ...form, [f.key]: e.target.value });
-              return;
-            }
-            setRawValue(f.rawKeys || [], e.target.value);
-          }}
-        />
-      ) : (
-        <Input
-          className={f.mono ? "font-mono text-xs" : ""}
-          value={f.key ? form?.[f.key] || "" : String(getRawValue(f.rawKeys || []) ?? "")}
-          placeholder={f.key ? undefined : "-"}
-          onChange={(e) => {
-            if (f.key) {
-              setForm({ ...form, [f.key]: e.target.value });
-              return;
-            }
-            setRawValue(f.rawKeys || [], e.target.value);
-          }}
-        />
-      )}
-    </div>
-  );
+    return (
+      <div
+        key={f.key || f.label}
+        className={cn("space-y-1.5", f.wide ? "md:col-span-2 2xl:col-span-3" : "")}
+      >
+        <Label className="text-xs text-muted-foreground">{f.label}</Label>
+        {f.multiline ? (
+          <Textarea
+            rows={f.rows || 3}
+            wrap={f.noWrap ? "off" : undefined}
+            className={cn(
+              f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
+              f.mono ? "font-mono text-xs" : "",
+            )}
+            value={value}
+            onChange={(e) => {
+              setDraft((prev) => ({ ...prev, [f.label]: e.target.value }));
+            }}
+            onBlur={() => commitField(f)}
+          />
+        ) : (
+          <Input
+            className={f.mono ? "font-mono text-xs" : ""}
+            value={value}
+            placeholder={f.key ? undefined : "-"}
+            onChange={(e) => {
+              setDraft((prev) => ({ ...prev, [f.label]: e.target.value }));
+            }}
+            onBlur={() => commitField(f)}
+          />
+        )}
+      </div>
+    );
+  };
 
   const SectionCard = ({
     title,

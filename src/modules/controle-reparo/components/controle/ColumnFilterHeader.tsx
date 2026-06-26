@@ -13,6 +13,7 @@ import {
   Filter,
   ListFilter,
 } from "lucide-react";
+import { normalizeControleFilterText } from "@/modules/controle-reparo/lib/displayNormalization";
 
 export interface ColFilter {
   search: string;
@@ -42,9 +43,9 @@ export function ColumnFilterHeader({
   const active = filter.search.trim() !== "" || filter.selected.length > 0;
 
   const visibleOptions = useMemo(() => {
-    const s = q.trim().toLowerCase();
+    const s = normalizeControleFilterText(q);
     const opts = s
-      ? options.filter((o) => o.toLowerCase().includes(s))
+      ? options.filter((o) => normalizeControleFilterText(o).includes(s))
       : options;
     return opts.slice(0, 500);
   }, [options, q]);

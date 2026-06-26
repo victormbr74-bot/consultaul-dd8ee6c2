@@ -13,6 +13,12 @@ import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { STATUS_PLANILHA_OPCOES, isLinkBackup } from "@/modules/controle-reparo/lib/processing";
 import { getFaixa, formatHoras, formatDataHora, computeHoras } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
+import { fetchLotericasExportRows } from "@/lib/lotericasExport";
+import { buildControleLotericasSyncUpdates } from "@/modules/controle-reparo/lib/controleLotericasSync";
+import {
+  normalizeControleDisplayName,
+  normalizeControleFilterText,
+} from "@/modules/controle-reparo/lib/displayNormalization";
 import {
   ColumnFilterHeader,
   EMPTY_FILTER,
@@ -34,6 +40,8 @@ import {
   History,
   Search,
   AlertTriangle,
+  Database,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Columns3,
@@ -363,6 +371,14 @@ function historyValue(value: unknown): string | null {
   return String(value);
 }
 
+function displayText(col: ColumnDef, row: RowT): string {
+  return normalizeControleDisplayName(col.text(row));
+}
+
+function filterText(col: ColumnDef, row: RowT): string {
+  return normalizeControleFilterText(col.text(row));
+}
+
 function editDisplayValue(row: RowT, col: ColumnDef): string {
   if (col.id === "inicio") return formatDataHora(row.data_hora_inicial);
   if (col.id === "previsao") return formatDataHora(row.previsao_atendimento);
@@ -579,6 +595,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
   const [versao, setVersao] = useState<number | null>(() => initialVersion());
   const [histCodigo, setHistCodigo] = useState<string | null>(null);
   const [histLot, setHistLot] = useState<string | null>(null);
+  const [syncingLotericas, setSyncingLotericas] = useState(false);
   const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() => loadColumnWidths());
   const resizingRef = useRef<{
     id: string;
@@ -761,7 +778,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
     const map: Record<string, string[]> = {};
     for (const c of COLUMNS) {
       const set = new Set<string>();
-      for (const r of baseRows) set.add(c.text(r));
+      for (const r of baseRows) set.add(displayText(c, r));
       map[c.id] = Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
     }
     return map;
@@ -790,8 +807,9 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
         if (!f) continue;
         const col = colDefById.get(colId);
         if (!col) continue;
-        const v = col.text(r);
-        if (f.search.trim() && !v.toLowerCase().includes(f.search.trim().toLowerCase()))
+        const v = displayText(col, r);
+        const normalizedSearch = normalizeControleFilterText(f.search);
+        if (normalizedSearch && !filterText(col, r).includes(normalizedSearch))
           return false;
         if (f.selected.length > 0 && !f.selected.includes(v)) return false;
       }
@@ -900,6 +918,72 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
     );
   };
 
+  const syncControleFromLotericas = async () => {
+    if (meusCasos) return;
+    if (!rows.length) {
+      toast.info("Nenhum registro carregado para sincronizar.");
+      return;
+    }
+
+    setSyncingLotericas(true);
+    try {
+      const lotericasRows = await fetchLotericasExportRows();
+      const updates = buildControleLotericasSyncUpdates(rows, lotericasRows);
+
+      if (updates.length === 0) {
+        toast.success("Controle já está sincronizado com a base de lotéricas.");
+        return;
+      }
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("controle_diario")
+          .update(update.patch as never)
+          .eq("id", update.id);
+        if (error) throw error;
+      }
+
+      const historyRows = updates.flatMap((update) =>
+        update.changes.map((change) => ({
+          controle_id: update.id,
+          codigo_loterica: update.codigo_loterica,
+          usuario: nome,
+          campo: change.field,
+          valor_anterior: change.before,
+          valor_novo: change.after,
+        })),
+      );
+
+      for (let index = 0; index < historyRows.length; index += 500) {
+        const { error } = await supabase
+          .from("historico_tratativas")
+          .insert(historyRows.slice(index, index + 500) as never);
+        if (error) {
+          console.warn("Falha ao gravar histórico da sincronização com lotéricas", error);
+          break;
+        }
+      }
+
+      setRows((current) =>
+        current.map((row) => {
+          const update = updates.find((item) => item.id === row.id);
+          return update ? { ...row, ...update.patch } : row;
+        }),
+      );
+
+      toast.success("Controle sincronizado com a base de lotéricas.", {
+        description: `${updates.length} circuito(s), ${historyRows.length} campo(s) atualizado(s).`,
+      });
+    } catch (error) {
+      console.error("Falha ao sincronizar controle com lotéricas", error);
+      toast.error("Falha ao sincronizar lotéricas", {
+        description: error instanceof Error ? error.message : "Erro inesperado.",
+      });
+    } finally {
+      setSyncingLotericas(false);
+    }
+  };
+
   const columnFilterCount = Object.values(st.colFilters).filter(
     (f) => f && (f.search.trim() || f.selected.length),
   ).length;
@@ -1005,6 +1089,21 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                 ))}
               </SelectContent>
             </Select>
+            {!meusCasos && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={syncControleFromLotericas}
+                disabled={syncingLotericas || isFetching || rows.length === 0}
+              >
+                {syncingLotericas ? (
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Database className="mr-2 h-4 w-4" />
+                )}
+                Sincronizar Lotéricas
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => exportar("xlsx")}>
               <Download className="mr-2 h-4 w-4" /> Excel
             </Button>
@@ -1300,7 +1399,7 @@ function Cell({
     );
   }
   // text / default
-  const v = col.text(row);
+  const v = displayText(col, row);
   if (col.id === "codigo_loterica") {
     return (
       <div className="flex items-center gap-1.5 font-medium">

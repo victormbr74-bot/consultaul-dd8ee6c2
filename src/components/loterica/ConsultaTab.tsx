@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { memo, useCallback, useRef } from "react";
+import { useCallback, useRef, useLayoutEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,50 +68,55 @@ interface ConsultaTabProps {
   saveButton?: ReactNode;
 }
 
-const ConsultaTabContent = ({ form, setForm, saveButton }: ConsultaTabProps) => {
+const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
   const draftRef = useRef<Record<string, string>>({});
-  const isEditingRef = useRef<Record<string, boolean>>({});
+  const formIdRef = useRef<string>("");
+  const formRef = useRef<any>(form);
 
-  const getRawValue = (form: any, keys: string[]) => {
+  useLayoutEffect(() => {
+    formRef.current = form;
+    const newId = form?.cod_ul || "";
+    if (newId !== formIdRef.current) {
+      formIdRef.current = newId;
+      for (const key of Object.keys(draftRef.current)) {
+        delete draftRef.current[key];
+      }
+    }
+  }, [form]);
+
+  const getRawValue = useCallback((form: any, keys: string[]) => {
     const raw = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(raw, k)) return raw[k];
     }
     return undefined;
-  };
+  }, []);
 
-  const getFieldValue = (f: MainField) => {
-    if (isEditingRef.current[f.label]) {
-      return draftRef.current[f.label] ?? "";
+  const getFieldValue = useCallback((f: MainField) => {
+    if (draftRef.current[f.label] !== undefined) {
+      return draftRef.current[f.label];
     }
     if (f.key) {
-      return form?.[f.key] ?? "";
+      return formRef.current?.[f.key] ?? "";
     }
     if (f.rawKeys) {
-      const rawValue = getRawValue(form, f.rawKeys);
+      const rawValue = getRawValue(formRef.current, f.rawKeys);
       return rawValue != null ? String(rawValue) : "";
     }
     return "";
-  };
+  }, [getRawValue]);
 
   const commitField = useCallback(
     (f: MainField) => {
       const value = draftRef.current[f.label];
       if (value === undefined) return;
 
-      isEditingRef.current[f.label] = false;
-
       if (f.key) {
-        setForm((prev: any) => {
-          if (prev?.[f.key] === value) return prev;
-          return { ...prev, [f.key]: value };
-        });
+        setForm((prev: any) => ({ ...prev, [f.key]: value }));
       } else if (f.rawKeys) {
         setForm((prev: any) => {
           const current = prev?.raw_data && typeof prev.raw_data === "object" ? prev.raw_data : {};
           const targetKey = f.rawKeys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || f.rawKeys[0];
-          const currentValue = current[targetKey];
-          if (currentValue === value) return prev;
           const next: Record<string, unknown> = { ...current, [targetKey]: value };
           return { ...prev, raw_data: next };
         });
@@ -123,7 +128,6 @@ const ConsultaTabContent = ({ form, setForm, saveButton }: ConsultaTabProps) => 
 
   const handleInputChange = useCallback((f: MainField, value: string) => {
     draftRef.current[f.label] = value;
-    isEditingRef.current[f.label] = true;
   }, []);
 
   const renderField = useCallback(
@@ -208,25 +212,4 @@ const ConsultaTabContent = ({ form, setForm, saveButton }: ConsultaTabProps) => 
   );
 };
 
-export default memo(ConsultaTabContent, (prev, next) => {
-  if (prev.saveButton !== next.saveButton) return false;
-  if (prev.setForm !== next.setForm) return false;
-  if (prev.form === next.form) return true;
-  const prevForm = prev.form || {};
-  const nextForm = next.form || {};
-  const prevKeys = Object.keys(prevForm);
-  const nextKeys = Object.keys(nextForm);
-  if (prevKeys.length !== nextKeys.length) return false;
-  for (const key of prevKeys) {
-    if (prevForm[key] !== nextForm[key]) return false;
-  }
-  const prevRaw = prevForm.raw_data || {};
-  const nextRaw = nextForm.raw_data || {};
-  const prevRawKeys = Object.keys(prevRaw);
-  const nextRawKeys = Object.keys(nextRaw);
-  if (prevRawKeys.length !== nextRawKeys.length) return false;
-  for (const key of prevRawKeys) {
-    if (prevRaw[key] !== nextRaw[key]) return false;
-  }
-  return true;
-});
+export default ConsultaTab;

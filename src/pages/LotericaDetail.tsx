@@ -384,9 +384,7 @@ const LotericaDetail = () => {
       if (error) {
         const message = getSupabaseErrorMessage(error);
         if (message.includes("loterica_notices") && message.includes("Could not find the table")) {
-          setNotices([]);
-          setNoticesError(buildLotericaNoticesMissingTableMessage());
-          return;
+          throw new Error(buildLotericaNoticesMissingTableMessage());
         }
 
         throw new Error(message || "Erro ao carregar avisos da loterica.");

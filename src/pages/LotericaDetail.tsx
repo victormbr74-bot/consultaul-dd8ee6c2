@@ -279,8 +279,8 @@ const LotericaDetail = () => {
   }, [codUl]);
 
   useEffect(() => {
-    setNoticeEditorValue(noticeBaseText);
-  }, [noticeBaseText, noticeTargetCode]);
+    setNoticeEditorValue("");
+  }, [noticeTargetCode]);
 
   useEffect(() => {
     if (lotericaTab === "avisos") {
@@ -483,24 +483,15 @@ const LotericaDetail = () => {
 
   const handleSaveNotice = useCallback(async () => {
     const targetCode = String(noticeTargetCode || "").trim();
-    const baseText = noticeBaseText;
-    const editorValue = noticeEditorValue;
-    let observacao = "";
+    const observacao = noticeEditorValue.trim();
 
     if (!targetCode) {
       setNoticesError("Nenhuma UL carregada para registrar o aviso.");
       return;
     }
 
-    if (baseText && !editorValue.startsWith(baseText)) {
-      setNoticesError("Mantenha o texto existente e adicione a nova informação no final da caixa.");
-      return;
-    }
-
-    observacao = baseText ? editorValue.slice(baseText.length).trim() : editorValue.trim();
-
     if (!observacao) {
-      setNoticesError("Adicione a nova informação no final da caixa de texto antes de salvar.");
+      setNoticesError("Digite a nova informação antes de salvar.");
       return;
     }
 
@@ -548,6 +539,7 @@ const LotericaDetail = () => {
         },
         ...prev.filter((item) => item.id !== savedNotice.id),
       ]);
+      setNoticeEditorValue("");
       setNoticeSuccessMessage(`Aviso salvo para a UL ${targetCode}.`);
     } catch (error) {
       console.error("Falha inesperada ao salvar aviso da loterica", error);
@@ -555,7 +547,7 @@ const LotericaDetail = () => {
     } finally {
       setSavingNotice(false);
     }
-  }, [noticeBaseText, noticeEditorValue, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
+  }, [noticeEditorValue, noticeTargetCode, profile?.name, profile?.user_code, user?.id]);
 
   const handleClearNotices = useCallback(async () => {
     const targetCode = String(noticeTargetCode || "").trim();
@@ -797,6 +789,7 @@ const LotericaDetail = () => {
         namesByCode={lotericaNamesByCode}
         selectedCode={noticeTargetCode}
         onSelectedCodeChange={setSelectedNoticeCode}
+        historyText={noticeBaseText}
         textValue={noticeEditorValue}
         onTextValueChange={setNoticeEditorValue}
         onSubmit={() => {

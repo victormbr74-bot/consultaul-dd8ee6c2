@@ -23,6 +23,7 @@ interface LotericaNoticesCardProps {
   namesByCode: Record<string, string>;
   selectedCode: string;
   onSelectedCodeChange: (code: string) => void;
+  historyText: string;
   textValue: string;
   onTextValueChange: (value: string) => void;
   onSubmit: () => void;
@@ -41,6 +42,7 @@ const LotericaNoticesCard = ({
   namesByCode,
   selectedCode,
   onSelectedCodeChange,
+  historyText,
   textValue,
   onTextValueChange,
   onSubmit,
@@ -107,12 +109,19 @@ const LotericaNoticesCard = ({
         )}
 
         <div className="space-y-1">
-          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Informa\u00E7\u00F5es"}</Label>
+          <Label className="text-xs">{"Hist\u00F3rico"}</Label>
+          <div className="max-h-28 overflow-auto rounded-md border border-border bg-background/50 p-2 text-xs leading-5 whitespace-pre-wrap">
+            {loading ? "Carregando avisos..." : historyText || "Nenhum aviso registrado."}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Nova informa\u00E7\u00E3o"}</Label>
           <Textarea
             id="loterica-aviso-textarea"
-            value={loading ? "Carregando avisos..." : textValue}
+            value={textValue}
             onChange={(event) => onTextValueChange(event.target.value)}
-            placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
+            placeholder={"Digite a nova informa\u00E7\u00E3o para esta UL."}
             className="min-h-[72px] resize-y bg-background/70 text-xs leading-5"
             readOnly={loading}
           />

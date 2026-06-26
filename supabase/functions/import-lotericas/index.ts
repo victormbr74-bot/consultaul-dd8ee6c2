@@ -174,7 +174,7 @@ function toJira(row: Record<string, unknown>) {
     chave,
     cod_ul: asText(pick(row, ["Código da Lotérica_", "CÃ³digo da LotÃ©rica_", "cod_ul"])),
     resumo: asText(pick(row, ["Resumo", "resumo"])),
-    tipo_falha: asText(pick(row, ["Tipo da falha", "tipo_falha"])),
+    tipo_falha: asText(pick(row, ["Tipo de Falha", "Tipo da falha", "Tipo Falha", "tipo_falha"])),
     status: asText(pick(row, ["Status", "status"])),
     criado: asIsoDate(pick(row, ["Criado", "criado"])),
     data_hora_normalizacao: asIsoDate(pick(row, ["Data/Hora de Normalização", "Data/Hora de NormalizaÃ§Ã£o", "data_hora_normalizacao"])),

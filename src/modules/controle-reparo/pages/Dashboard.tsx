@@ -252,6 +252,7 @@ function Indicadores({
   const controleIncs = useMemo(() => {
     const incs = new Set<string>();
     for (const r of fullRows) {
+      if (isNormalizado(r)) continue;
       const inc = normalizeIncidentValue(r.chamado) || normalizeIncidentValue(r.inc_snow);
       if (inc) incs.add(inc);
     }
@@ -260,82 +261,16 @@ function Indicadores({
 
   const jiraAlarmRows = useMemo(() => {
     if (!jiraRows.length) return [] as Row[];
-    const termos = ["LINK PRINCIPAL INOPERANTE", "LINK BACKUP INOPERANTE"];
-    return jiraRows.filter((row) => {
-      const texto = alarmNorm(
-        getVal(
-          row,
-          "Resumo",
-          "Summary",
-          "Título",
-          "Titulo",
-          "Assunto",
-          "Descrição",
-          "Descricao",
-          "Descripcion",
-          "Mensagem",
-          "Tipo",
-          "Chamado",
-          "Chave",
-          "Key",
-          "Descrição do problema",
-          "Descrição do Problema",
-        ),
-      );
-      return termos.some((term) => texto.includes(term));
-    });
+    return jiraRows.filter(isJiraAlarmRow);
   }, [jiraRows]);
 
   const incSemAlarmeRows = useMemo(() => {
-    if (!jiraAlarmRows.length || !fullRows.length) return [] as Row[];
-    const controleIndex = new Map<string, Set<string>>();
-    for (const r of fullRows) {
-      const codUl = cleanText(r.codigo_loterica ?? "");
-      const tipoLink = cleanText(r.tipo_link ?? "");
-      const falha = cleanText(r.situacao ?? r.ordem ?? "");
-      if (!codUl && !tipoLink && !falha) continue;
-      const key = `${codUl}|${tipoLink}|${falha}`;
-      const incSet = controleIndex.get(key) ?? new Set();
-      const inc = normalizeIncidentValue(r.chamado) || normalizeIncidentValue(r.inc_snow);
-      if (inc) incSet.add(inc);
-      controleIndex.set(key, incSet);
-    }
-    return jiraAlarmRows.filter((row) => {
-      const jiraCodUl = cleanText(getVal(row, "cod_ul", "Código da Lotérica", "Codigo da Loterica", "CÃ³d. da LotÃ©rica", "CÃ³digo da LotÃ©rica_", "Codigo UL", "Código UL", "Codigo UL"));
-      const alarmeTexto = alarmNorm(
-        getVal(
-          row,
-          "Resumo",
-          "Summary",
-          "Título",
-          "Titulo",
-          "Assunto",
-          "Descrição",
-          "Descricao",
-          "Mensagem",
-          "Tipo",
-          "Chamado",
-          "Chave",
-          "Key",
-          "Descrição do problema",
-          "Descrição do Problema",
-        ),
-      );
-      const isPrincipal = alarmeTexto.includes("LINK PRINCIPAL");
-      const isBackup = alarmeTexto.includes("LINK BACKUP");
-      const jiraTipoLink = isPrincipal ? "PRIMÁRIO" : isBackup ? "SECUNDÁRIO" : "";
-      const jiraFalha = cleanText(getVal(row, "Tipo de Falha", "tipo_falha", "Tipo Falha", "TIPO DE FALHA"));
-      const inc = normalizeIncidentValue(
-        getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
-      );
-      if (!jiraCodUl && !jiraTipoLink && !jiraFalha) return true;
-      const matchKey = `${jiraCodUl}|${jiraTipoLink}|${jiraFalha}`;
-      const incSet = controleIndex.get(matchKey);
-      if (!incSet) return true;
-      if (!inc) return true;
-      return !incSet.has(inc);
+    if (!jiraRows.length) return [] as Row[];
+    return jiraRows.filter((row) => {
+      const inc = getJiraIncident(row);
+      return !inc || !controleIncs.has(inc);
     });
-  }, [jiraAlarmRows, fullRows]);
+  }, [controleIncs, jiraRows]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [
@@ -530,7 +465,7 @@ function JiraPanel({
             </thead>
             <tbody>
               {visibleRows.map((row, index) => {
-                const inc = getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc");
+                const inc = getJiraIncident(row);
                 const texto = alarmNorm(
                   getVal(
                     row,
@@ -551,11 +486,7 @@ function JiraPanel({
                     "Descrição do Problema",
                   ),
                 );
-                const tipoAlarme = texto.includes("LINK PRINCIPAL INOPERANTE")
-                  ? "LINK PRINCIPAL INOPERANTE"
-                  : texto.includes("LINK BACKUP INOPERANTE")
-                    ? "LINK BACKUP INOPERANTE"
-                    : "—";
+                const tipoAlarme = getJiraAlarmType(row) || "-";
                 const semCorrespondencia = !controleIncs.has(inc);
 
                 return (
@@ -572,7 +503,7 @@ function JiraPanel({
                       {getVal(row, "Resumo", "Summary", "Descrição", "Descricao")}
                     </td>
                     <td className="max-w-[160px] truncate">{getVal(row, "Fila", "Fila Jira")}</td>
-                    <td className="max-w-[160px] truncate">{getVal(row, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")}</td>
+                    <td className="max-w-[160px] truncate">{getJiraTipoFalha(row)}</td>
                     <td className="max-w-[260px] truncate whitespace-pre-wrap break-words">
                       {getVal(row, "Último Comentário", "Ultimo Comentario")}
                     </td>
@@ -1033,30 +964,61 @@ function alarmNorm(v: string | null | undefined): string {
     .toUpperCase();
 }
 
+const JIRA_ALARM_TERMS = [
+  "LINK BACKUP INOPERANTE",
+  "LINK PRINCIPAL INOPERANTE",
+  "UL ISOLADA",
+  "INTERMITENCIA PRINCIPAL",
+  "INTERMITENCIA BACKUP",
+];
+
+function getJiraIncident(row: Row): string {
+  return normalizeIncidentValue(
+    getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
+  );
+}
+
+function getJiraResumo(row: Row): string {
+  return getVal(
+    row,
+    "Resumo",
+    "Summary",
+    "Titulo",
+    "Assunto",
+    "Descricao",
+    "Descripcion",
+    "Mensagem",
+    "Tipo",
+    "Chamado",
+    "Chave",
+    "Key",
+    "Descricao do problema",
+    "Descricao do Problema",
+  );
+}
+
+function getJiraTipoFalha(row: Row): string {
+  return getVal(row, "Tipo de Falha", "tipo_falha", "Tipo Falha", "TIPO DE FALHA", "Tipo da falha");
+}
+
+function isReqReference(texto: string): boolean {
+  return /^REQ[-\s]?\d+/.test(alarmNorm(texto));
+}
+
+function getJiraAlarmType(row: Row): string | null {
+  const resumo = getJiraResumo(row);
+  const resumoNorm = alarmNorm(resumo);
+  const resumoHit = JIRA_ALARM_TERMS.find((term) => resumoNorm.includes(term));
+  if (resumoHit) return resumoHit;
+
+  if (!isReqReference(resumo)) return null;
+
+  const tipoFalha = alarmNorm(getJiraTipoFalha(row));
+  return JIRA_ALARM_TERMS.find((term) => tipoFalha.includes(term)) ?? null;
+}
+
 function isJiraAlarmRow(row: Row): boolean {
-  const texto = alarmNorm(
-    getVal(
-      row,
-      "Resumo",
-      "Summary",
-      "Título",
-      "Titulo",
-      "Assunto",
-      "Descrição",
-      "Descricao",
-      "Descripcion",
-      "Mensagem",
-      "Tipo",
-      "Chamado",
-      "Chave",
-      "Key",
-      "Descrição do problema",
-      "Descrição do Problema",
-    ),
-  );
-  return (
-    texto.includes("LINK PRINCIPAL INOPERANTE") || texto.includes("LINK BACKUP INOPERANTE")
-  );
+  return getJiraAlarmType(row) !== null;
 }
 
 function ordemKey(v: string | null | undefined): string {

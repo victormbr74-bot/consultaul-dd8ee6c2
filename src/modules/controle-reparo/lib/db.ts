@@ -8,7 +8,7 @@ import { PROCESSING_TIMEZONE, processingDate, processingTimestamp } from "./date
 const PAGE = 1000;
 const STAGING_CHUNK_PAGE = 25;
 let controleVersaoSupported: boolean | null = null;
-const PRESERVE_MANUAL_EDITS_FROM_HISTORY = false;
+const PRESERVE_MANUAL_EDITS_FROM_HISTORY = true;
 
 interface FetchControleOptions {
   dataReferencia?: string;
@@ -343,13 +343,46 @@ async function fetchJiraAbertosRows(): Promise<Row[]> {
   while (true) {
     const { data, error } = await supabase
       .from("jira_abertos")
-      .select("raw_data")
+      .select("*")
       .range(from, from + PAGE - 1);
-    if (error) throw error;
+    if (error) {
+      const message = String(error?.message ?? "").toLowerCase();
+      if (message.includes("pgrst205") || message.includes("could not find the table 'public.jira_abertos'")) {
+        console.warn("Tabela jira_abertos ainda não existe no banco. Usando staging_bases como fallback.");
+        return [];
+      }
+      throw error;
+    }
     if (!data || data.length === 0) break;
     for (const r of data) {
-      const row = r.raw_data as Row | null;
-      if (row) out.push(row);
+      const raw = (r.raw_data as Row | null) ?? {};
+      out.push({
+        ...raw,
+        Chave: r.chave ?? raw.Chave ?? raw.chave ?? "",
+        chave: r.chave ?? raw.Chave ?? raw.chave ?? "",
+        Key: r.chave ?? raw.Key ?? raw.key ?? "",
+        key: r.chave ?? raw.Key ?? raw.key ?? "",
+        Chamado: r.chave ?? raw.Chamado ?? raw.chamado ?? "",
+        "Código da Lotérica": r.cod_ul ?? raw["Código da Lotérica"] ?? raw.cod_ul ?? "",
+        "Codigo da Loterica": r.cod_ul ?? raw["Codigo da Loterica"] ?? raw.cod_ul ?? "",
+        cod_ul: r.cod_ul ?? raw.cod_ul ?? "",
+        "Tipo de Falha": r.tipo_falha ?? raw["Tipo de Falha"] ?? raw.tipo_falha ?? "",
+        "Tipo Falha": r.tipo_falha ?? raw["Tipo Falha"] ?? raw.tipo_falha ?? "",
+        "TIPO DE FALHA": r.tipo_falha ?? raw["TIPO DE FALHA"] ?? raw.tipo_falha ?? "",
+        tipo_falha: r.tipo_falha ?? raw.tipo_falha ?? "",
+        Status: r.status ?? raw.Status ?? raw.status ?? "",
+        status: r.status ?? raw.status ?? "",
+        Resumo: r.resumo ?? raw.Resumo ?? raw.resumo ?? "",
+        resumo: r.resumo ?? raw.resumo ?? "",
+        Summary: r.resumo ?? raw.Summary ?? raw.summary ?? "",
+        summary: r.resumo ?? raw.summary ?? "",
+        "Fila Jira": raw["Fila Jira"] ?? raw.fila_jira ?? "",
+        Fila: raw["Fila Jira"] ?? raw.fila_jira ?? "",
+        "Último Comentário": raw["Último Comentário"] ?? raw.ultimo_comentario ?? "",
+        "Ultimo Comentario": raw["Último Comentário"] ?? raw.ultimo_comentario ?? "",
+        "Último Comentário Interno": raw["Último Comentário Interno"] ?? raw.ultimo_comentario_interno ?? "",
+        "Ultimo Comentario Interno": raw["Último Comentário Interno"] ?? raw.ultimo_comentario_interno ?? "",
+      });
     }
     if (data.length < PAGE) break;
     from += PAGE;
@@ -435,7 +468,14 @@ async function fetchGrafanaRows(): Promise<Row[]> {
       .from("grafana")
       .select("*")
       .range(from, from + PAGE - 1);
-    if (error) throw error;
+    if (error) {
+      const message = String(error?.message ?? "").toLowerCase();
+      if (message.includes("pgrst205") || message.includes("could not find the table 'public.grafana'")) {
+        console.warn("Tabela grafana ainda não existe no banco. Usando staging_bases como fallback.");
+        return [];
+      }
+      throw error;
+    }
     if (!data || data.length === 0) break;
     for (const r of data) {
       out.push({

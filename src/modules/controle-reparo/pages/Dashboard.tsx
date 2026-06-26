@@ -287,15 +287,55 @@ function Indicadores({
   }, [jiraRows]);
 
   const incSemAlarmeRows = useMemo(() => {
-    if (!jiraAlarmRows.length) return [] as Row[];
+    if (!jiraAlarmRows.length || !fullRows.length) return [] as Row[];
+    const controleIndex = new Map<string, Set<string>>();
+    for (const r of fullRows) {
+      const codUl = cleanText(r.codigo_loterica ?? "");
+      const tipoLink = cleanText(r.tipo_link ?? "");
+      const falha = cleanText(r.situacao ?? r.ordem ?? "");
+      if (!codUl && !tipoLink && !falha) continue;
+      const key = `${codUl}|${tipoLink}|${falha}`;
+      const incSet = controleIndex.get(key) ?? new Set();
+      const inc = normalizeIncidentValue(r.chamado) || normalizeIncidentValue(r.inc_snow);
+      if (inc) incSet.add(inc);
+      controleIndex.set(key, incSet);
+    }
     return jiraAlarmRows.filter((row) => {
+      const jiraCodUl = cleanText(getVal(row, "cod_ul", "Código da Lotérica", "Codigo da Loterica", "CÃ³d. da LotÃ©rica", "CÃ³digo da LotÃ©rica_", "Codigo UL", "Código UL", "Codigo UL"));
+      const alarmeTexto = alarmNorm(
+        getVal(
+          row,
+          "Resumo",
+          "Summary",
+          "Título",
+          "Titulo",
+          "Assunto",
+          "Descrição",
+          "Descricao",
+          "Mensagem",
+          "Tipo",
+          "Chamado",
+          "Chave",
+          "Key",
+          "Descrição do problema",
+          "Descrição do Problema",
+        ),
+      );
+      const isPrincipal = alarmeTexto.includes("LINK PRINCIPAL");
+      const isBackup = alarmeTexto.includes("LINK BACKUP");
+      const jiraTipoLink = isPrincipal ? "PRIMÁRIO" : isBackup ? "SECUNDÁRIO" : "";
+      const jiraFalha = cleanText(getVal(row, "Tipo de Falha", "tipo_falha", "Tipo Falha", "TIPO DE FALHA"));
       const inc = normalizeIncidentValue(
         getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
       );
-      if (!inc) return false;
-      return !controleIncs.has(inc);
+      if (!jiraCodUl && !jiraTipoLink && !jiraFalha) return true;
+      const matchKey = `${jiraCodUl}|${jiraTipoLink}|${jiraFalha}`;
+      const incSet = controleIndex.get(matchKey);
+      if (!incSet) return true;
+      if (!inc) return true;
+      return !incSet.has(inc);
     });
-  }, [jiraAlarmRows, controleIncs]);
+  }, [jiraAlarmRows, fullRows]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [

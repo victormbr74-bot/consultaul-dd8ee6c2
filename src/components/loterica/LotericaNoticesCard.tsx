@@ -60,6 +60,20 @@ const LotericaNoticesCard = ({
   const hasNotices = noticeCount > 0;
   const selectedName = (namesByCode[selectedCode] || "").trim();
   const selectedLabel = selectedCode ? [selectedCode, selectedName || "Sem nome"].join(" - ") : "";
+  const editorValue = historyText ? `${historyText}\n\n${textValue}` : textValue;
+  const handleEditorChange = (value: string) => {
+    if (!historyText) {
+      onTextValueChange(value);
+      return;
+    }
+
+    if (value.startsWith(historyText)) {
+      onTextValueChange(value.slice(historyText.length).replace(/^\s*\n*/, ""));
+      return;
+    }
+
+    onTextValueChange(value.trimStart());
+  };
 
   return (
     <Card className={cn("border border-blue-400/30 bg-blue-400/10 backdrop-blur-sm h-full")}>
@@ -109,20 +123,13 @@ const LotericaNoticesCard = ({
         )}
 
         <div className="space-y-1">
-          <Label className="text-xs">{"Hist\u00F3rico"}</Label>
-          <div className="max-h-28 overflow-auto rounded-md border border-border bg-background/50 p-2 text-xs leading-5 whitespace-pre-wrap">
-            {loading ? "Carregando avisos..." : historyText || "Nenhum aviso registrado."}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Nova informa\u00E7\u00E3o"}</Label>
+          <Label htmlFor="loterica-aviso-textarea" className="text-xs">{"Informa\u00E7\u00F5es"}</Label>
           <Textarea
             id="loterica-aviso-textarea"
-            value={textValue}
-            onChange={(event) => onTextValueChange(event.target.value)}
-            placeholder={"Digite a nova informa\u00E7\u00E3o para esta UL."}
-            className="min-h-[72px] resize-y bg-background/70 text-xs leading-5"
+            value={loading ? "Carregando avisos..." : editorValue}
+            onChange={(event) => handleEditorChange(event.target.value)}
+            placeholder={"Digite a primeira informa\u00E7\u00E3o ou acrescente uma nova ao final do texto."}
+            className="min-h-[120px] resize-y bg-background/70 text-xs leading-5"
             readOnly={loading}
           />
         </div>

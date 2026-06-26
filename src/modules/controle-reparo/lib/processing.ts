@@ -128,6 +128,7 @@ export interface ProcessInput {
   timezone?: string;
   /** existing controle rows from previous days + same day (for inheritance & normalization) */
   prior: ControleRow[];
+  sameDayPrior?: ControleRow[];
 }
 
 export interface ProcessResult {
@@ -253,6 +254,20 @@ export interface ProcessReport {
     principal: number;
     secundario: number;
     normalizados: number;
+  };
+  versionamento: {
+    versaoAnterior: number | null;
+    registrosVersaoAnteriorEncontrados: number;
+    statusPlanilhaPreservados: number;
+    statusPlanilhaRegraNormal: number;
+    responsavelPreservados: number;
+    responsavelRegraNormal: number;
+    exemplosPreservados: Array<{
+      chave: string;
+      codigo_loterica: string;
+      status_planilha: string | null;
+      responsavel: string | null;
+    }>;
   };
 }
 
@@ -1008,6 +1023,7 @@ export function processControle(input: ProcessInput): ProcessResult {
     processadoEmLocal,
     timezone,
     prior,
+    sameDayPrior = [],
     versao = 1,
   } = input;
 
@@ -1135,6 +1151,12 @@ export function processControle(input: ProcessInput): ProcessResult {
   for (const p of priorSorted) {
     if (p.data_referencia === dataReferencia && p.chave) currentByChave.set(p.chave, p);
   }
+  const sameDayPriorByChave = new Map<string, ControleRow>();
+  for (const p of priorSorted) {
+    if (p.data_referencia === dataReferencia && p.versao && (p.versao ?? 1) < versao && p.chave) {
+      sameDayPriorByChave.set(p.chave, p);
+    }
+  }
 
   const controle: ControleRow[] = [];
   const seenKeys = new Set<string>();
@@ -1164,6 +1186,20 @@ export function processControle(input: ProcessInput): ProcessResult {
   const plantaExemplos: ProcessReport["planta"]["exemplosEnriquecidos"] = [];
   const semIncAte24hKeys = new Set<string>();
   const filaJiraVaziaExemplos: ProcessReport["jira"]["filaJiraVaziaExemplos"] = [];
+
+  const versaoAnterior = sameDayPriorByChave.size > 0
+    ? prior
+        .filter((p) => p.data_referencia === dataReferencia && p.versao && (p.versao ?? 1) < versao)
+        .sort((a, b) => (a.versao ?? 1) - (b.versao ?? 1))
+    : [];
+  const maxVersaoAnterior = versaoAnterior.length > 0
+    ? Math.max(...versaoAnterior.map((p) => p.versao ?? 1))
+    : null;
+  let statusPlanilhaPreservados = 0;
+  let statusPlanilhaRegraNormal = 0;
+  let responsavelPreservados = 0;
+  let responsavelRegraNormal = 0;
+  const exemplosPreservados: ProcessReport["versionamento"]["exemplosPreservados"] = [];
 
   const getGrafanaCircuit = (...keys: Array<string | null | undefined>) => {
     for (const key of keys) {
@@ -1412,15 +1448,44 @@ export function processControle(input: ProcessInput): ProcessResult {
       ordemConvertidaReparo++;
     }
 
-    // Status Planilha vem do D-1 quando não houver edição manual; ausente ou inválido vira CEC ANALISANDO.
+    // Status Planilha: versão anterior do mesmo dia > D-1 > regra normal.
     if (!manualFields.has("status_planilha")) {
-      row.status_planilha = inheritedD1?.status_planilha ?? STATUS_PLANILHA_PADRAO;
+      const priorRow = sameDayPriorByChave.get(key);
+      const priorStatus = priorRow?.status_planilha ?? null;
+      if (priorStatus) {
+        row.status_planilha = priorStatus;
+        statusPlanilhaPreservados++;
+        if (exemplosPreservados.length < 10) {
+          exemplosPreservados.push({
+            chave: row.chave,
+            codigo_loterica: row.codigo_loterica,
+            status_planilha: priorStatus,
+            responsavel: priorRow.responsavel,
+          });
+        }
+      } else {
+        const d1Status = inheritedD1?.status_planilha ?? null;
+        row.status_planilha = d1Status ?? STATUS_PLANILHA_PADRAO;
+        statusPlanilhaRegraNormal++;
+      }
     }
     if (semIncAte24hKeys.has(row.chave)) {
       row.status_planilha = STATUS_PLANILHA_PADRAO;
     }
     if (row.status_planilha === STATUS_PLANILHA_PADRAO) {
       statusPlanilhaCec++;
+    }
+
+    // Responsável: versão anterior do mesmo dia tem prioridade quando não houver edição manual.
+    if (!manualFields.has("responsavel")) {
+      const priorRowResp = sameDayPriorByChave.get(key);
+      const priorResponsavel = priorRowResp?.responsavel ?? null;
+      if (priorResponsavel) {
+        row.responsavel = priorResponsavel;
+        responsavelPreservados++;
+      } else {
+        responsavelRegraNormal++;
+      }
     }
 
     // Item 17: OEMP — apenas contagem; o responsável é definido na fase de distribuição.
@@ -1676,6 +1741,15 @@ export function processControle(input: ProcessInput): ProcessResult {
       principal,
       secundario,
       normalizados,
+    },
+    versionamento: {
+      versaoAnterior: maxVersaoAnterior,
+      registrosVersaoAnteriorEncontrados: versaoAnterior.length,
+      statusPlanilhaPreservados: statusPlanilhaPreservados,
+      statusPlanilhaRegraNormal: statusPlanilhaRegraNormal,
+      responsavelPreservados: responsavelPreservados,
+      responsavelRegraNormal: responsavelRegraNormal,
+      exemplosPreservados,
     },
   };
 

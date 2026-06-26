@@ -207,6 +207,7 @@ async function fetchProfileNames(): Promise<string[]> {
 
 async function fetchProcessingContext(dataReferencia: string): Promise<{
   prior: ControleRow[];
+  sameDayPrior: ControleRow[];
   manualEditFieldsByChave: Record<string, string[]>;
 }> {
   const currentVersion = await fetchLatestControleVersao(dataReferencia);
@@ -225,13 +226,15 @@ async function fetchProcessingContext(dataReferencia: string): Promise<{
   if (error) throw error;
   const previousDate = previousDates?.[0]?.data_referencia;
 
-  if (!previousDate) return { prior: current, manualEditFieldsByChave };
+  if (!previousDate) {
+    return { prior: current, sameDayPrior: current, manualEditFieldsByChave };
+  }
 
   const previousVersion = await fetchLatestControleVersao(previousDate);
   const previous = previousVersion
     ? await fetchAllControle({ dataReferencia: previousDate, versao: previousVersion })
     : [];
-  return { prior: [...previous, ...current], manualEditFieldsByChave };
+  return { prior: [...previous, ...current], sameDayPrior: current, manualEditFieldsByChave };
 }
 
 async function nextControleVersao(dataReferencia: string): Promise<number> {
@@ -524,7 +527,7 @@ export async function runDailyProcessing(): Promise<{
   }
 
   await requireControleVersaoColumn();
-  const { prior, manualEditFieldsByChave } = await fetchProcessingContext(dataExecucao);
+  const { prior, sameDayPrior, manualEditFieldsByChave } = await fetchProcessingContext(dataExecucao);
   const versao = await nextControleVersao(dataExecucao);
 
   const result = processControle({
@@ -542,6 +545,7 @@ export async function runDailyProcessing(): Promise<{
     processadoEmLocal: processingTimestamp(processadoEm),
     timezone: PROCESSING_TIMEZONE,
     prior,
+    sameDayPrior,
   });
 
   // insert in chunks

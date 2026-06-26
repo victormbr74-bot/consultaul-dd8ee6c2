@@ -117,6 +117,9 @@ function formatProcessingReport(report: ProcessReport): string {
     `Responsáveis OEMP Principal (${resp.oempTotal} | distribuídos ${resp.oempDistribuidos}): ${dist(resp.oemp)}.`,
     `SEM INC: ${resp.semInc}.`,
     `Resultado: controle ${r.totalControle}; circuitos down ${report.gis.finalAtivos}; Situação=REPARO ${r.situacaoReparo}; Ordem=REPARO ${r.ordemReparo} (convertidos ${r.ordemConvertidaReparo}); Status Planilha=CEC ANALISANDO ${r.statusPlanilhaCecAnalisando}; Principal ${r.principal}; Secundário ${r.secundario}; Normalizados ${r.normalizados}.`,
+    report.versionamento
+      ? `Versionamento: referência V${report.versionamento.versaoAnterior ?? "—"} (${report.versionamento.registrosVersaoAnteriorEncontrados} registros); Status Planilha preservados ${report.versionamento.statusPlanilhaPreservados}; regra normal ${report.versionamento.statusPlanilhaRegraNormal}; Responsável preservados ${report.versionamento.responsavelPreservados}; regra normal ${report.versionamento.responsavelRegraNormal}; exemplos ${report.versionamento.exemplosPreservados.map((e) => `${e.codigo_loterica}: SP=${e.status_planilha ?? "—"} / Resp=${e.responsavel ?? "—"}`).join(" | ") || "nenhum"}.`
+      : "",
   ].join("\n");
 }
 

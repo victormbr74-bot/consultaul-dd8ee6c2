@@ -355,7 +355,10 @@ const LotericaDetail = () => {
     void fetchLotericas();
   }, [requestedCodes]);
 
-  const activeForm = activeCode ? formsByCode[activeCode] || lotericas[0] || {} : {};
+  const activeForm = useMemo(() => {
+    const code = activeCode ? formsByCode[activeCode] || lotericas[0] : null;
+    return code ?? {};
+  }, [activeCode, formsByCode, lotericas]);
 
   const fetchNotices = useCallback(async () => {
     if (!loadedCodes.length) {
@@ -890,7 +893,7 @@ const LotericaDetail = () => {
                 key={activeCode}
                 form={activeForm}
                 saveButton={saveButton}
-                setForm={(nextForm) => {
+                setForm={(nextForm: any) => {
                   if (!activeCode) return;
                   setFormsByCode((prev) => ({ ...prev, [activeCode]: nextForm }));
                 }}

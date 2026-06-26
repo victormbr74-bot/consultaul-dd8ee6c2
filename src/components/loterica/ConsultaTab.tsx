@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import TestesTab from "@/components/loterica/TestesTab";
 
 type MainField = {
@@ -69,119 +68,99 @@ interface ConsultaTabProps {
   saveButton?: ReactNode;
 }
 
-const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
-  const allFields = useMemo(() => [...PRINCIPAL_FIELDS, ...BACKUP_FIELDS, ...LOTERICA_FIELDS], []);
+const ConsultaTabContent = ({ form, setForm, saveButton }: ConsultaTabProps) => {
+  const draftRef = useRef<Record<string, string>>({});
+  const isEditingRef = useRef<Record<string, boolean>>({});
 
-  const buildDraft = useCallback((formData: any) => {
-    const rawData = formData?.raw_data && typeof formData.raw_data === "object" ? formData.raw_data : {};
-    const next: Record<string, string> = {};
-    for (const f of allFields) {
-      if (f.key) {
-        next[f.label] = formData?.[f.key] || "";
-      } else if (f.rawKeys) {
-        let found = false;
-        for (const k of f.rawKeys) {
-          if (Object.prototype.hasOwnProperty.call(rawData, k)) {
-            next[f.label] = String(rawData[k] || "");
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          next[f.label] = "";
-        }
-      }
+  const getRawValue = (form: any, keys: string[]) => {
+    const raw = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
+    for (const k of keys) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) return raw[k];
     }
-    return next;
-  }, [allFields]);
+    return undefined;
+  };
 
-  const [draft, setDraft] = useState<Record<string, string>>(() => buildDraft(form));
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-
-  useEffect(() => {
-    const expected = buildDraft(form);
-    const current = draftRef.current;
-    const hasUncommitted = Object.keys(expected).some((label) => current[label] !== expected[label]);
-    if (!hasUncommitted) {
-      const isSame =
-        Object.keys(expected).length === Object.keys(current).length &&
-        Object.keys(expected).every((label) => current[label] === expected[label]);
-      if (!isSame) {
-        setDraft(expected);
-      }
+  const getFieldValue = (f: MainField) => {
+    if (isEditingRef.current[f.label]) {
+      return draftRef.current[f.label] ?? "";
     }
-  }, [form, buildDraft]);
-
-  const commitField = (f: MainField) => {
-    const value = draftRef.current[f.label] || "";
     if (f.key) {
-      setForm({ ...form, [f.key]: value });
-    } else if (f.rawKeys) {
-      const current = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
-      const next: Record<string, unknown> = { ...current };
-      const targetKey = f.rawKeys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || f.rawKeys[0];
-      next[targetKey] = value;
-      setForm({ ...form, raw_data: next });
+      return form?.[f.key] ?? "";
     }
+    if (f.rawKeys) {
+      const rawValue = getRawValue(form, f.rawKeys);
+      return rawValue != null ? String(rawValue) : "";
+    }
+    return "";
   };
 
-  const renderField = (f: MainField) => {
-    const value = draft[f.label] ?? "";
+  const commitField = useCallback(
+    (f: MainField) => {
+      const value = draftRef.current[f.label];
+      if (value === undefined) return;
 
-    return (
-      <div
-        key={f.key || f.label}
-        className={cn("space-y-1.5", f.wide ? "md:col-span-2 2xl:col-span-3" : "")}
-      >
-        <Label className="text-xs text-muted-foreground">{f.label}</Label>
-        {f.multiline ? (
-          <Textarea
-            rows={f.rows || 3}
-            wrap={f.noWrap ? "off" : undefined}
-            className={cn(
-              f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
-              f.mono ? "font-mono text-xs" : "",
-            )}
-            value={value}
-            onChange={(e) => {
-              setDraft((prev) => ({ ...prev, [f.label]: e.target.value }));
-            }}
-            onBlur={() => commitField(f)}
-          />
-        ) : (
-          <Input
-            className={f.mono ? "font-mono text-xs" : ""}
-            value={value}
-            placeholder={f.key ? undefined : "-"}
-            onChange={(e) => {
-              setDraft((prev) => ({ ...prev, [f.label]: e.target.value }));
-            }}
-            onBlur={() => commitField(f)}
-          />
-        )}
-      </div>
-    );
-  };
+      isEditingRef.current[f.label] = false;
 
-  const SectionCard = ({
-    title,
-    fields,
-    action,
-  }: {
-    title: string;
-    fields: MainField[];
-    action?: ReactNode;
-  }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle className="text-lg">{title}</CardTitle>
-        {action}
-      </CardHeader>
-      <CardContent>
-        <FieldGrid>{fields.map(renderField)}</FieldGrid>
-      </CardContent>
-    </Card>
+      if (f.key) {
+        setForm((prev: any) => {
+          if (prev?.[f.key] === value) return prev;
+          return { ...prev, [f.key]: value };
+        });
+      } else if (f.rawKeys) {
+        setForm((prev: any) => {
+          const current = prev?.raw_data && typeof prev.raw_data === "object" ? prev.raw_data : {};
+          const targetKey = f.rawKeys.find((k) => Object.prototype.hasOwnProperty.call(current, k)) || f.rawKeys[0];
+          const currentValue = current[targetKey];
+          if (currentValue === value) return prev;
+          const next: Record<string, unknown> = { ...current, [targetKey]: value };
+          return { ...prev, raw_data: next };
+        });
+      }
+      delete draftRef.current[f.label];
+    },
+    [setForm],
+  );
+
+  const handleInputChange = useCallback((f: MainField, value: string) => {
+    draftRef.current[f.label] = value;
+    isEditingRef.current[f.label] = true;
+  }, []);
+
+  const renderField = useCallback(
+    (f: MainField) => {
+      const value = getFieldValue(f);
+
+      return (
+        <div
+          key={f.key || f.label}
+          className={cn("space-y-1.5", f.wide ? "md:col-span-2 2xl:col-span-3" : "")}
+        >
+          <Label className="text-xs text-muted-foreground">{f.label}</Label>
+          {f.multiline ? (
+            <Textarea
+              rows={f.rows || 3}
+              wrap={f.noWrap ? "off" : undefined}
+              className={cn(
+                f.compactExpandable ? "h-10 min-h-10 resize overflow-auto" : "resize-y",
+                f.mono ? "font-mono text-xs" : "",
+              )}
+              value={value}
+              onChange={(e) => handleInputChange(f, e.target.value)}
+              onBlur={() => commitField(f)}
+            />
+          ) : (
+            <Input
+              className={f.mono ? "font-mono text-xs" : ""}
+              value={value}
+              placeholder={f.key ? undefined : "-"}
+              onChange={(e) => handleInputChange(f, e.target.value)}
+              onBlur={() => commitField(f)}
+            />
+          )}
+        </div>
+      );
+    },
+    [getFieldValue, handleInputChange, commitField],
   );
 
   return (
@@ -191,20 +170,63 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
       </aside>
 
       <div className="min-w-0 space-y-6">
-        <SectionCard title="Dados Principal" fields={PRINCIPAL_FIELDS} />
-        <SectionCard title="Dados Backup" fields={BACKUP_FIELDS} />
-        <SectionCard title="Dados da Lotérica" fields={LOTERICA_FIELDS} action={saveButton} />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-lg">Dados Principal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {PRINCIPAL_FIELDS.map(renderField)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-lg">Dados Backup</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {BACKUP_FIELDS.map(renderField)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-lg">Dados da Lotérica</CardTitle>
+            {saveButton}
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {LOTERICA_FIELDS.map(renderField)}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 };
 
-function FieldGrid({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {children}
-    </div>
-  );
-}
-
-export default ConsultaTab;
+export default memo(ConsultaTabContent, (prev, next) => {
+  if (prev.saveButton !== next.saveButton) return false;
+  if (prev.setForm !== next.setForm) return false;
+  if (prev.form === next.form) return true;
+  const prevForm = prev.form || {};
+  const nextForm = next.form || {};
+  const prevKeys = Object.keys(prevForm);
+  const nextKeys = Object.keys(nextForm);
+  if (prevKeys.length !== nextKeys.length) return false;
+  for (const key of prevKeys) {
+    if (prevForm[key] !== nextForm[key]) return false;
+  }
+  const prevRaw = prevForm.raw_data || {};
+  const nextRaw = nextForm.raw_data || {};
+  const prevRawKeys = Object.keys(prevRaw);
+  const nextRawKeys = Object.keys(nextRaw);
+  if (prevRawKeys.length !== nextRawKeys.length) return false;
+  for (const key of prevRawKeys) {
+    if (prevRaw[key] !== nextRaw[key]) return false;
+  }
+  return true;
+});

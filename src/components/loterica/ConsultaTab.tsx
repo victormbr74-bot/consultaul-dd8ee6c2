@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useRef, useLayoutEffect } from "react";
+import { useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,26 +64,18 @@ const BACKUP_FIELDS: MainField[] = [
 
 interface ConsultaTabProps {
   form: any;
-  setForm: (form: any) => void;
+  setForm: (form: any | ((prev: any) => any)) => void;
   saveButton?: ReactNode;
 }
 
+const toInputValue = (value: unknown) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+};
+
 const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
-  const draftRef = useRef<Record<string, string>>({});
-  const formIdRef = useRef<string>("");
-  const formRef = useRef<any>(form);
-
-  useLayoutEffect(() => {
-    formRef.current = form;
-    const newId = form?.cod_ul || "";
-    if (newId !== formIdRef.current) {
-      formIdRef.current = newId;
-      for (const key of Object.keys(draftRef.current)) {
-        delete draftRef.current[key];
-      }
-    }
-  }, [form]);
-
   const getRawValue = useCallback((form: any, keys: string[]) => {
     const raw = form?.raw_data && typeof form.raw_data === "object" ? form.raw_data : {};
     for (const k of keys) {
@@ -93,24 +85,18 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
   }, []);
 
   const getFieldValue = useCallback((f: MainField) => {
-    if (draftRef.current[f.label] !== undefined) {
-      return draftRef.current[f.label];
-    }
     if (f.key) {
-      return formRef.current?.[f.key] ?? "";
+      return toInputValue(form?.[f.key]);
     }
     if (f.rawKeys) {
-      const rawValue = getRawValue(formRef.current, f.rawKeys);
-      return rawValue != null ? String(rawValue) : "";
+      const rawValue = getRawValue(form, f.rawKeys);
+      return toInputValue(rawValue);
     }
     return "";
-  }, [getRawValue]);
+  }, [form, getRawValue]);
 
-  const commitField = useCallback(
-    (f: MainField) => {
-      const value = draftRef.current[f.label];
-      if (value === undefined) return;
-
+  const updateField = useCallback(
+    (f: MainField, value: string) => {
       if (f.key) {
         setForm((prev: any) => ({ ...prev, [f.key]: value }));
       } else if (f.rawKeys) {
@@ -121,14 +107,9 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
           return { ...prev, raw_data: next };
         });
       }
-      delete draftRef.current[f.label];
     },
     [setForm],
   );
-
-  const handleInputChange = useCallback((f: MainField, value: string) => {
-    draftRef.current[f.label] = value;
-  }, []);
 
   const renderField = useCallback(
     (f: MainField) => {
@@ -149,22 +130,20 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
                 f.mono ? "font-mono text-xs" : "",
               )}
               value={value}
-              onChange={(e) => handleInputChange(f, e.target.value)}
-              onBlur={() => commitField(f)}
+              onChange={(e) => updateField(f, e.target.value)}
             />
           ) : (
             <Input
               className={f.mono ? "font-mono text-xs" : ""}
               value={value}
               placeholder={f.key ? undefined : "-"}
-              onChange={(e) => handleInputChange(f, e.target.value)}
-              onBlur={() => commitField(f)}
+              onChange={(e) => updateField(f, e.target.value)}
             />
           )}
         </div>
       );
     },
-    [getFieldValue, handleInputChange, commitField],
+    [getFieldValue, updateField],
   );
 
   return (
@@ -177,6 +156,7 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-lg">Dados Principal</CardTitle>
+            {saveButton}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -199,7 +179,6 @@ const ConsultaTab = ({ form, setForm, saveButton }: ConsultaTabProps) => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-lg">Dados da Lotérica</CardTitle>
-            {saveButton}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

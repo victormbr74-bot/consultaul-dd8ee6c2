@@ -172,6 +172,9 @@ const hasLotericaChanges = (rows: any[], forms: Record<string, any>) =>
     return Object.keys(buildChangePayload(row, currentForm).changes).length > 0;
   });
 
+const resolveFormUpdate = (update: any | ((prev: any) => any), previous: any) =>
+  typeof update === "function" ? update(previous) : update;
+
 const buildLotericaNoticesMissingTableMessage = () =>
   "Banco desatualizado: falta a tabela loterica_notices.\n" +
   `Aplique a migracao Supabase '${LOTERICA_NOTICES_MIGRATION}'.`;
@@ -355,13 +358,10 @@ const LotericaDetail = () => {
     void fetchLotericas();
   }, [requestedCodes]);
 
-  const [activeFormDraft, setActiveFormDraft] = useState<any>(null);
-
   const activeForm = useMemo(() => {
     const code = activeCode ? formsByCode[activeCode] || lotericas[0] : null;
-    const base = code ?? {};
-    return activeFormDraft ?? base;
-  }, [activeCode, formsByCode, lotericas, activeFormDraft]);
+    return code ?? {};
+  }, [activeCode, formsByCode, lotericas]);
 
   const fetchNotices = useCallback(async () => {
     if (!loadedCodes.length) {
@@ -879,8 +879,11 @@ const LotericaDetail = () => {
                   <ConsultaTab
                     form={rowForm}
                     saveButton={saveButton}
-                    setForm={(nextForm) => {
-                      setFormsByCode((prev) => ({ ...prev, [rowCode]: nextForm }));
+                    setForm={(update) => {
+                      setFormsByCode((prev) => {
+                        const current = prev[rowCode] || row;
+                        return { ...prev, [rowCode]: resolveFormUpdate(update, current) };
+                      });
                     }}
                   />
                 </section>
@@ -894,10 +897,13 @@ const LotericaDetail = () => {
                 key={activeCode}
                 form={activeForm}
                 saveButton={saveButton}
-                setForm={(nextForm: any) => {
-                  setActiveFormDraft(nextForm);
+                setForm={(update: any) => {
                   if (!activeCode) return;
-                  setFormsByCode((prev) => ({ ...prev, [activeCode]: nextForm }));
+                  setFormsByCode((prev) => {
+                    const current = prev[activeCode] || activeForm;
+                    const nextForm = resolveFormUpdate(update, current);
+                    return { ...prev, [activeCode]: nextForm };
+                  });
                 }}
               />
             )}

@@ -590,6 +590,24 @@ export type Database = {
         }
         Relationships: []
       }
+      grafana: {
+        Row: {
+          circuito: string
+          imported_at: string
+          posto: string
+        }
+        Insert: {
+          circuito?: string
+          imported_at?: string
+          posto?: string
+        }
+        Update: {
+          circuito?: string
+          imported_at?: string
+          posto?: string
+        }
+        Relationships: []
+      }
       historico_tratativas: {
         Row: {
           campo: string

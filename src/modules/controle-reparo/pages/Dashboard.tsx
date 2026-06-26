@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { fetchAllControle, fetchControleDatas, fetchControleVersoes, getLatestStaging } from "@/modules/controle-reparo/lib/db";
+import { fetchAllControle, fetchControleDatas, fetchControleVersoes, fetchJiraAbertosRows } from "@/modules/controle-reparo/lib/db";
 import {
   CONTROL_DATE_SESSION_KEY,
   CONTROL_VERSION_SESSION_KEY,
@@ -122,8 +122,8 @@ export default function DashboardPage() {
   });
 
   const { data: jiraRows = [] } = useQuery({
-    queryKey: ["jira-staging"],
-    queryFn: () => getLatestStaging("jira"),
+    queryKey: ["jira-db"],
+    queryFn: () => fetchJiraAbertosRows(),
   });
 
   const CLOSED_JIRA_STATUSES = new Set([

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { arraysToWorkbook, writeFile } from "@/lib/excelCompat";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -268,6 +269,9 @@ const Dashboard = () => {
   const importRef = useRef<HTMLInputElement>(null);
   const search = sidebarSearch;
   const extraSearchColumnsRef = useRef<string[]>([]);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const DEBOUNCE_MS = 300;
 
   useEffect(() => {
     let cancelled = false;
@@ -365,7 +369,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [consultaSearchMode, search, page]);
+  }, [consultaSearchMode, debouncedSearch, page]);
 
   useEffect(() => {
     void fetchLotericas();
@@ -373,6 +377,16 @@ const Dashboard = () => {
 
   useEffect(() => {
     setPage(0);
+  }, [search]);
+
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, DEBOUNCE_MS);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
   }, [search]);
 
   const goToFirstResult = useCallback(async () => {

@@ -102,8 +102,34 @@ async function fetchMassivas(): Promise<MassivaRecord[]> {
     if (data.length < pageSize) break;
     from += pageSize;
   }
+
+  const seen = new Set<string>();
+  const deduped: MassivaRecord[] = [];
+  for (const m of out) {
+    const circuitos = (m.massiva_circuitos ?? [])
+      .map((c) => c.codigo_loterica || c.designacao || c.ip_loopback || "")
+      .filter(Boolean)
+      .sort()
+      .join(",");
+    const key = [
+      m.tipo_massiva,
+      m.uf,
+      m.operadora,
+      m.qtd_circuitos,
+      m.data_hora_abertura,
+      m.primeiro_alarme,
+      m.circuito_pai || "",
+      circuitos || m.circuito_pai || "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(m);
+  }
+
   console.info("[consulta-massiva] massivas retornadas pelo controle", {
     total: out.length,
+    deduped: deduped.length,
+    removidas: out.length - deduped.length,
     menorDataAlarme: out.length
       ? new Date(Math.min(...out.map((m) => eventDate(m).getTime()).filter(Number.isFinite))).toISOString()
       : null,
@@ -111,7 +137,7 @@ async function fetchMassivas(): Promise<MassivaRecord[]> {
       ? new Date(Math.max(...out.map((m) => eventDate(m).getTime()).filter(Number.isFinite))).toISOString()
       : null,
   });
-  return out;
+  return deduped;
 }
 
 function eventDate(m: MassivaRecord): Date {

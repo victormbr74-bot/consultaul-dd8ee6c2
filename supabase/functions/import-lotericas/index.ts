@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type Dataset = "lotericas" | "macro_base_alarmes" | "jira_abertos" | "falhas_gis";
+type Dataset = "lotericas" | "macro_base_alarmes" | "jira_abertos" | "falhas_gis" | "grafana";
 
 type ImportBody = {
   dataset?: Dataset;
@@ -236,12 +236,25 @@ function toFalhaGis(row: Record<string, unknown>, index: number) {
   };
 }
 
+function toGrafana(row: Record<string, unknown>) {
+  const circuito = asText(pick(row, ["Circuito", "circuito", "CIRCUITO"]));
+  if (!circuito) return null;
+
+  return {
+    circuito,
+    posto: asText(pick(row, ["Posto", "posto", "POSTO", "Postos", "Nome do Posto", "Unidade / Posto"])) || "",
+  };
+}
+
 function buildRows(dataset: Dataset, rows: Record<string, unknown>[], userId: string) {
   if (dataset === "lotericas" || dataset === "macro_base_alarmes") {
     return rows.map((row) => toLoterica(row, userId)).filter(Boolean);
   }
   if (dataset === "jira_abertos") {
     return rows.map((row) => toJira(row)).filter(Boolean);
+  }
+  if (dataset === "grafana") {
+    return rows.map((row) => toGrafana(row)).filter(Boolean);
   }
   return rows.map((row, index) => toFalhaGis(row, index)).filter(Boolean);
 }
@@ -250,6 +263,7 @@ function tableForDataset(dataset: Dataset) {
   if (dataset === "lotericas") return { table: "lotericas", conflict: "cod_ul", pk: "cod_ul" };
   if (dataset === "macro_base_alarmes") return { table: "macro_base_alarmes", conflict: "cod_ul", pk: "cod_ul" };
   if (dataset === "jira_abertos") return { table: "jira_abertos", conflict: "chave", pk: "chave" };
+  if (dataset === "grafana") return { table: "grafana", conflict: "circuito", pk: "circuito" };
   return { table: "falhas_gis", conflict: "record_key", pk: "record_key" };
 }
 
@@ -276,7 +290,7 @@ Deno.serve(async (req) => {
   const rows = body.rows as Record<string, unknown>[];
   const dataset: Dataset = body.dataset ?? "lotericas";
 
-  if (!["lotericas", "macro_base_alarmes", "jira_abertos", "falhas_gis"].includes(dataset)) {
+  if (!["lotericas", "macro_base_alarmes", "jira_abertos", "falhas_gis", "grafana"].includes(dataset)) {
     return new Response(JSON.stringify({ error: "Invalid dataset" }), { status: 400, headers: corsHeaders });
   }
 

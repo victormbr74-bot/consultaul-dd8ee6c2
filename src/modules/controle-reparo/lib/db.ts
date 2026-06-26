@@ -317,6 +317,144 @@ export async function getLatestStaging(tipo: Tipo): Promise<Row[]> {
   return out;
 }
 
+async function fetchFalhasGisRows(): Promise<Row[]> {
+  const out: Row[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("falhas_gis")
+      .select("raw_data")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data) {
+      const row = r.raw_data as Row | null;
+      if (row) out.push(row);
+    }
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+async function fetchJiraAbertosRows(): Promise<Row[]> {
+  const out: Row[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("jira_abertos")
+      .select("raw_data")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data) {
+      const row = r.raw_data as Row | null;
+      if (row) out.push(row);
+    }
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+async function getPreviousControleDate(dataReferencia: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("controle_diario")
+    .select("data_referencia")
+    .lt("data_referencia", dataReferencia)
+    .order("data_referencia", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data?.[0]?.data_referencia ?? null;
+}
+
+async function fetchControleD1FromDb(): Promise<Row[]> {
+  const processadoEm = new Date();
+  const dataExecucao = processingDate(processadoEm);
+  const previousDate = await getPreviousControleDate(dataExecucao);
+  if (!previousDate) return [];
+
+  const rows = await fetchAllControle({ dataReferencia: previousDate, allVersions: true });
+  return rows.map((r) => ({
+    "Cód. da Lotérica": r.codigo_loterica ?? "",
+    "Codigo da Loterica": r.codigo_loterica ?? "",
+    "Código da Lotérica": r.codigo_loterica ?? "",
+    "Codigo UL": r.codigo_loterica ?? "",
+    "Código UL": r.codigo_loterica ?? "",
+    "Tipo de Link": r.tipo_link ?? "",
+    "Tipo de link": r.tipo_link ?? "",
+    "Tipo Link": r.tipo_link ?? "",
+    "Tipo do Link": r.tipo_link ?? "",
+    "Link": r.tipo_link ?? "",
+    "Designacao": r.designacao ?? "",
+    "Designação": r.designacao ?? "",
+    "Designacao OEMP": r.designacao_parceiro ?? "",
+    "Designação OEMP": r.designacao_parceiro ?? "",
+    "Novo Circuito": r.novo_circuito ?? "",
+    "NOVO CIRCUITO": r.novo_circuito ?? "",
+    "IP Loopback": r.ip_loopback ?? "",
+    "IP de loopback": r.ip_loopback ?? "",
+    "Loopback": r.ip_loopback ?? "",
+    "IP": r.ip_loopback ?? "",
+    "Chamado": r.chamado ?? "",
+    "Chave": r.chamado ?? "",
+    "ORDEM": r.ordem ?? "",
+    "SITUAÇÃO": r.situacao ?? "",
+    "SITUACAO": r.situacao ?? "",
+    "STATUS PLANILHA": r.status_planilha ?? "",
+    "STATUS JIRA": r.status_jira ?? "",
+    "OBS": r.obs ?? "",
+    "COMENTÁRIO INTERNO": r.obs ?? "",
+    "Comentário Interno": r.obs ?? "",
+    "RESPONSÁVEL": r.responsavel ?? "",
+    "RESPONSAVEL": r.responsavel ?? "",
+    "STATUS ZABBIX": r.status_zabbix ?? "",
+    "Duração (h)": r.duracao_h?.toString() ?? "",
+    "Duracao (h)": r.duracao_h?.toString() ?? "",
+    "Data e Hora Inicial": r.data_hora_inicial ?? "",
+    "Data/Hora Inicial": r.data_hora_inicial ?? "",
+    "Previsão de Atendimento": r.previsao_atendimento ?? "",
+    "Previsao de Atendimento": r.previsao_atendimento ?? "",
+    "Último Comentário": r.ultimo_comentario ?? "",
+    "Ultimo Comentario": r.ultimo_comentario ?? "",
+    "Lotérica": r.loterica ?? "",
+    "Loterica": r.loterica ?? "",
+    "UF": r.uf ?? "",
+    "Cidade": r.cidade ?? "",
+    "ID do Alarme": r.chamado ?? "",
+    "ID do Alarmes": r.chamado ?? "",
+    "Identificador do Alarme": r.chamado ?? "",
+  } as Row));
+}
+
+async function fetchGrafanaRows(): Promise<Row[]> {
+  const out: Row[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("grafana")
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data) {
+      out.push({
+        "Circuito": r.circuito ?? "",
+        "circuito": r.circuito ?? "",
+        "Posto": r.posto ?? "",
+        "posto": r.posto ?? "",
+        "POSTO": r.posto ?? "",
+        "Postos": r.posto ?? "",
+        "Nome do Posto": r.posto ?? "",
+        "Unidade / Posto": r.posto ?? "",
+      } as Row);
+    }
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
 /** Loads all staging bases, runs processing and persists the daily control + implantações. */
 export async function runDailyProcessing(): Promise<{
   inserted: number;
@@ -327,11 +465,11 @@ export async function runDailyProcessing(): Promise<{
   const processadoEm = new Date();
   const dataExecucao = processingDate(processadoEm);
   const [gis1, gis2, controleD1, jira, grafana, planta, profileNames] = await Promise.all([
-    getLatestStaging("gis1"),
+    fetchFalhasGisRows().then((db) => (db.length > 0 ? db : getLatestStaging("gis1"))),
     getLatestStaging("gis2"),
-    getLatestStaging("controle_d1"),
-    getLatestStaging("jira"),
-    getLatestStaging("grafana"),
+    fetchControleD1FromDb().then((db) => (db.length > 0 ? db : getLatestStaging("controle_d1"))),
+    fetchJiraAbertosRows().then((db) => (db.length > 0 ? db : getLatestStaging("jira"))),
+    fetchGrafanaRows().then((db) => (db.length > 0 ? db : getLatestStaging("grafana"))),
     fetchLotericasExportRows(),
     fetchProfileNames(),
   ]);
@@ -413,3 +551,5 @@ export async function runDailyProcessing(): Promise<{
 
   return { inserted, dataReferencia: dataExecucao, versao, stats: result.stats };
 }
+
+export { fetchFalhasGisRows, fetchJiraAbertosRows, fetchGrafanaRows };

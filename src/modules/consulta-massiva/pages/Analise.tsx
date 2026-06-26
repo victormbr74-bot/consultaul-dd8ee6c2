@@ -93,6 +93,7 @@ function massivaFingerprintFromRows(m: Massiva, rows: ProcessedRow[]): string {
     .join(",");
   const primeiroIso = Number.isFinite(m.primeiro_ts) ? new Date(m.primeiro_ts).toISOString() : "";
   const ultimoIso = Number.isFinite(m.ultimo_ts) ? new Date(m.ultimo_ts).toISOString() : "";
+  const control = massivaControlFields(m, rows);
   return [
     m.tipo_massiva,
     m.uf,
@@ -100,6 +101,7 @@ function massivaFingerprintFromRows(m: Massiva, rows: ProcessedRow[]): string {
     m.qtd_circuitos,
     primeiroIso,
     ultimoIso,
+    control.circuito_pai || "",
     circuitos,
   ].join("|");
 }
@@ -119,6 +121,7 @@ function massivaFingerprintFromDb(row: PersistedMassivaForDedupe): string {
     row.qtd_circuitos,
     primeiroIso,
     ultimoIso,
+    row.circuito_pai || "",
     circuitos || row.circuito_pai || "",
   ].join("|");
 }

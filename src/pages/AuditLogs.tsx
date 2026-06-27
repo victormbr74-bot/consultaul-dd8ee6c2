@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Download, Eye, Search } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -44,6 +45,66 @@ const statusLabel: Record<string, string> = {
   error: "Erro",
   denied: "Negado",
 };
+
+const fieldLabels: Record<string, string> = {
+  action: "Acao",
+  browser: "Navegador",
+  created_at: "Data/Hora",
+  device_type: "Dispositivo",
+  entity: "Entidade",
+  entity_id: "ID do registro",
+  id: "ID do log",
+  integrity_hash: "Hash de integridade",
+  ip_address: "IP",
+  message: "Mensagem",
+  module: "Modulo",
+  new_values: "Valores novos",
+  observation: "Observacao",
+  old_values: "Valores anteriores",
+  origin: "Origem",
+  os: "Sistema operacional",
+  request_method: "Metodo",
+  request_path: "Caminho",
+  status: "Status",
+  user_agent: "User-Agent",
+  user_email: "E-mail",
+  user_id: "ID do usuario",
+  user_name: "Usuario",
+};
+
+function getFieldLabel(key: string) {
+  return fieldLabels[key] ?? key.replaceAll("_", " ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatDetailValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "boolean") return value ? "Sim" : "Nao";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return JSON.stringify(value, null, 2);
+}
+
+function formatDateTime(value: string | null | undefined) {
+  return value ? new Date(value).toLocaleString("pt-BR") : "-";
+}
+
+function buildChangeRows(oldValues: unknown, newValues: unknown) {
+  const oldRecord = isRecord(oldValues) ? oldValues : {};
+  const newRecord = isRecord(newValues) ? newValues : {};
+  const keys = Array.from(new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)])).sort((a, b) =>
+    getFieldLabel(a).localeCompare(getFieldLabel(b), "pt-BR"),
+  );
+
+  return keys.map((key) => ({
+    key,
+    label: getFieldLabel(key),
+    oldValue: oldRecord[key],
+    newValue: newRecord[key],
+  }));
+}
 
 function csvEscape(value: unknown) {
   const text = String(value ?? "");
@@ -102,6 +163,125 @@ function downloadXlsx(rows: AuditLog[]) {
 
 function formatSystem(row: AuditLog) {
   return [row.os, row.browser, row.device_type].filter(Boolean).join(" / ") || "-";
+}
+
+function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-md border bg-card">
+      <h3 className="border-b px-4 py-2 text-sm font-semibold">{title}</h3>
+      <div className="grid gap-3 p-4 md:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function DetailItem({ label, value, mono = false }: { label: string; value: unknown; mono?: boolean }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`break-words text-sm ${mono ? "font-mono text-xs" : ""}`}>{formatDetailValue(value)}</p>
+    </div>
+  );
+}
+
+function ValueBlock({ value }: { value: unknown }) {
+  const text = formatDetailValue(value);
+  const isComplex = typeof value === "object" && value !== null;
+
+  return (
+    <div className={`max-h-40 overflow-auto whitespace-pre-wrap break-words rounded border bg-muted/40 p-2 ${isComplex ? "font-mono text-xs" : "text-sm"}`}>
+      {text}
+    </div>
+  );
+}
+
+function ChangeTable({ oldValues, newValues }: { oldValues: unknown; newValues: unknown }) {
+  const changes = buildChangeRows(oldValues, newValues);
+
+  if (!changes.length) {
+    return <p className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">Nao ha valores anteriores ou novos registrados neste evento.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[26%]">Campo</TableHead>
+            <TableHead>Antes</TableHead>
+            <TableHead>Depois</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {changes.map((change) => (
+            <TableRow key={change.key}>
+              <TableCell className="align-top font-medium">{change.label}</TableCell>
+              <TableCell className="align-top">
+                <ValueBlock value={change.oldValue} />
+              </TableCell>
+              <TableCell className="align-top">
+                <ValueBlock value={change.newValue} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function AuditLogDetail({ log }: { log: AuditLog }) {
+  return (
+    <div className="max-h-[72vh] space-y-4 overflow-auto pr-2">
+      <div className="rounded-md border bg-muted/30 p-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-base font-semibold">{log.observation || log.message || getFieldLabel(log.action)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatDateTime(log.created_at)} | {log.module || "Modulo nao informado"} | {log.entity || "Entidade nao informada"}
+            </p>
+          </div>
+          <Badge variant={log.status === "success" ? "secondary" : "destructive"}>{statusLabel[log.status] ?? log.status}</Badge>
+        </div>
+      </div>
+
+      <DetailSection title="Evento">
+        <DetailItem label="Acao" value={log.action} mono />
+        <DetailItem label="Data/Hora" value={formatDateTime(log.created_at)} />
+        <DetailItem label="Modulo" value={log.module} />
+        <DetailItem label="Entidade" value={log.entity} />
+        <DetailItem label="ID do registro" value={log.entity_id} mono />
+        <DetailItem label="Origem" value={log.origin} mono />
+        <DetailItem label="Mensagem" value={log.message} />
+        <DetailItem label="Observacao" value={log.observation} />
+      </DetailSection>
+
+      <DetailSection title="Usuario e acesso">
+        <DetailItem label="Usuario" value={log.user_name} />
+        <DetailItem label="E-mail" value={log.user_email} />
+        <DetailItem label="ID do usuario" value={log.user_id} mono />
+        <DetailItem label="IP" value={log.ip_address} mono />
+        <DetailItem label="Metodo" value={log.request_method} mono />
+        <DetailItem label="Caminho" value={log.request_path} mono />
+      </DetailSection>
+
+      <DetailSection title="Ambiente">
+        <DetailItem label="Navegador" value={log.browser} />
+        <DetailItem label="Sistema operacional" value={log.os} />
+        <DetailItem label="Dispositivo" value={log.device_type} />
+        <DetailItem label="User-Agent" value={log.user_agent} />
+      </DetailSection>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">Alteracoes registradas</h3>
+        <ChangeTable oldValues={log.old_values} newValues={log.new_values} />
+      </section>
+
+      <DetailSection title="Integridade">
+        <DetailItem label="ID do log" value={log.id} mono />
+        <DetailItem label="Hash de integridade" value={log.integrity_hash} mono />
+      </DetailSection>
+    </div>
+  );
 }
 
 export default function AuditLogs() {
@@ -294,13 +474,11 @@ export default function AuditLogs() {
       </footer>
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Detalhe do log</DialogTitle>
           </DialogHeader>
-          <pre className="max-h-[70vh] overflow-auto rounded-md bg-muted p-4 text-xs">
-            {selected ? JSON.stringify(selected, null, 2) : ""}
-          </pre>
+          {selected && <AuditLogDetail log={selected} />}
         </DialogContent>
       </Dialog>
     </div>

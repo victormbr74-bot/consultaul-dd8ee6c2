@@ -16,6 +16,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_LOADING_TIMEOUT_MS = 8000;
+const USER_PRESENCE_INTERVAL_MS = 60000;
 
 function isInvalidRefreshTokenError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -55,12 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (rolesResult.value.error) {
         console.error("Failed to fetch user roles", rolesResult.value.error);
       } else {
-        isAdmin = rolesResult.value.data?.some((r) =>
-          r.role === "administrador_master" ||
-          r.role === "administrador" ||
-          r.role === "admin" ||
-          r.role === "ADMIN"
-        ) ?? false;
+        isAdmin = rolesResult.value.data?.some((r) => r.role === "admin") ?? false;
       }
     } else {
       console.error("Failed to fetch user roles", rolesResult.reason);
@@ -80,6 +76,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { isAdmin, profile };
   };
 
+  const updatePresence = async (userId: string) => {
+    const profilesTable = supabase.from("profiles") as unknown as {
+      update: (values: { last_seen_at: string }) => {
+        eq: (column: string, value: string) => Promise<{ error: { message?: string } | null }>;
+      };
+    };
+    const { error } = await profilesTable.update({ last_seen_at: new Date().toISOString() }).eq("id", userId);
+
+    if (error) {
+      const message = String(error.message || "");
+      if (!message.includes("last_seen_at")) {
+        console.error("Failed to update user presence", error);
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
     const timeoutId = window.setTimeout(() => {
@@ -95,23 +107,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(nextSession);
         const nextUser = nextSession?.user ?? null;
         setUser(nextUser);
-        // Never block the UI waiting for profile/roles network round trips.
-        setLoading(false);
 
         if (nextUser) {
           const userData = await fetchUserData(nextUser.id);
           if (!active) return;
           setIsAdmin(userData.isAdmin);
           setProfile(userData.profile);
+          setLoading(false);
         } else {
           setIsAdmin(false);
           setProfile(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Failed to apply auth session", error);
         if (!active) return;
         setIsAdmin(false);
         setProfile(null);
+        setLoading(false);
       }
     };
 
@@ -144,6 +157,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    void updatePresence(user.id);
+    const intervalId = window.setInterval(() => {
+      void updatePresence(user.id);
+    }, USER_PRESENCE_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

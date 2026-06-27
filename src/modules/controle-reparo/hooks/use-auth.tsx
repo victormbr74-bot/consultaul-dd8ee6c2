@@ -1,10 +1,10 @@
 import { useAuth as useConsultaUlAuth } from "@/contexts/AuthContext";
 
-export type AppRole = "administrador_master" | "administrador" | "operacao" | "consulta";
+export type AppRole = "admin" | "user";
 
 export function useAuth() {
   const auth = useConsultaUlAuth();
-  const role: AppRole = auth.isAdmin ? "administrador_master" : "operacao";
+  const role: AppRole = auth.isAdmin ? "admin" : "user";
 
   return {
     user: auth.user,

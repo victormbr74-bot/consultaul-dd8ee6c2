@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Users, UserPlus, Trash2, Pencil, Save, RotateCcw, Check, X, RefreshCw, Eye, KeyRound, Webhook, Filter } from "lucide-react";
 import { notifyJirayab } from "@/lib/jirayabNotify";
 
-type AppRole = "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
+type AppRole = "admin" | "user";
 
 type UserRow = {
   id: string;
@@ -26,6 +26,7 @@ type UserRow = {
   role: AppRole;
   active: boolean;
   created_at?: string;
+  last_seen_at?: string | null;
 };
 
 type AdminAction =
@@ -58,22 +59,27 @@ type ChangeRequestViewRow = ChangeRequestRow & {
 const DEFAULT_PASSWORD = "Oi@12345";
 
 const ROLE_LABEL: Record<AppRole, string> = {
-  administrador_master: "ADM Master",
-  administrador: "Administrador",
   admin: "Admin",
-  operacao: "Operação",
-  consulta: "Consulta",
   user: "Usuário",
 };
 
 const ROLE_VARIANT: Record<AppRole, "default" | "secondary" | "destructive" | "outline"> = {
-  administrador_master: "default",
-  administrador: "default",
-  admin: "secondary",
-  operacao: "outline",
-  consulta: "secondary",
+  admin: "default",
   user: "secondary",
 };
+
+const normalizeAppRole = (role: unknown): AppRole => (role === "admin" ? "admin" : "user");
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+
+function isUserOnline(lastSeenAt: string | null | undefined, now: number) {
+  if (!lastSeenAt) return false;
+  const lastSeenTime = new Date(lastSeenAt).getTime();
+  return Number.isFinite(lastSeenTime) && now - lastSeenTime <= ONLINE_WINDOW_MS;
+}
+
+function formatLastSeen(lastSeenAt: string | null | undefined) {
+  return lastSeenAt ? new Date(lastSeenAt).toLocaleString("pt-BR") : "Nunca visto";
+}
 
 const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const { isAdmin, loading: authLoading, user } = useAuth();
@@ -99,6 +105,7 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
   const [filterRole, setFilterRole] = useState<AppRole | "all">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "ativo" | "inativo">("all");
   const [filterSearch, setFilterSearch] = useState("");
+  const [presenceNow, setPresenceNow] = useState(() => Date.now());
 
   const [selectedChangeIds, setSelectedChangeIds] = useState<string[]>([]);
   const [lotericaUpdatesEnabled, setLotericaUpdatesEnabled] = useState(true);
@@ -269,6 +276,12 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     }
   }, [authLoading, isAdmin, navigate, section]);
 
+  useEffect(() => {
+    if (section !== "users") return;
+    const intervalId = window.setInterval(() => setPresenceNow(Date.now()), 30000);
+    return () => window.clearInterval(intervalId);
+  }, [section]);
+
   const fetchJirayabSetting = async () => {
     setJirayabLoading(true);
     try {
@@ -334,6 +347,11 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
       return true;
     });
   }, [sortedUsers, filterRole, filterStatus, filterSearch]);
+
+  const onlineUserCount = useMemo(
+    () => users.filter((row) => isUserOnline(row.last_seen_at, presenceNow)).length,
+    [presenceNow, users],
+  );
 
   const selectedUserCount = selectedUserIds.size;
 
@@ -602,7 +620,8 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
         user_code: p.user_code,
         active: p.active,
         created_at: p.created_at,
-        role: (roles?.find((r) => r.user_id === p.id)?.role || "user") as AppRole,
+        last_seen_at: (p as { last_seen_at?: string | null }).last_seen_at ?? null,
+        role: normalizeAppRole(roles?.find((r) => r.user_id === p.id)?.role),
       }));
 
       setUsers(merged);
@@ -614,12 +633,24 @@ const AdminPanel = ({ section }: { section: "data" | "users" }) => {
     }
   };
 
+  useEffect(() => {
+    if (authLoading || !isAdmin || section !== "users") return;
+    const intervalId = window.setInterval(() => {
+      void fetchUsers();
+    }, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [authLoading, isAdmin, section]);
+
   const applyChangeReview = async (
     req: ChangeRequestViewRow,
     nextStatus: "approved" | "rejected",
     reviewerId: string,
     reviewNote?: string,
   ) => {
+    if (!isAdmin) {
+      throw new Error("Apenas ADM pode aprovar ou rejeitar alteracoes de loterica.");
+    }
+
     if (nextStatus === "approved") {
       const updates =
         req.after_data && typeof req.after_data === "object" ? (req.after_data as Record<string, unknown>) : {};
@@ -1291,12 +1322,8 @@ ${failureDetails}`,
                     <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">Usuário</SelectItem>
-                        <SelectItem value="consulta">Consulta</SelectItem>
-                        <SelectItem value="operacao">Operação</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="administrador">Administrador</SelectItem>
-                        <SelectItem value="administrador_master">ADM Master</SelectItem>
+                        <SelectItem value="user">Usuário</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1342,6 +1369,7 @@ ${failureDetails}`,
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Filter className="w-4 h-4" />
                     <span>Filtros</span>
+                    <Badge variant="secondary">Online: {onlineUserCount}</Badge>
                     {(filterSearch || filterRole !== "all" || filterStatus !== "all") && (
                       <Badge variant="secondary" className="cursor-pointer" onClick={clearUserFilters}>
                         Limpar filtros
@@ -1359,11 +1387,7 @@ ${failureDetails}`,
                       <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Papel" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os papéis</SelectItem>
-                        <SelectItem value="administrador_master">ADM Master</SelectItem>
-                        <SelectItem value="administrador">Administrador</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="operacao">Operação</SelectItem>
-                        <SelectItem value="consulta">Consulta</SelectItem>
                         <SelectItem value="user">Usuário</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1394,6 +1418,7 @@ ${failureDetails}`,
                         <th className="text-left p-3 font-medium text-muted-foreground">Nome</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Código</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Papel</th>
+                        <th className="text-left p-3 font-medium text-muted-foreground">Online</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
                         <th className="text-left p-3 font-medium text-muted-foreground">Ações</th>
                       </tr>
@@ -1401,13 +1426,13 @@ ${failureDetails}`,
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
                             Carregando...
                           </td>
                         </tr>
                       ) : filteredUsers.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
                             Nenhum usuário encontrado com os filtros aplicados.
                           </td>
                         </tr>
@@ -1441,16 +1466,23 @@ ${failureDetails}`,
                                 <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
                                   <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="user">Usuário</SelectItem>
-                                    <SelectItem value="consulta">Consulta</SelectItem>
-                                    <SelectItem value="operacao">Operação</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="administrador">Administrador</SelectItem>
-                                    <SelectItem value="administrador_master">ADM Master</SelectItem>
+                                    <SelectItem value="user">Usuário</SelectItem>
                                   </SelectContent>
                                 </Select>
                               ) : (
                                 <Badge variant={ROLE_VARIANT[u.role]}>{ROLE_LABEL[u.role]}</Badge>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {isUserOnline(u.last_seen_at, presenceNow) ? (
+                                <Badge className="bg-emerald-600 text-white hover:bg-emerald-600" title={`Ultimo sinal: ${formatLastSeen(u.last_seen_at)}`}>
+                                  Online
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" title={`Ultimo sinal: ${formatLastSeen(u.last_seen_at)}`}>
+                                  Offline
+                                </Badge>
                               )}
                             </td>
                             <td className="p-3">
@@ -1536,12 +1568,8 @@ ${failureDetails}`,
                     <Select value={bulkEditRole} onValueChange={(v) => setBulkEditRole(v as AppRole)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">Usuário</SelectItem>
-                        <SelectItem value="consulta">Consulta</SelectItem>
-                        <SelectItem value="operacao">Operação</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="administrador">Administrador</SelectItem>
-                        <SelectItem value="administrador_master">ADM Master</SelectItem>
+                        <SelectItem value="user">Usuário</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type AppRole = "administrador_master" | "administrador" | "admin" | "operacao" | "consulta" | "user";
+type AppRole = "admin" | "user";
 
 type UserPayload = {
   user_id?: string;
@@ -45,7 +45,7 @@ const json = (body: unknown, status = 200) =>
 const normalizeUserCode = (value: unknown) => String(value ?? "").replace(/\D/g, "");
 const normalizeRole = (value: unknown): AppRole => {
   const str = String(value ?? "").trim().toLowerCase();
-  if (str === "administrador_master" || str === "administrador" || str === "admin" || str === "ADMIN" || str === "operacao" || str === "consulta" || str === "user") {
+  if (str === "admin" || str === "user") {
     return str as AppRole;
   }
   return "user";
@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
       const userCode = normalizeUserCode(p.user_code);
       const role = normalizeRole(p.role);
       const rawPassword = typeof p.password === "string" ? p.password.trim() : "";
-      const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+      const isAdminRole = role === "admin";
       if (isAdminRole && !rawPassword) {
         return json({ error: "Senha obrigatoria para usuarios admin." }, 400);
       }
@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
           if (existingProfile?.id) {
             userId = existingProfile.id;
           } else {
-            const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+            const isAdminRole = role === "admin";
             if (isAdminRole) {
               throw new Error("Seed nao cria usuario admin sem senha explicita. Crie o admin manualmente.");
             }
@@ -415,7 +415,7 @@ Deno.serve(async (req) => {
 
           await applyRole(adminClient, userId, role);
 
-          const isAdminRole = role === "administrador_master" || role === "administrador" || role === "admin" || role === "ADMIN";
+          const isAdminRole = role === "admin";
           if (!isAdminRole) {
             const { error: passError } = await adminClient.auth.admin.updateUserById(userId, {
               password: defaultPassword,

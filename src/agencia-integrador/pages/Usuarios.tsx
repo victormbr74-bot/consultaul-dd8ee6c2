@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type DbClient = any;
-type AppRole = 'admin' | 'operacao' | 'leitura';
+type AppRole = 'admin' | 'user';
 
 type UserAdminRow = {
   userId: string;
@@ -43,23 +43,19 @@ const EMPTY_FORM: UserForm = {
   username: '',
   email: '',
   password: '',
-  role: 'operacao',
+  role: 'user',
 };
 
 const db = supabase as DbClient;
 
 function getRolePriority(role: string): number {
-  if (role === 'admin') return 3;
-  if (role === 'operacao') return 2;
+  if (role === 'admin') return 2;
   return 1;
 }
 
 function normalizeAppRole(role: string): AppRole {
   if (role === 'admin') return 'admin';
-  if (role === 'operacao') return 'operacao';
-  // Compat with legacy loteria-vision-hub role value
-  if (role === 'user') return 'leitura';
-  return 'leitura';
+  return 'user';
 }
 
 function normalizeUsername(value: string) {
@@ -126,7 +122,7 @@ export default function Usuarios() {
         username: String(p.username ?? ''),
         email: String(p.email ?? ''),
         isActive: p.is_active !== false,
-        role: (roleMap.get(String(p.user_id)) ?? 'leitura') as AppRole,
+        role: (roleMap.get(String(p.user_id)) ?? 'user') as AppRole,
         createdAt: String(p.created_at ?? ''),
       }));
 
@@ -378,9 +374,8 @@ export default function Usuarios() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="operacao">operacao</SelectItem>
-                  <SelectItem value="leitura">leitura</SelectItem>
                   <SelectItem value="admin">admin</SelectItem>
+                  <SelectItem value="user">user</SelectItem>
                 </SelectContent>
               </Select>
             </div>

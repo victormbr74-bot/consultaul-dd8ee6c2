@@ -40,7 +40,19 @@ const STATUS_PLANILHA_CANONICO = new Map(
   STATUS_PLANILHA_OPCOES.map((status) => [normKey(status), status]),
 );
 
-STATUS_PLANILHA_CANONICO.set(normKey("RETIRAR DA BLINDAGEM"), "RETIRAR DA BLIDAGEM");
+function addStatusPlanilhaAlias(alias: string, canonical: (typeof STATUS_PLANILHA_OPCOES)[number]): void {
+  STATUS_PLANILHA_CANONICO.set(normKey(alias), canonical);
+}
+
+addStatusPlanilhaAlias("RETIRAR DA BLINDAGEM", "RETIRAR DA BLIDAGEM");
+addStatusPlanilhaAlias("LINK SATÃ‰LITE - NECESSÃRIO VISITA TÃ‰CNICA", "LINK SATÉLITE - NECESSÁRIO VISITA TÉCNICA");
+addStatusPlanilhaAlias("LINK SATÃ‰LITE - NECESSÃÁRIO VISITA TÃ‰CNICA", "LINK SATÉLITE - NECESSÁRIO VISITA TÉCNICA");
+addStatusPlanilhaAlias("LINK SATÃ‰LITE - TRATATIVA SENCINET", "LINK SATÉLITE - TRATATIVA SENCINET");
+addStatusPlanilhaAlias("LINK 4G ARQIA - NECESSÃRIO VISITA TÃ‰CNICA", "LINK 4G ARQIA - NECESSÁRIO VISITA TÉCNICA");
+addStatusPlanilhaAlias("LINK 4G TIM - NECESSÃRIO VISITA TÃ‰CNICA", "LINK 4G TIM - NECESSÁRIO VISITA TÉCNICA");
+addStatusPlanilhaAlias("LINK 4G VIVO - NECESSÃRIO VISITA TÃ‰CNICA", "LINK 4G VIVO - NECESSÁRIO VISITA TÉCNICA");
+addStatusPlanilhaAlias("MIGRAÃ§Ã£o de cobre para fibra.", "MIGRAÇÃO DE COBRE PARA FIBRA");
+addStatusPlanilhaAlias("MIGRAÃ‡ÃƒO DE COBRE PARA FIBRA", "MIGRAÇÃO DE COBRE PARA FIBRA");
 
 function normalizeStatusPlanilha(value: string | null | undefined): string | null {
   const key = normKey(cleanText(value ?? ""));
@@ -1494,7 +1506,11 @@ export function processControle(input: ProcessInput): ProcessResult {
     if (!manualFields.has("status_planilha")) {
       const priorRow = sameDayPriorByChave.get(key);
       const priorStatus = normalizeStatusPlanilha(priorRow?.status_planilha ?? null);
-      if (priorStatus) {
+      const d1Status = normalizeStatusPlanilha(inheritedD1?.status_planilha ?? null);
+      if (d1Status) {
+        row.status_planilha = d1Status;
+        statusPlanilhaRegraNormal++;
+      } else if (priorStatus) {
         row.status_planilha = priorStatus;
         statusPlanilhaPreservados++;
         if (exemplosPreservados.length < 10) {
@@ -1506,11 +1522,11 @@ export function processControle(input: ProcessInput): ProcessResult {
           });
         }
       } else {
-        const d1Status = normalizeStatusPlanilha(inheritedD1?.status_planilha ?? null);
-        row.status_planilha = d1Status ?? STATUS_PLANILHA_PADRAO;
+        row.status_planilha = STATUS_PLANILHA_PADRAO;
         statusPlanilhaRegraNormal++;
       }
     }
+    row.status_planilha = normalizeStatusPlanilha(row.status_planilha) ?? STATUS_PLANILHA_PADRAO;
     if (semIncAte24hKeys.has(row.chave)) {
       row.status_planilha = STATUS_PLANILHA_PADRAO;
     }

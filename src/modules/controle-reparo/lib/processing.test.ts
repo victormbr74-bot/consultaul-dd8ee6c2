@@ -159,6 +159,88 @@ describe("processControle Controle D-1", () => {
     expect(result.controle[0].status_planilha).toBe("PENDENCIA INFRA CLIENTE");
   });
 
+  it("prioriza Status Planilha do D-1 sobre CEC ANALISANDO preservado na versao do mesmo dia", () => {
+    const sameDayPrior = {
+      data_referencia: "2026-06-29",
+      versao: 1,
+      chave: "21-001284-6|PRINCIPAL|105133193+SBO5011854+SBO5011854+SBO5011854+INC-475347+279875239",
+      codigo_loterica: "21-001284-6",
+      loterica: "LOTERIC A MEGA PREMIUM",
+      tipo_link: "PRINCIPAL",
+      uf: "SP",
+      cidade: "SAO BERNARDO DO CAMPO",
+      designacao: "SBO5011854",
+      ip_loopback: "10.51.33.193",
+      data_hora_inicial: "2026-01-12T10:34:00.000Z",
+      duracao_h: 4030,
+      chamado: "INC-475347",
+      previsao_atendimento: null,
+      ultimo_comentario: "6/24/26 10:14",
+      grafana: null,
+      empresa: "OI",
+      designacao_parceiro: "115484351030699",
+      fila_jira: "OEMP",
+      inc_snow: "PENDENCIA INFRA CLIENTE",
+      incidente_mam: "MIGRACAO",
+      ordem: "REPARO",
+      novo_circuito: "SBO 5011854",
+      situacao: "REPARO",
+      status_planilha: "CEC ANALISANDO",
+      status_jira: "PENDENCIA INFRA CLIENTE",
+      obs: "Em contato com o responsavel VIVO Jailson.",
+      responsavel: "Caroline Victoria Marques de Oliveira",
+      responsavel_backup: "0",
+      status_zabbix: "0",
+      status_normalizacao: "ATIVO" as const,
+      normalizado_em: null,
+      pendente_enriquecimento: false,
+      tem_os_reparo: false,
+      tipo_falha: null,
+    };
+
+    const result = processControle({
+      gis1: [
+        {
+          "Cod. da Loterica": "21-001284-6",
+          Loterica: "LOTERIC A MEGA PREMIUM",
+          "Tipo de Link": "PRINCIPAL",
+          Cidade: "SAO BERNARDO DO CAMPO",
+          UF: "SP",
+          Designacao: "SBO5011854",
+          "IP Loopback": "10.51.33.193",
+          "Duracao (h)": "4030",
+          Empresa: "OI",
+          Chamado: "INC-475347",
+          "ID do Alarmes": "279875239",
+        },
+      ],
+      gis2: [],
+      controleD1: [
+        {
+          "Cod. da Loterica": "21-001284-6",
+          "Tipo de Link": "PRINCIPAL",
+          Designacao: "SBO5011854",
+          "IP Loopback": "10.51.33.193",
+          Chamado: "INC-475347",
+          "ID do Alarmes": "279875239",
+          "STATUS PLANILHA": "PENDENCIA INFRA CLIENTE",
+        },
+      ],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-29",
+      processadoEm: "2026-06-29T12:00:00.000Z",
+      prior: [sameDayPrior],
+      sameDayPrior: [sameDayPrior],
+      versao: 2,
+    });
+
+    expect(result.controle[0].status_planilha).toBe("PENDENCIA INFRA CLIENTE");
+    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(0);
+  });
+
   it("usa CEC ANALISANDO somente quando Status Planilha do D-1 esta vazio ou invalido", () => {
     const result = processControle({
       gis1: [
@@ -193,6 +275,78 @@ describe("processControle Controle D-1", () => {
     });
 
     expect(result.controle[0].status_planilha).toBe("CEC ANALISANDO");
+  });
+
+  it("canoniza Status Planilha valido com mojibake vindo do D-1", () => {
+    const result = processControle({
+      gis1: [
+        {
+          "Código da Lotérica": "21-001284-6",
+          Lotérica: "UL SATELITE",
+          "Tipo de Link": "SECUNDARIO",
+          UF: "BA",
+          Cidade: "SALVADOR",
+          Designação: "CEFSATELITE",
+          Chamado: "INC-47537",
+          "Duração (h)": "48",
+          Empresa: "SENCINET",
+        },
+      ],
+      gis2: [],
+      controleD1: [
+        {
+          "Código da Lotérica": "21-001284-6",
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "CEFSATELITE",
+          "STATUS PLANILHA": "LINK SATÃ‰LITE - TRATATIVA SENCINET",
+        },
+      ],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-29",
+      processadoEm: "2026-06-29T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(result.controle[0].status_planilha).toBe("LINK SATÉLITE - TRATATIVA SENCINET");
+  });
+
+  it("canoniza Status Planilha satelite necessario com mojibake vindo do D-1", () => {
+    const result = processControle({
+      gis1: [
+        {
+          "Código da Lotérica": "21-001284-7",
+          Lotérica: "UL SATELITE NECESSARIO",
+          "Tipo de Link": "SECUNDARIO",
+          UF: "BA",
+          Cidade: "SALVADOR",
+          Designação: "CEFSATELITENEC",
+          Chamado: "INC-47539",
+          "Duração (h)": "48",
+          Empresa: "SENCINET",
+        },
+      ],
+      gis2: [],
+      controleD1: [
+        {
+          "Código da Lotérica": "21-001284-7",
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "CEFSATELITENEC",
+          "STATUS PLANILHA": "LINK SATÃ‰LITE - NECESSÃRIO VISITA TÃ‰CNICA",
+        },
+      ],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-29",
+      processadoEm: "2026-06-29T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(result.controle[0].status_planilha).toBe("LINK SATÉLITE - NECESSÁRIO VISITA TÉCNICA");
   });
 });
 
@@ -303,5 +457,74 @@ describe("processControle Jira e responsaveis", () => {
 
     expect(result.controle[0].responsavel).toBe("Caroline Victoria Marques de Oliveira");
     expect(result.stats.report.versionamento.responsavelPreservados).toBe(1);
+  });
+
+  it("nao preserva Status Planilha invalido de versao anterior", () => {
+    const priorBase = {
+      data_referencia: "2026-06-29",
+      versao: 1,
+      chave: "21-001284-6|PRINCIPAL|PRINCIPAL+OEMP+INC-47538",
+      codigo_loterica: "21-001284-6",
+      loterica: "UL STATUS INVALIDO VERSAO",
+      tipo_link: "PRINCIPAL",
+      uf: "SP",
+      cidade: "SAO PAULO",
+      designacao: "CEFSTATUSVERSAO",
+      ip_loopback: null,
+      data_hora_inicial: null,
+      duracao_h: null,
+      chamado: "INC-47538",
+      previsao_atendimento: null,
+      ultimo_comentario: null,
+      grafana: null,
+      empresa: "OEMP",
+      designacao_parceiro: null,
+      fila_jira: null,
+      inc_snow: null,
+      incidente_mam: null,
+      ordem: "REPARO",
+      novo_circuito: null,
+      situacao: "REPARO",
+      status_planilha: "AGUARDANDO ABERTURA DE OS",
+      status_jira: null,
+      obs: null,
+      responsavel: "Caroline Victoria Marques de Oliveira",
+      responsavel_backup: null,
+      status_zabbix: null,
+      status_normalizacao: "ATIVO" as const,
+      normalizado_em: null,
+      pendente_enriquecimento: false,
+      tem_os_reparo: false,
+      tipo_falha: null,
+    };
+
+    const result = processControle({
+      gis1: [
+        {
+          "Código da Lotérica": "21-001284-6",
+          Lotérica: "UL STATUS INVALIDO VERSAO",
+          "Tipo de Link": "PRINCIPAL",
+          UF: "SP",
+          Cidade: "SAO PAULO",
+          Designação: "CEFSTATUSVERSAO",
+          Chamado: "INC-47538",
+          "Duração (h)": "48",
+          Empresa: "OEMP",
+        },
+      ],
+      gis2: [],
+      controleD1: [],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-29",
+      processadoEm: "2026-06-29T12:00:00.000Z",
+      prior: [priorBase],
+      sameDayPrior: [priorBase],
+      versao: 2,
+    });
+
+    expect(result.controle[0].status_planilha).toBe("CEC ANALISANDO");
   });
 });

@@ -219,6 +219,7 @@ function fixedSelectOptions(field: string, current: string): string[] | null {
   const base = FIXED_SELECT_OPTIONS[field];
   if (!base) return null;
   const opts = [...base];
+  if (field === "status_planilha") return opts;
   if (current && !opts.includes(current)) opts.unshift(current);
   return opts;
 }
@@ -347,6 +348,9 @@ function parseEditableValue(field: string, raw: string): EditableValue {
   if (config.parse) return config.parse(raw);
   const value = raw.trim();
   if (config.required && !value) throw new Error("Este campo não pode ficar vazio.");
+  if (field === "status_planilha" && !STATUS_PLANILHA_OPCOES.includes(value as (typeof STATUS_PLANILHA_OPCOES)[number])) {
+    throw new Error("Selecione um Status Planilha da lista oficial.");
+  }
   return value === "" ? null : value;
 }
 

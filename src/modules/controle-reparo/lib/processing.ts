@@ -26,8 +26,7 @@ export const STATUS_PLANILHA_OPCOES = [
   "ROTEADOR",
   "SEM MIKROTIK, RETIRADA INDEVIDA",
   "TROCA DE CHIP",
-  "TROCA DE MODEM",
-  "RETIRAR DA BLINDAGEM",
+  "RETIRAR DA BLIDAGEM",
   "PENDENCIA INFRA CLIENTE",
   "NORMALIZADO",
   "MASSIVA",
@@ -41,9 +40,11 @@ const STATUS_PLANILHA_CANONICO = new Map(
   STATUS_PLANILHA_OPCOES.map((status) => [normKey(status), status]),
 );
 
-function normalizeStatusPlanilha(value: string | null | undefined): string {
+STATUS_PLANILHA_CANONICO.set(normKey("RETIRAR DA BLINDAGEM"), "RETIRAR DA BLIDAGEM");
+
+function normalizeStatusPlanilha(value: string | null | undefined): string | null {
   const key = normKey(cleanText(value ?? ""));
-  return (key && STATUS_PLANILHA_CANONICO.get(key)) || STATUS_PLANILHA_PADRAO;
+  return (key && STATUS_PLANILHA_CANONICO.get(key)) || null;
 }
 
 /** Backup/secundário quando o tipo de link indica isso (item 2/12). */
@@ -590,6 +591,16 @@ function canonicalProfileName(
   return found.length === 1 ? found[0] : null;
 }
 
+function canonicalResponsavelPreservado(
+  value: string | null | undefined,
+  profileNames: string[],
+): string | null {
+  const raw = cleanText(value ?? "");
+  if (!raw) return null;
+  if (raw.toUpperCase() === SEM_INC) return SEM_INC;
+  return canonicalProfileName(raw, profileNames);
+}
+
 /** Considera Ordem inválida (vazia/ND/NA/null/etc.) que deve virar REPARO (item 8). */
 function isOrdemInvalida(v: string | null | undefined): boolean {
   return isInvalidTechnicalValue(v);
@@ -880,7 +891,40 @@ export function normalizeIncidentValue(v: string | null | undefined): string | n
   const s = cleanTechnicalValue(v);
   if (!s) return null;
   const normalized = s.replace(/\s+/g, "").toUpperCase();
-  return /^INC[-_]?\d+/.test(normalized) ? normalized : null;
+  const match = normalized.match(/^INC[-_]?(\d+)/);
+  return match ? `INC-${match[1]}` : null;
+}
+
+function normalizeJiraIncidentValue(v: string | null | undefined): string | null {
+  const inc = normalizeIncidentValue(v);
+  if (inc) return inc;
+  const s = cleanTechnicalValue(v);
+  return /^\d+$/.test(s) ? `INC-${s}` : null;
+}
+
+function getJiraIncidentValue(row: Row): string | null {
+  return normalizeJiraIncidentValue(
+    getVal(
+      row,
+      "Chave",
+      "Key",
+      "Chamado",
+      "INC",
+      "Incidente",
+      "Numero INC",
+      "Numero Inc",
+      "Número INC",
+      "Nº INC",
+      "N° INC",
+      "Nº INC Snow",
+      "N° INC Snow",
+      "Numero INC Snow",
+      "Número INC Snow",
+      "INC Snow",
+      "Incidente Snow",
+      "n_inc_snow",
+    ),
+  );
 }
 
 function caseAgeHours(row: ControleRow, referenceIso: string | undefined): number | null {
@@ -1064,9 +1108,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   const jiraDetectedIncSnowColumns = detectIncSnowColumns(jira);
   const jiraIncSnowColumnUsage: Record<string, number> = {};
   for (const r of jira) {
-    const inc = normalizeIncidentValue(
-      getVal(r, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
-    );
+    const inc = getJiraIncidentValue(r);
     if (!inc) continue;
     addCount(jiraIncCounts, inc);
     jiraByInc.set(inc, r);
@@ -1171,7 +1213,7 @@ export function processControle(input: ProcessInput): ProcessResult {
   let filaJiraVazia = 0;
   let jiraIncSnowPreenchido = 0;
   let jiraIncSnowVazio = 0;
-  let jiraIncSnowIgnoradoInvalido = 0;
+  const jiraIncSnowIgnoradoInvalido = 0;
   const jiraIncSnowUsandoChave = 0;
   let semIncTotal = 0;
   let ordemConvertidaReparo = 0;
@@ -1451,7 +1493,7 @@ export function processControle(input: ProcessInput): ProcessResult {
     // Status Planilha: versão anterior do mesmo dia > D-1 > regra normal.
     if (!manualFields.has("status_planilha")) {
       const priorRow = sameDayPriorByChave.get(key);
-      const priorStatus = priorRow?.status_planilha ?? null;
+      const priorStatus = normalizeStatusPlanilha(priorRow?.status_planilha ?? null);
       if (priorStatus) {
         row.status_planilha = priorStatus;
         statusPlanilhaPreservados++;
@@ -1464,7 +1506,7 @@ export function processControle(input: ProcessInput): ProcessResult {
           });
         }
       } else {
-        const d1Status = inheritedD1?.status_planilha ?? null;
+        const d1Status = normalizeStatusPlanilha(inheritedD1?.status_planilha ?? null);
         row.status_planilha = d1Status ?? STATUS_PLANILHA_PADRAO;
         statusPlanilhaRegraNormal++;
       }
@@ -1479,7 +1521,10 @@ export function processControle(input: ProcessInput): ProcessResult {
     // Responsável: versão anterior do mesmo dia tem prioridade quando não houver edição manual.
     if (!manualFields.has("responsavel")) {
       const priorRowResp = sameDayPriorByChave.get(key);
-      const priorResponsavel = priorRowResp?.responsavel ?? null;
+      const priorResponsavel = canonicalResponsavelPreservado(
+        priorRowResp?.responsavel ?? null,
+        normalizedProfileNames,
+      );
       if (priorResponsavel) {
         row.responsavel = priorResponsavel;
         responsavelPreservados++;

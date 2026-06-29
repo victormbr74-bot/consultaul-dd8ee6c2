@@ -1854,6 +1854,10 @@ export type Database = {
           uf: string
         }[]
       }
+      sync_controle_lotericas_export: {
+        Args: { _data_referencia: string; _versao: number }
+        Returns: Json
+      }
       set_user_app_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

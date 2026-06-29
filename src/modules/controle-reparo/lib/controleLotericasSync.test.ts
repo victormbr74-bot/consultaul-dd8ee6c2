@@ -50,6 +50,7 @@ describe("buildControleLotericasSyncUpdates", () => {
           cod_ul: "01-005481-2",
           "Empresa CEF": "VTAL",
           "Circuito OEMP": "RJO 1234567",
+          "Designacao Nova": "NEW-123",
           "OPERADORA 4G": "VIVO",
         },
       ],
@@ -59,6 +60,7 @@ describe("buildControleLotericasSyncUpdates", () => {
     expect(updates[0].patch).toEqual({
       empresa: "VTAL",
       designacao_parceiro: "RJO 1234567",
+      novo_circuito: "NEW-123",
       responsavel_backup: "VIVO",
     });
   });
@@ -71,6 +73,7 @@ describe("buildControleLotericasSyncUpdates", () => {
           cod_ul: "01-005481-2",
           "Empresa CEF": "VTAL",
           "Circuito OEMP": "RJO 1234567",
+          "Designacao Nova": "NEW-123",
           "OPERADORA 4G": "VIVO",
         },
       ],
@@ -79,6 +82,7 @@ describe("buildControleLotericasSyncUpdates", () => {
     expect(updates[0].patch).toEqual({
       empresa: "VTAL",
       designacao_parceiro: "RJO 1234567",
+      novo_circuito: "NEW-123",
     });
   });
 
@@ -89,6 +93,7 @@ describe("buildControleLotericasSyncUpdates", () => {
           ...controleBase,
           empresa: "VTAL",
           designacao_parceiro: "RJO 1234567",
+          novo_circuito: "NEW-123",
           responsavel_backup: "VIVO",
         },
       ],
@@ -97,6 +102,7 @@ describe("buildControleLotericasSyncUpdates", () => {
           cod_ul: "01-005481-2",
           "Empresa CEF": "VTAL",
           "Circuito OEMP": "RJO 1234567",
+          "Designacao Nova": "NEW-123",
           "OPERADORA 4G": "VIVO",
         },
       ],

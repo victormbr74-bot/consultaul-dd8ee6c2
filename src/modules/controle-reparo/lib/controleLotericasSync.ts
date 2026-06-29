@@ -2,7 +2,7 @@ import { normalizeLotericasExportHeader } from "@/lib/lotericasExport";
 import { isLinkBackup, type ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { normCodigo } from "@/modules/controle-reparo/lib/parse";
 
-type SyncField = "empresa" | "designacao_parceiro" | "responsavel_backup";
+type SyncField = "empresa" | "designacao_parceiro" | "novo_circuito" | "responsavel_backup";
 
 export interface ControleLotericasSyncChange {
   field: SyncField;
@@ -68,6 +68,7 @@ function getLotericaSyncValues(row: Record<string, unknown>) {
       getExportValue(row, "Operadora"),
     ),
     designacao_parceiro: getExportValue(row, "Circuito OEMP", "CIRCUITO OEMP", "Designacao OEMP", "Designação OEMP"),
+    novo_circuito: getExportValue(row, "Designacao Nova", "Designacao Nova", "DESIGINACAO NOVA", "NOVO CIRCUITO"),
     responsavel_backup: getExportValue(row, "OPERADORA 4G", "RESP BACKUP"),
   };
 }
@@ -92,6 +93,7 @@ export function buildControleLotericasSyncUpdates(
 
     if (syncValues.empresa) next.empresa = syncValues.empresa;
     if (syncValues.designacao_parceiro) next.designacao_parceiro = syncValues.designacao_parceiro;
+    if (syncValues.novo_circuito) next.novo_circuito = syncValues.novo_circuito;
     if (isLinkBackup(row.tipo_link) && syncValues.responsavel_backup) {
       next.responsavel_backup = syncValues.responsavel_backup;
     }

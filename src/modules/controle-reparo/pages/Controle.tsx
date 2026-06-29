@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/modules/controle-reparo/hooks/use-auth";
 import { fetchAllControle, fetchControleDatas, fetchControleVersoes } from "@/modules/controle-reparo/lib/db";
@@ -13,8 +13,6 @@ import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { STATUS_PLANILHA_OPCOES, isLinkBackup } from "@/modules/controle-reparo/lib/processing";
 import { getFaixa, formatHoras, formatDataHora, computeHoras } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle } from "@/modules/controle-reparo/lib/controleExport";
-import { fetchLotericasExportRows } from "@/lib/lotericasExport";
-import { buildControleLotericasSyncUpdates } from "@/modules/controle-reparo/lib/controleLotericasSync";
 import {
   normalizeControleDisplayName,
   normalizeControleFilterText,
@@ -587,6 +585,7 @@ export default function ControlePage() {
 
 export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}) {
   const { canWrite, isAdmin, nome } = useAuth();
+  const queryClient = useQueryClient();
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -920,6 +919,14 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
 
   const syncControleFromLotericas = async () => {
     if (meusCasos) return;
+    if (!isAdmin) {
+      toast.error("Você não tem permissão para sincronizar a base do Consulta UL.");
+      return;
+    }
+    if (!dataRef || !versao) {
+      toast.info("Selecione uma data e versão para sincronizar.");
+      return;
+    }
     if (!rows.length) {
       toast.info("Nenhum registro carregado para sincronizar.");
       return;
@@ -927,63 +934,35 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
 
     setSyncingLotericas(true);
     try {
-      const lotericasRows = await fetchLotericasExportRows();
-      const updates = buildControleLotericasSyncUpdates(rows, lotericasRows);
+      const { data, error } = await supabase.rpc("sync_controle_lotericas_export", {
+        _data_referencia: dataRef,
+        _versao: versao,
+      });
+      if (error) throw error;
 
-      if (updates.length === 0) {
-        toast.success("Controle já está sincronizado com a base de lotéricas.");
-        return;
-      }
+      await queryClient.invalidateQueries({ queryKey: ["controle-rows", dataRef, versao] });
+      await queryClient.invalidateQueries({ queryKey: ["controle-datas"] });
+      await queryClient.invalidateQueries({ queryKey: ["controle-versoes", dataRef] });
 
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("controle_diario")
-          .update(update.patch as never)
-          .eq("id", update.id);
-        if (error) throw error;
-      }
+      const report = (data ?? {}) as {
+        atualizados?: number;
+        campos_atualizados?: number;
+        sem_correspondencia?: number;
+      };
 
-      const historyRows = updates.flatMap((update) =>
-        update.changes.map((change) => ({
-          controle_id: update.id,
-          codigo_loterica: update.codigo_loterica,
-          usuario: nome,
-          campo: change.field,
-          valor_anterior: change.before,
-          valor_novo: change.after,
-        })),
-      );
-
-      for (let index = 0; index < historyRows.length; index += 500) {
-        const { error } = await supabase
-          .from("historico_tratativas")
-          .insert(historyRows.slice(index, index + 500) as never);
-        if (error) {
-          console.warn("Falha ao gravar histórico da sincronização com lotéricas", error);
-          break;
-        }
-      }
-
-      setRows((current) =>
-        current.map((row) => {
-          const update = updates.find((item) => item.id === row.id);
-          return update ? { ...row, ...update.patch } : row;
-        }),
-      );
-
-      toast.success("Controle sincronizado com a base de lotéricas.", {
-        description: `${updates.length} circuito(s), ${historyRows.length} campo(s) atualizado(s).`,
+      toast.success("Base Consulta UL sincronizada com sucesso para a versão atual.", {
+        description: `${report.atualizados ?? 0} registro(s), ${report.campos_atualizados ?? 0} campo(s), ${report.sem_correspondencia ?? 0} sem correspondência.`,
       });
     } catch (error) {
-      console.error("Falha ao sincronizar controle com lotéricas", error);
-      toast.error("Falha ao sincronizar lotéricas", {
-        description: error instanceof Error ? error.message : "Erro inesperado.",
+      console.error("Falha ao sincronizar controle com lotericas", error);
+      const message = error instanceof Error ? error.message : "Erro inesperado.";
+      toast.error(message.includes("permissão") || message.includes("permissao") ? message : "Falha ao sincronizar base Consulta UL", {
+        description: message,
       });
     } finally {
       setSyncingLotericas(false);
     }
   };
-
   const columnFilterCount = Object.values(st.colFilters).filter(
     (f) => f && (f.search.trim() || f.selected.length),
   ).length;
@@ -1089,7 +1068,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                 ))}
               </SelectContent>
             </Select>
-            {!meusCasos && (
+            {!meusCasos && isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
@@ -1101,7 +1080,7 @@ export function ControleView({ meusCasos = false }: { meusCasos?: boolean } = {}
                 ) : (
                   <Database className="mr-2 h-4 w-4" />
                 )}
-                Sincronizar Lotéricas
+                Sincronizar Base
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => exportar("xlsx")}>

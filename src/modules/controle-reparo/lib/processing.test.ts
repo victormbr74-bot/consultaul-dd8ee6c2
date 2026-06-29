@@ -69,3 +69,49 @@ describe("processControle sem INC ate 24h", () => {
     expect(report.total).toBe(0);
   });
 });
+
+describe("processControle Controle D-1", () => {
+  it("herda Ordem e Situacao do Controle D-1 pelos cabecalhos exportados", () => {
+    const result = processControle({
+      gis1: [
+        {
+          "Cód. da Lotérica": "05-005778-2",
+          Lotérica: "LOTERIA SORTE GRANDE",
+          "Tipo de Link": "PRINCIPAL",
+          UF: "CE",
+          Cidade: "FORTALEZA",
+          Designação: "CEFFLA5979675",
+          Chamado: "INC-231887",
+          "Duração (h)": "18512",
+          Empresa: "OI",
+        },
+      ],
+      gis2: [],
+      controleD1: [
+        {
+          "Código da Lotérica": "05-005778-2",
+          Lotérica: "LOTERIA SORTE GRANDE",
+          "Tipo de Link": "PRINCIPAL",
+          UF: "CE",
+          Designação: "FLA5979675",
+          Ordem: "ALTCTEC",
+          Situação: "MIGRAÇÃO EM ANDAMENTO",
+          "STATUS PLANILHA": "MIGRAÇÃO EM ANDAMENTO",
+          Responsável: "Wesley Fernandes da Fonseca Rodrigues",
+        },
+      ],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-19",
+      processadoEm: "2026-06-19T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(result.controle[0].ordem).toBe("ALTCTEC");
+    expect(result.controle[0].situacao).toBe("MIGRAÇÃO EM ANDAMENTO");
+    expect(result.stats.report.d1.cruzados).toBe(1);
+    expect(result.stats.report.d1.situacaoFallbackReparo).toBe(0);
+  });
+});

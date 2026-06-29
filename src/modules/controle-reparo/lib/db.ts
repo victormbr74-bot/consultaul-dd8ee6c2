@@ -463,6 +463,12 @@ async function fetchControleD1FromDb(): Promise<Row[]> {
   } as Row));
 }
 
+async function getLatestStagingOrDb(tipo: Tipo, fetchDbRows: () => Promise<Row[]>): Promise<Row[]> {
+  const stagingRows = await getLatestStaging(tipo);
+  if (stagingRows.length > 0) return stagingRows;
+  return fetchDbRows();
+}
+
 async function fetchGrafanaRows(): Promise<Row[]> {
   const out: Row[] = [];
   let from = 0;
@@ -508,11 +514,11 @@ export async function runDailyProcessing(): Promise<{
   const processadoEm = new Date();
   const dataExecucao = processingDate(processadoEm);
   const [gis1, gis2, controleD1, jira, grafana, planta, profileNames] = await Promise.all([
-    fetchFalhasGisRows().then((db) => (db.length > 0 ? db : getLatestStaging("gis1"))),
+    getLatestStagingOrDb("gis1", fetchFalhasGisRows),
     getLatestStaging("gis2"),
-    fetchControleD1FromDb().then((db) => (db.length > 0 ? db : getLatestStaging("controle_d1"))),
-    fetchJiraAbertosRows().then((db) => (db.length > 0 ? db : getLatestStaging("jira"))),
-    fetchGrafanaRows().then((db) => (db.length > 0 ? db : getLatestStaging("grafana"))),
+    getLatestStagingOrDb("controle_d1", fetchControleD1FromDb),
+    getLatestStagingOrDb("jira", fetchJiraAbertosRows),
+    getLatestStagingOrDb("grafana", fetchGrafanaRows),
     fetchLotericasExportRows(),
     fetchProfileNames(),
   ]);

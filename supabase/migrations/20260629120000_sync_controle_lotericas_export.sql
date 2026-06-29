@@ -28,7 +28,7 @@ AS $$
   SELECT regexp_replace(upper(coalesce(value, '')), '\s+', '', 'g')
 $$;
 
-CREATE OR REPLACE FUNCTION public.controle_sync_first_filled(VARIADIC values text[])
+CREATE OR REPLACE FUNCTION public.controle_sync_first_filled(VARIADIC input_values text[])
 RETURNS text
 LANGUAGE plpgsql
 IMMUTABLE
@@ -37,7 +37,7 @@ AS $$
 DECLARE
   item text;
 BEGIN
-  FOREACH item IN ARRAY values LOOP
+  FOREACH item IN ARRAY input_values LOOP
     IF nullif(btrim(coalesce(item, '')), '') IS NOT NULL THEN
       RETURN btrim(item);
     END IF;

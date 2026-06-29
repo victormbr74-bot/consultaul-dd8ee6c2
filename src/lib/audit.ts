@@ -16,6 +16,12 @@ export type AuditEventInput = {
 };
 
 const SENSITIVE_KEYS = ["password", "senha", "token", "secret", "authorization", "apikey"];
+const DOWNLOAD_ACTION_PATTERNS = ["export", "download", "baix", "xlsx", "csv", "pdf"];
+
+export function shouldPersistAuditEvent(action: string): boolean {
+  const normalized = action.toLowerCase();
+  return DOWNLOAD_ACTION_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
 
 export function maskSensitiveValues(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(maskSensitiveValues);
@@ -33,6 +39,8 @@ export function maskSensitiveValues(value: unknown): unknown {
 }
 
 export async function logAuditEvent(input: AuditEventInput) {
+  if (!shouldPersistAuditEvent(input.action)) return;
+
   const metadata = detectClientMetadata();
   const requestPath = `${window.location.pathname}${window.location.search}`;
   const payload = {

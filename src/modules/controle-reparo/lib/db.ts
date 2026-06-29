@@ -373,12 +373,24 @@ async function fetchJiraAbertosRows(): Promise<Row[]> {
         "Tipo Falha": r.tipo_falha ?? raw["Tipo Falha"] ?? raw.tipo_falha ?? "",
         "TIPO DE FALHA": r.tipo_falha ?? raw["TIPO DE FALHA"] ?? raw.tipo_falha ?? "",
         tipo_falha: r.tipo_falha ?? raw.tipo_falha ?? "",
+        "Nº INC Snow": r.n_inc_snow ?? raw["Nº INC Snow"] ?? raw["N° INC Snow"] ?? raw.n_inc_snow ?? "",
+        "Numero INC Snow": r.n_inc_snow ?? raw["Numero INC Snow"] ?? raw["Número INC Snow"] ?? raw.n_inc_snow ?? "",
+        n_inc_snow: r.n_inc_snow ?? raw.n_inc_snow ?? "",
+        "Nº Incidente MAM": r.n_incidente_mam ?? raw["Nº Incidente MAM"] ?? raw.n_incidente_mam ?? "",
+        "Nº REQ Caixa": r.n_req_caixa ?? raw["Nº REQ Caixa"] ?? raw.n_req_caixa ?? "",
         Status: r.status ?? raw.Status ?? raw.status ?? "",
         status: r.status ?? raw.status ?? "",
         Resumo: r.resumo ?? raw.Resumo ?? raw.resumo ?? "",
         resumo: r.resumo ?? raw.resumo ?? "",
         Summary: r.resumo ?? raw.Summary ?? raw.summary ?? "",
         summary: r.resumo ?? raw.summary ?? "",
+        "Descrição": r.descricao ?? raw["Descrição"] ?? raw.Descricao ?? raw.descricao ?? "",
+        Descricao: r.descricao ?? raw.Descricao ?? raw.descricao ?? "",
+        descricao: r.descricao ?? raw.descricao ?? "",
+        "Categoria e Sintoma": r.categoria_sintoma ?? raw["Categoria e Sintoma"] ?? raw.categoria_sintoma ?? "",
+        categoria_sintoma: r.categoria_sintoma ?? raw.categoria_sintoma ?? "",
+        Criado: r.criado ?? raw.Criado ?? raw.criado ?? "",
+        criado: r.criado ?? raw.criado ?? "",
         "Fila Jira": raw["Fila Jira"] ?? raw.fila_jira ?? "",
         Fila: raw["Fila Jira"] ?? raw.fila_jira ?? "",
         "Último Comentário": raw["Último Comentário"] ?? raw.ultimo_comentario ?? "",
@@ -391,6 +403,10 @@ async function fetchJiraAbertosRows(): Promise<Row[]> {
     from += PAGE;
   }
   return out;
+}
+
+export async function fetchJiraControleRows(): Promise<Row[]> {
+  return getLatestStagingOrDb("jira", fetchJiraAbertosRows);
 }
 
 async function getPreviousControleDate(dataReferencia: string): Promise<string | null> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maskSensitiveValues } from "@/lib/audit";
+import { maskSensitiveValues, shouldPersistAuditEvent } from "@/lib/audit";
 import { detectClientMetadata } from "@/lib/clientMetadata";
 
 describe("audit helpers", () => {
@@ -21,6 +21,15 @@ describe("audit helpers", () => {
         value: "ok",
       },
     });
+  });
+
+  it("persists only download/export audit events from the client logger", () => {
+    expect(shouldPersistAuditEvent("export_performed")).toBe(true);
+    expect(shouldPersistAuditEvent("audit_logs_exported")).toBe(true);
+    expect(shouldPersistAuditEvent("MASCARA_PDF_GERADA")).toBe(true);
+    expect(shouldPersistAuditEvent("login_success")).toBe(false);
+    expect(shouldPersistAuditEvent("terms_accepted")).toBe(false);
+    expect(shouldPersistAuditEvent("navigate")).toBe(false);
   });
 
   it("detects mobile user agents", () => {

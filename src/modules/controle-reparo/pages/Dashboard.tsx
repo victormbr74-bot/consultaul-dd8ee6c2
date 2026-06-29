@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { fetchAllControle, fetchControleDatas, fetchControleVersoes, fetchJiraAbertosRows } from "@/modules/controle-reparo/lib/db";
+import { fetchAllControle, fetchControleDatas, fetchControleVersoes, fetchJiraControleRows } from "@/modules/controle-reparo/lib/db";
 import {
   CONTROL_DATE_SESSION_KEY,
   CONTROL_VERSION_SESSION_KEY,
@@ -122,8 +122,8 @@ export default function DashboardPage() {
   });
 
   const { data: jiraRows = [] } = useQuery({
-    queryKey: ["jira-db"],
-    queryFn: () => fetchJiraAbertosRows(),
+    queryKey: ["jira-controle-dashboard"],
+    queryFn: () => fetchJiraControleRows(),
   });
 
   const CLOSED_JIRA_STATUSES = new Set([
@@ -133,9 +133,7 @@ export default function DashboardPage() {
   const jiraIncStatusMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const r of jiraRows) {
-      const inc = normalizeIncidentValue(
-        getVal(r, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
-      );
+      const inc = getJiraIncident(r);
       if (!inc) continue;
       const status = cleanText(getVal(r, "Status"));
       if (!map.has(inc)) map.set(inc, status);
@@ -177,22 +175,44 @@ export default function DashboardPage() {
             gráfico de faixas.
           </p>
         </div>
-        <Select
-          value={versao ? String(versao) : ""}
-          onValueChange={(value) => setVersao(Number(value))}
-          disabled={versoes.length === 0}
-        >
-          <SelectTrigger className="w-28">
-            <SelectValue placeholder="Versão" />
-          </SelectTrigger>
-          <SelectContent>
-            {versoes.map((v) => (
-              <SelectItem key={v} value={String(v)}>
-                V{v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <Select
+            value={dataRef}
+            onValueChange={(value) => {
+              setDataRef(value);
+              setVersao(null);
+            }}
+            disabled={!datas?.length}
+          >
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Data" />
+            </SelectTrigger>
+            <SelectContent>
+              {(datas ?? []).map((data) => (
+                <SelectItem key={data} value={data}>
+                  {formatDateBR(data)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={versao ? String(versao) : ""}
+            onValueChange={(value) => setVersao(Number(value))}
+            disabled={versoes.length === 0}
+          >
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Versão" />
+            </SelectTrigger>
+            <SelectContent>
+              {versoes.map((v) => (
+                <SelectItem key={v} value={String(v)}>
+                  V{v} · {dataRef ? formatDateBR(dataRef) : "sem data"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Tabs defaultValue="operacional" className="min-w-0">
@@ -259,6 +279,16 @@ function Indicadores({
     return incs;
   }, [fullRows]);
 
+  const controleLinkKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const r of fullRows) {
+      if (isNormalizado(r)) continue;
+      const key = buildCodeTypeDashboardKey(r.codigo_loterica, r.tipo_link);
+      if (key) keys.add(key);
+    }
+    return keys;
+  }, [fullRows]);
+
   const jiraAlarmRows = useMemo(() => {
     if (!jiraRows.length) return [] as Row[];
     return jiraRows.filter(isJiraAlarmRow);
@@ -267,10 +297,12 @@ function Indicadores({
   const incSemAlarmeRows = useMemo(() => {
     if (!jiraRows.length) return [] as Row[];
     return jiraRows.filter((row) => {
-      const inc = getJiraIncident(row);
-      return !inc || !controleIncs.has(inc);
+      const tipoLink = inferJiraLinkTypeForGisCompare(row);
+      if (!tipoLink) return false;
+      const key = buildCodeTypeDashboardKey(getJiraCodigoLoterica(row), tipoLink);
+      return !!key && !controleLinkKeys.has(key);
     });
-  }, [controleIncs, jiraRows]);
+  }, [controleLinkKeys, jiraRows]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [
@@ -410,6 +442,7 @@ function Indicadores({
           rows={exportRows as Row[]}
           onOpen={(title, rows) => onOpen(title, rows as Row[])}
           controleIncs={controleIncs}
+          controleLinkKeys={controleLinkKeys}
         />
       ) : (
         <>
@@ -437,11 +470,13 @@ function JiraPanel({
   rows,
   onOpen,
   controleIncs,
+  controleLinkKeys,
 }: {
   title: string;
   rows: Row[];
   onOpen: (title: string, rows: Row[]) => void;
   controleIncs: Set<string>;
+  controleLinkKeys: Set<string>;
 }) {
   const visibleRows = rows.slice(0, 12);
 
@@ -487,7 +522,15 @@ function JiraPanel({
                   ),
                 );
                 const tipoAlarme = getJiraAlarmType(row) || "-";
-                const semCorrespondencia = !controleIncs.has(inc);
+                const linkKey = buildCodeTypeDashboardKey(
+                  getJiraCodigoLoterica(row),
+                  inferJiraLinkTypeForGisCompare(row),
+                );
+                const semCorrespondencia = linkKey
+                  ? !controleLinkKeys.has(linkKey)
+                  : inc
+                    ? !controleIncs.has(inc)
+                    : true;
 
                 return (
                   <tr
@@ -967,14 +1010,78 @@ function alarmNorm(v: string | null | undefined): string {
 const JIRA_ALARM_TERMS = [
   "LINK BACKUP INOPERANTE",
   "LINK PRINCIPAL INOPERANTE",
+  "LINK BACKUP",
+  "LINK PRINCIPAL",
   "UL ISOLADA",
   "INTERMITENCIA PRINCIPAL",
   "INTERMITENCIA BACKUP",
+  "INTERMITENCIA",
+  "INDISPONIBILIDADE",
 ];
+
+const JIRA_GIS_COMPARE_TERMS = [
+  "LINK BACKUP INOPERANTE",
+  "LINK PRINCIPAL INOPERANTE",
+  "INTERMITENCIA BACKUP",
+  "INTERMITENCIA PRINCIPAL",
+];
+
+function normalizeDashboardCode(value: string | null | undefined): string {
+  return cleanText(value ?? "").replace(/\s+/g, "").toUpperCase();
+}
+
+function normalizeDashboardTipoLink(value: string | null | undefined): "PRINCIPAL" | "SECUNDÁRIO" | "" {
+  const key = alarmNorm(value);
+  if (!key) return "";
+  if (key.includes("BACKUP") || key.includes("SECUNDARIO") || key.includes("SECUNDÁRIO")) return "SECUNDÁRIO";
+  if (key.includes("PRINCIPAL") || key.includes("PRIMARIO") || key.includes("PRIMÁRIO")) return "PRINCIPAL";
+  return "";
+}
+
+function buildCodeTypeDashboardKey(
+  codigo: string | null | undefined,
+  tipoLink: string | null | undefined,
+): string {
+  const code = normalizeDashboardCode(codigo);
+  const tipo = normalizeDashboardTipoLink(tipoLink);
+  return code && tipo ? `${code}|${tipo}` : "";
+}
 
 function getJiraIncident(row: Row): string {
   return normalizeIncidentValue(
-    getVal(row, "Chave", "Key", "Chamado", "INC", "Incidente", "Numero INC", "Numero Inc"),
+    getVal(
+      row,
+      "Nº INC Snow",
+      "N° INC Snow",
+      "Numero INC Snow",
+      "Número INC Snow",
+      "n_inc_snow",
+      "INC Snow",
+      "Incidente Snow",
+      "Nº INC",
+      "N° INC",
+      "Numero INC",
+      "Número INC",
+      "INC",
+      "Incidente",
+      "Chamado",
+      "Chave",
+      "Key",
+    ),
+  );
+}
+
+function getJiraCodigoLoterica(row: Row): string {
+  return getVal(
+    row,
+    "Código da Lotérica",
+    "Codigo da Loterica",
+    "Cód. da Lotérica",
+    "Cod. da Loterica",
+    "Código UL",
+    "Codigo UL",
+    "cod_ul",
+    "codigo_loterica",
   );
 }
 
@@ -1001,20 +1108,43 @@ function getJiraTipoFalha(row: Row): string {
   return getVal(row, "Tipo de Falha", "tipo_falha", "Tipo Falha", "TIPO DE FALHA", "Tipo da falha");
 }
 
+function getJiraDescricao(row: Row): string {
+  return getVal(
+    row,
+    "Descrição",
+    "Descricao",
+    "Descripcion",
+    "Description",
+    "Categoria e Sintoma",
+    "categoria_sintoma",
+  );
+}
+
+function getJiraTipoLink(row: Row): string {
+  return getVal(row, "Tipo de Link", "Tipo de link", "Tipo Link", "Tipo do Link", "Link", "tipo_link");
+}
+
+function inferJiraLinkTypeForGisCompare(row: Row): "PRINCIPAL" | "SECUNDÁRIO" | "" {
+  const joined = alarmNorm([getJiraResumo(row), getJiraTipoFalha(row), getJiraDescricao(row)].filter(Boolean).join(" | "));
+  const term = JIRA_GIS_COMPARE_TERMS.find((candidate) => joined.includes(candidate));
+  if (term) return normalizeDashboardTipoLink(term);
+  return normalizeDashboardTipoLink(getJiraTipoLink(row));
+}
+
 function isReqReference(texto: string): boolean {
   return /^REQ[-\s]?\d+/.test(alarmNorm(texto));
 }
 
 function getJiraAlarmType(row: Row): string | null {
-  const resumo = getJiraResumo(row);
-  const resumoNorm = alarmNorm(resumo);
-  const resumoHit = JIRA_ALARM_TERMS.find((term) => resumoNorm.includes(term));
-  if (resumoHit) return resumoHit;
+  const joined = alarmNorm([getJiraTipoFalha(row), getJiraResumo(row), getJiraDescricao(row)].filter(Boolean).join(" | "));
+  const hit = JIRA_ALARM_TERMS.find((term) => joined.includes(term));
+  if (hit) return hit;
 
+  const resumo = getJiraResumo(row);
   if (!isReqReference(resumo)) return null;
 
   const tipoFalha = alarmNorm(getJiraTipoFalha(row));
-  return JIRA_ALARM_TERMS.find((term) => tipoFalha.includes(term)) ?? null;
+  return tipoFalha || null;
 }
 
 function isJiraAlarmRow(row: Row): boolean {

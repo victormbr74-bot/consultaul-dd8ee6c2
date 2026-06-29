@@ -71,6 +71,18 @@ const maskSensitive = (value: unknown): unknown => {
 const isAdminRole = (role: string) =>
   role === "admin" || role === "ADMIN" || role === "administrador" || role === "administrador_master";
 
+const shouldPersistAuditEvent = (action: string) => {
+  const normalized = action.toLowerCase();
+  return (
+    normalized.includes("export") ||
+    normalized.includes("download") ||
+    normalized.includes("baix") ||
+    normalized.includes("xlsx") ||
+    normalized.includes("csv") ||
+    normalized.includes("pdf")
+  );
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -89,34 +101,6 @@ Deno.serve(async (req) => {
     const userAgent = req.headers.get("user-agent");
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    if (!authHeader && body.action === "log_audit" && body.payload?.action === "login_failed") {
-      const payload = body.payload;
-      const { error } = await adminClient.from("audit_logs").insert({
-        user_id: null,
-        user_name: null,
-        user_email: null,
-        action: "login_failed",
-        module: payload.module || "auth",
-        entity: payload.entity || "auth.users",
-        entity_id: null,
-        old_values: null,
-        new_values: maskSensitive(payload.new_values ?? null),
-        ip_address: clientIp,
-        user_agent: userAgent,
-        browser: payload.browser || null,
-        os: payload.os || null,
-        device_type: payload.device_type || "unknown",
-        request_method: payload.request_method || req.method,
-        request_path: payload.request_path || new URL(req.url).pathname,
-        status: "denied",
-        message: payload.message || "Tentativa de login invalida.",
-        observation: payload.observation || "Usuario tentou acessar o sistema com credenciais invalidas.",
-        origin: req.headers.get("origin"),
-      });
-      if (error) return json({ error: error.message }, 400);
-      return json({ success: true });
-    }
-
     if (!authHeader) return json({ error: "Token de autenticacao ausente." }, 401);
 
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -124,33 +108,6 @@ Deno.serve(async (req) => {
     });
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData.user) {
-      if (body.action === "log_audit" && body.payload?.action === "login_failed") {
-        const payload = body.payload;
-        const { error } = await adminClient.from("audit_logs").insert({
-          user_id: null,
-          user_name: null,
-          user_email: null,
-          action: "login_failed",
-          module: payload.module || "auth",
-          entity: payload.entity || "auth.users",
-          entity_id: null,
-          old_values: null,
-          new_values: maskSensitive(payload.new_values ?? null),
-          ip_address: clientIp,
-          user_agent: userAgent,
-          browser: payload.browser || null,
-          os: payload.os || null,
-          device_type: payload.device_type || "unknown",
-          request_method: payload.request_method || req.method,
-          request_path: payload.request_path || new URL(req.url).pathname,
-          status: "denied",
-          message: payload.message || "Tentativa de login invalida.",
-          observation: payload.observation || "Usuario tentou acessar o sistema com credenciais invalidas.",
-          origin: req.headers.get("origin"),
-        });
-        if (error) return json({ error: error.message }, 400);
-        return json({ success: true });
-      }
       return json({ error: "Nao autenticado." }, 401);
     }
 
@@ -194,6 +151,7 @@ Deno.serve(async (req) => {
     if (body.action === "log_audit") {
       const payload = body.payload;
       if (!payload?.action) return json({ error: "Acao de auditoria ausente." }, 400);
+      if (!shouldPersistAuditEvent(payload.action)) return json({ success: true, skipped: true });
       await insertAudit(payload);
       return json({ success: true });
     }
@@ -218,23 +176,6 @@ Deno.serve(async (req) => {
         device_type: payload.device_type || "unknown",
       }, { onConflict: "user_id,terms_version_id,privacy_policy_version_id" });
       if (error) return json({ error: error.message }, 400);
-
-      await insertAudit({
-        action: "terms_accepted",
-        module: "lgpd",
-        entity: "user_consents",
-        entity_id: user.id,
-        new_values: {
-          terms_version_id: termsVersionId,
-          privacy_policy_version_id: privacyPolicyVersionId,
-        },
-        browser: payload.browser,
-        os: payload.os,
-        device_type: payload.device_type,
-        status: "success",
-        message: "Usuario aceitou Termos de Uso e Politica de Privacidade.",
-        observation: "Usuario aceitou os Termos de Uso e a Politica de Privacidade vigentes.",
-      });
 
       return json({ success: true });
     }

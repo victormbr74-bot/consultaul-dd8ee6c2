@@ -14,25 +14,17 @@ export type ProjectModule = {
 export const projectModules: ProjectModule[] = [
   {
     id: "consulta-massiva",
-    label: "Consulta Massiva GIS",
-    description: "Analise GIS, massivas, operadoras, escalonamentos e auditoria.",
+    label: "CONTROLE DE MASSIVAS - GIS",
+    description: "Analise GIS, controle de massivas, passagem operacional e configuracoes.",
     items: [
       { id: "analise", label: "Analise", path: "/" },
-      { id: "operadoras", label: "Operadoras", path: "/admin/operadoras" },
+      { id: "mascara-massiva", label: "MASCARA DE MASSIVA", path: "/mascara-massiva" },
+      { id: "passagem", label: "PASSAGEM", path: "/passagem" },
+      { id: "massivas-abertas", label: "MASSIVAS ABERTAS", path: "/massivas-abertas" },
       { id: "escalonamentos", label: "Escalonamentos", path: "/admin/escalonamentos" },
       { id: "cidades", label: "Cidades / Geo", path: "/admin/cidades" },
       { id: "usuarios", label: "Usuarios", path: "/admin/usuarios" },
       { id: "auditoria", label: "Auditoria", path: "/admin/auditoria" },
-    ],
-  },
-  {
-    id: "passagem-turno",
-    label: "PASSAGEM DE TURNO",
-    description: "Mascara de massiva, passagem operacional e massivas abertas.",
-    items: [
-      { id: "mascara-massiva", label: "MASCARA DE MASSIVA", path: "/mascara-massiva" },
-      { id: "passagem", label: "PASSAGEM", path: "/passagem" },
-      { id: "massivas-abertas", label: "MASSIVAS ABERTAS", path: "/massivas-abertas" },
     ],
   },
   {

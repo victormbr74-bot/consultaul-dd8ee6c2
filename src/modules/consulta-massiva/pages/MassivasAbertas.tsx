@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BarChart3, Copy, Eye, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Activity, AlertOctagon, BarChart3, Copy, Eye, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ type MassivaRecord = {
   atualizacao: string | null;
   operadora: string;
   primeiro_alarme: string | null;
+  ultimo_alarme: string | null;
   created_at: string;
   mascara_texto: string | null;
 };
@@ -81,7 +82,27 @@ type BulkEditState = {
 };
 
 const MASSIVA_SELECT =
-  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
+  "id,id_massiva,circuito_pai,consorcio_ul,uf,tipo_link,tipo_massiva,chamado,qtd_circuitos,qtd_lotericas_isoladas,inc,data_hora_abertura,data_hora_normalizacao,status,atualizacao,operadora,primeiro_alarme,ultimo_alarme,created_at,mascara_texto,massiva_circuitos(codigo_loterica,loterica,tipo_link,cidade,uf,designacao,ip_loopback,operadora,tipo_empresa,status)";
+
+function occurrenceKey(m: MassivaRecord): string {
+  const normalize = (value: unknown) => String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+  const eventValue = m.primeiro_alarme ?? m.data_hora_abertura;
+  const eventTimestamp = eventValue ? new Date(eventValue).getTime() : NaN;
+  const eventMinute = Number.isFinite(eventTimestamp)
+    ? String(Math.floor(eventTimestamp / 60_000))
+    : normalize(eventValue);
+
+  return [
+    normalize(m.tipo_massiva),
+    normalize(m.uf),
+    normalize(m.operadora),
+    eventMinute,
+  ].join("|");
+}
 
 async function fetchMassivas(): Promise<MassivaRecord[]> {
   const pageSize = 200;
@@ -103,28 +124,20 @@ async function fetchMassivas(): Promise<MassivaRecord[]> {
     from += pageSize;
   }
 
-  const seen = new Set<string>();
-  const deduped: MassivaRecord[] = [];
+  const dedupedByKey = new Map<string, MassivaRecord>();
   for (const m of out) {
-    const circuitos = (m.massiva_circuitos ?? [])
-      .map((c) => c.codigo_loterica || c.designacao || c.ip_loopback || "")
-      .filter(Boolean)
-      .sort()
-      .join(",");
-    const key = [
-      m.tipo_massiva,
-      m.uf,
-      m.operadora,
-      m.qtd_circuitos,
-      m.data_hora_abertura,
-      m.primeiro_alarme,
-      m.circuito_pai || "",
-      circuitos || m.circuito_pai || "",
-    ].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(m);
+    const key = occurrenceKey(m);
+    const current = dedupedByKey.get(key);
+    if (!current) {
+      dedupedByKey.set(key, m);
+      continue;
+    }
+
+    const currentNormalizada = normalizeMassivaStatus(current.status) === "NORMALIZADO";
+    const candidateAberta = normalizeMassivaStatus(m.status) !== "NORMALIZADO";
+    if (currentNormalizada && candidateAberta) dedupedByKey.set(key, m);
   }
+  const deduped = Array.from(dedupedByKey.values());
 
   console.info("[consulta-massiva] massivas retornadas pelo controle", {
     total: out.length,
@@ -636,7 +649,7 @@ export default function MassivasAbertas() {
                   <EditableCell row={m} field="tipo_link" value={valueFor(m, "tipo_link")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} kind="tipo" />
                   <EditableCell row={m} field="chamado" value={valueFor(m, "chamado")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} mono />
                   <EditableCell row={m} field="qtd_circuitos" value={valueFor(m, "qtd_circuitos")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} type="number" align="right" mono />
-                  <EditableCell row={m} field="qtd_lotericas_isoladas" value={valueFor(m, "qtd_lotericas_isoladas")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} type="number" align="right" mono />
+                  <EditableCell row={m} field="qtd_lotericas_isoladas" value={valueFor(m, "qtd_lotericas_isoladas")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} type="number" kind="isoladas" align="right" mono />
                   <EditableCell row={m} field="inc" value={valueFor(m, "inc")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} mono />
                   <EditableCell row={m} field="data_hora_abertura" value={valueFor(m, "data_hora_abertura")} display={formatDateTime(fromDateTimeLocal(valueFor(m, "data_hora_abertura")) ?? m.data_hora_abertura ?? m.primeiro_alarme)} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} type="datetime-local" mono />
                   <EditableCell row={m} field="status" value={valueFor(m, "status")} editingCell={editingCell} setEditingCell={setEditingCell} onChange={setPendingValue} kind="status" mono />
@@ -914,7 +927,7 @@ function EditableCell({
   setEditingCell: (cell: EditingCell) => void;
   onChange: (row: MassivaRecord, field: EditableField, value: string) => void;
   type?: string;
-  kind?: "tipo" | "status" | "textarea";
+  kind?: "tipo" | "status" | "isoladas" | "textarea";
   align?: "left" | "right";
   mono?: boolean;
   className?: string;
@@ -966,6 +979,47 @@ function EditableCell({
           onChange={(e) => onChange(row, field, e.target.value)}
           onBlur={() => setEditingCell(null)}
         />
+      </td>
+    );
+  }
+
+  if (kind === "tipo") {
+    const principal = normalizeSituacao(value).includes("PRIM");
+    return (
+      <td className="cursor-text px-3 py-2 hover:bg-accent/50" onClick={() => setEditingCell({ id: row.id, field })} title="Clique para editar">
+        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${principal
+          ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+          : "border-purple-500/50 bg-purple-500/10 text-purple-700 dark:text-purple-300"}`}>
+          {text}
+        </span>
+      </td>
+    );
+  }
+
+  if (kind === "status") {
+    const normalizado = normalizeMassivaStatus(value) === "NORMALIZADO";
+    return (
+      <td className="cursor-text px-3 py-2 hover:bg-accent/50" onClick={() => setEditingCell({ id: row.id, field })} title="Clique para editar">
+        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${normalizado
+          ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>
+          {text}
+        </span>
+      </td>
+    );
+  }
+
+  if (kind === "isoladas") {
+    const total = Number(value) || 0;
+    return (
+      <td className="cursor-text px-3 py-2 text-right hover:bg-accent/50" onClick={() => setEditingCell({ id: row.id, field })} title="Clique para editar">
+        {total > 0 ? (
+          <span className="inline-flex items-center gap-1 rounded border border-red-400/60 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-200">
+            <AlertOctagon className="h-3 w-3" />{String(total).padStart(2, "0")}
+          </span>
+        ) : (
+          <span className="inline-flex rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">00</span>
+        )}
       </td>
     );
   }

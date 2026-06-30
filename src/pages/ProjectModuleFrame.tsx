@@ -23,6 +23,9 @@ import ControleMeusCasos from "@/modules/controle-reparo/pages/MeusCasos";
 const nativePages: Record<string, Record<string, ComponentType>> = {
   "consulta-massiva": {
     analise: MassivaAnalise,
+    "mascara-massiva": MascaraMassiva,
+    passagem: Passagem,
+    "massivas-abertas": MassivasAbertas,
     operadoras: MassivaOperadoras,
     escalonamentos: MassivaEscalonamentos,
     cidades: MassivaCidades,
@@ -35,17 +38,17 @@ const nativePages: Record<string, Record<string, ComponentType>> = {
     controle: ControleOperacional,
     "meus-casos": ControleMeusCasos,
   },
-  "passagem-turno": {
-    "mascara-massiva": MascaraMassiva,
-    passagem: Passagem,
-    "massivas-abertas": MassivasAbertas,
-  },
 };
 
 export default function ProjectModuleFrame() {
   const { projectId, itemId } = useParams();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+
+  // Mantem links antigos funcionais depois da consolidacao do menu.
+  if (projectId === "passagem-turno" && itemId) {
+    return <Navigate to={"/projetos/consulta-massiva/" + itemId} replace />;
+  }
   const project = getProjectModule(projectId);
   const item = getProjectModuleItem(project, itemId);
 

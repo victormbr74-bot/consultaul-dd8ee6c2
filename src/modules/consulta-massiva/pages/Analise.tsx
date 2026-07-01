@@ -19,7 +19,7 @@ import { processGis, type ProcessResult } from "@/modules/consulta-massiva/lib/m
 import { exportToCsv, exportToPdf, exportToXlsx, processedRowsForExport, readGisFile } from "@/modules/consulta-massiva/lib/excel";
 import { buildEscalonamentoMap, operadorasFromLotericas } from "@/modules/consulta-massiva/lib/operadoras";
 import type { GisRow, Massiva, ProcessedRow } from "@/modules/consulta-massiva/lib/gis-types";
-import type { DbLoterica, DbEscalonamento } from "@/modules/consulta-massiva/lib/db-types";
+import type { DbLoterica, DbEscalonamento, DbOperadora } from "@/modules/consulta-massiva/lib/db-types";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/modules/consulta-massiva/lib/audit";
 import { loadCidadesLookup } from "@/modules/consulta-massiva/lib/base-cidades";
@@ -30,7 +30,8 @@ import { toast } from "sonner";
 
 type LoadedFile = { name: string; count: number; rows: GisRow[] } | null;
 
-const ANALISE_STORAGE_KEY = "consulta-massiva:analise-atual:v4";
+const ANALISE_ALGORITHM_VERSION = 7;
+const ANALISE_STORAGE_KEY = "consulta-massiva:analise-atual:v7";
 
 type PersistedMassivaForDedupe = {
   id: string;
@@ -180,6 +181,25 @@ async function fetchAllLotericas(): Promise<DbLoterica[]> {
   return out;
 }
 
+async function fetchAllOperadoras(): Promise<DbOperadora[]> {
+  const out: DbOperadora[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("operadoras")
+      .select("*")
+      .eq("ativo", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    out.push(...(data as DbOperadora[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 export default function Page() {
   const [file1, setFile1] = useState<LoadedFile>(null);
   const [file2, setFile2] = useState<LoadedFile>(null);
@@ -194,6 +214,7 @@ export default function Page() {
   const [analiseId, setAnaliseId] = useState<string | null>(null);
 
   const lotQ = useQuery({ queryKey: ["lotericas-massiva-ref"], queryFn: fetchAllLotericas, staleTime: 5 * 60_000 });
+  const operadorasQ = useQuery({ queryKey: ["operadoras-massiva-ref"], queryFn: fetchAllOperadoras, staleTime: 5 * 60_000 });
   const escQ = useQuery({ queryKey: ["escalonamentos"], queryFn: fetchEscalonamentos, staleTime: 60_000 });
   const cidadesQ = useQuery({ queryKey: ["base_cidades-lookup"], queryFn: loadCidadesLookup, staleTime: 5 * 60_000 });
 
@@ -334,28 +355,34 @@ export default function Page() {
     }
   }, [analiseId, massivasTabelaQ.data]);
 
-  const operadorasConsultaUl = useMemo(
-    () => operadorasFromLotericas(lotQ.data ?? []),
-    [lotQ.data],
-  );
+  const operadorasConsultaUl = useMemo(() => {
+    const derivadasDaBase = operadorasFromLotericas(lotQ.data ?? []);
+    const cadastradas = operadorasQ.data ?? [];
+    // A tabela operadoras é a fonte autoritativa do projeto original. Como
+    // buildOperadoraLookup mantém a última ocorrência, ela deve vir por último.
+    return [...derivadasDaBase, ...cadastradas];
+  }, [lotQ.data, operadorasQ.data]);
   const escMap = useMemo(() => buildEscalonamentoMap(escQ.data ?? []), [escQ.data]);
 
   useEffect(() => {
     let cancelled = false;
-    const applySaved = (payload: unknown) => {
-      if (cancelled || !payload) return;
+    const applySaved = (payload: unknown): boolean => {
+      if (cancelled || !payload) return false;
       const parsed = payload as {
+        version?: number;
         file1?: LoadedFile;
         file2?: LoadedFile;
         result?: ProcessResult | null;
         filters?: Filters;
         analiseId?: string | null;
       };
+      if (parsed.version !== ANALISE_ALGORITHM_VERSION) return false;
       setFile1(parsed.file1 ?? null);
       setFile2(parsed.file2 ?? null);
       setResult(parsed.result ?? null);
       setAnaliseId(parsed.analiseId ?? null);
       setFilters(parsed.filters ?? emptyFilters);
+      return true;
     };
 
     const loadSaved = async () => {
@@ -365,10 +392,7 @@ export default function Page() {
           .select("payload")
           .eq("id", "current")
           .maybeSingle();
-        if (!error && data?.payload) {
-          applySaved(data.payload);
-          return;
-        }
+        if (!error && data?.payload && applySaved(data.payload)) return;
       } catch (e) {
         console.warn("failed to restore massiva analysis from database", e);
       }
@@ -390,7 +414,7 @@ export default function Page() {
   useEffect(() => {
     if (!file1 && !file2 && !result) return;
     try {
-      localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify({ file1, file2, result, filters }));
+      localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify({ version: ANALISE_ALGORITHM_VERSION, file1, file2, result, filters }));
     } catch (e) {
       console.warn("failed to save massiva analysis", e);
     }
@@ -411,6 +435,7 @@ export default function Page() {
   const runAnalysis = async () => {
     if (!file1 && !file2) { toast.error("Carregue pelo menos um arquivo GIS."); return; }
     if (!lotQ.data) { toast.error("Base de lotéricas ainda carregando."); return; }
+    if (!operadorasQ.data) { toast.error("Base de operadoras ainda carregando."); return; }
     setProcessing(true);
     setTimeout(async () => {
       const all: GisRow[] = [...(file1?.rows ?? []), ...(file2?.rows ?? [])];
@@ -471,7 +496,7 @@ export default function Page() {
           arquivo_2links: file2?.name ?? null,
         }).select("id").single();
         setAnaliseId(analise?.id ?? null);
-        const currentPayload = { file1, file2, result: r, filters, analiseId: analise?.id ?? null };
+        const currentPayload = { version: ANALISE_ALGORITHM_VERSION, file1, file2, result: r, filters, analiseId: analise?.id ?? null };
         localStorage.setItem(ANALISE_STORAGE_KEY, JSON.stringify(currentPayload));
         await (supabase as any).from("analise_resultado_atual").upsert({
           id: "current",

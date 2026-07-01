@@ -85,6 +85,10 @@ function normalizeCircuito(value: unknown): string {
   return normalizeLookup(value).replace(/[^A-Z0-9]/g, "");
 }
 
+function normalizeCodigoLoterica(value: unknown): string {
+  return normalizeLookup(value).replace(/[^A-Z0-9]/g, "");
+}
+
 function dedupeInputRows(input: InputRow[]): InputRow[] {
   const seen = new Set<string>();
   const out: InputRow[] = [];
@@ -134,7 +138,7 @@ function buildLotericasLookup(rows: DbLoterica[] = []): LotericasLookup {
     if (key && !byLoopback.has(key)) byLoopback.set(key, row);
   };
   for (const row of rows) {
-    const cod = normalizeLookup(row.cod_ul);
+    const cod = normalizeCodigoLoterica(row.cod_ul);
     if (cod && !byCodigo.has(cod)) byCodigo.set(cod, row);
     addCircuito(row.designacao_nova, row);
     addCircuito(row.ccto_oi, row);
@@ -157,7 +161,7 @@ function findLoterica(
 ): DbLoterica | undefined {
   return (
     lookup.byCircuito.get(normalizeCircuito(circuito)) ||
-    lookup.byCodigo.get(normalizeLookup(codigo)) ||
+    lookup.byCodigo.get(normalizeCodigoLoterica(codigo)) ||
     lookup.byLoopback.get(String(ipLoopback ?? "").trim())
   );
 }
@@ -185,12 +189,15 @@ function identifyFromLotericas(
       parceira: op,
     } as const;
   }
-  const empresaOemp = normalizeLookup(rawValue(hit, "EMPRESA OEMP", "EMPRESA", "SITE OWNER"));
-  const operadoraPri = normalizeLookup(
-    hit.operadora || rawValue(hit, "OPERADORA", "RESP BACKUP", "OWNER"),
+  // A operadora cadastrada na lotérica identifica o link de backup. Ela não
+  // pode classificar o link PRINCIPAL, pois isso fragmenta uma massiva VTAL
+  // quando as lotéricas afetadas possuem backups de operadoras diferentes.
+  // Mantém a regra do projeto de origem: principal só é OEMP quando a base
+  // informa explicitamente EMPRESA OEMP; caso contrário, é VTAL.
+  const empresaOemp = normalizeLookup(
+    rawValue(hit, "EMPRESA OEMP", "EMPRESA PRINCIPAL", "OPERADORA PRINCIPAL"),
   );
-  const operadora = empresaOemp || operadoraPri;
-  if (!operadora) return null;
+  const operadora = empresaOemp || "VTAL";
   const classificacao = operadora === "VTAL" ? "VTAL" : "OEMP";
   return {
     operadora,
@@ -201,6 +208,17 @@ function identifyFromLotericas(
 }
 
 function fallbackOperadoraFromGis(row: GisRow, tipoLink: string) {
+  // A ausência de uma lotérica na base não pode mudar a classificação do
+  // mesmo evento. Pela regra original, PRINCIPAL é VTAL por padrão e só é
+  // OEMP quando a base informa EMPRESA OEMP explicitamente.
+  if (normalizeLookup(tipoLink) === "PRINCIPAL") {
+    return {
+      operadora: "VTAL",
+      tipoEmp: "VTAL",
+      classificacao: "VTAL" as const,
+      parceira: "VTAL",
+    } as const;
+  }
   const operadora = (getCell(row, "Empresa") || getCell(row, "Site Owner")).trim().toUpperCase();
   if (!operadora) return null;
   const classificacao = tipoLink === "PRINCIPAL" && operadora === "VTAL" ? "VTAL" : "OEMP";
@@ -230,6 +248,18 @@ function codigoLotericaDisplayFromRow(row: GisRow): string {
   return firstText(
     getCell(row, "Cód. da Lotérica", "CÃ³d. da LotÃ©rica", "CÃƒÂ³d. da LotÃƒÂ©rica", "CÃƒÆ’Ã‚Â³d. da LotÃƒÆ’Ã‚Â©rica", "Cod. da Loterica", "Código da Lotérica", "CÃ³digo da LotÃ©rica", "CÃƒÂ³digo da LotÃƒÂ©rica", "Codigo da Loterica", "Codigo"),
   );
+}
+
+function principalVtalReportedByGis(row: GisRow, tipoLink: string) {
+  if (normalizeLookup(tipoLink) !== "PRINCIPAL") return null;
+  const empresa = normalizeCircuito(getCell(row, "Empresa"));
+  if (empresa !== "OI" && empresa !== "VTAL") return null;
+  return {
+    operadora: "VTAL",
+    tipoEmp: "VTAL",
+    classificacao: "VTAL" as const,
+    parceira: "VTAL",
+  } as const;
 }
 
 function normalizeSituacao(value: unknown): string {
@@ -392,12 +422,16 @@ export function processGis(
     const lookupDesig = enriched.designacao || desig;
     const lookupIp = enriched.ipLoopback || ip;
     const lookupUf = enriched.uf || uf;
-    const fromLotericas = identifyFromLotericas(tipoRaw, lookupCodigo, lookupDesig, lookupIp, lotericasLookup);
     const identified = identifyOperadora(tipoRaw, lookupDesig, lookupIp, lookupCodigo, lookup);
-    const id = fromLotericas ?? (
-      identified.classificacao === "NAO_IDENTIFICADO"
-        ? (fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
-        : identified
+    const fromLotericas = identifyFromLotericas(tipoRaw, lookupCodigo, lookupDesig, lookupIp, lotericasLookup);
+    const fromGis = principalVtalReportedByGis(r, tipoRaw);
+    // O arquivo representa o estado atual do alarme. Para link PRINCIPAL da
+    // OI, a classificação operacional é VTAL; cadastros auxiliares não podem
+    // fragmentar essa janela. Nos demais casos, mantém a precedência original.
+    const id = fromGis ?? (
+      identified.classificacao !== "NAO_IDENTIFICADO"
+        ? identified
+        : (fromLotericas ?? fallbackOperadoraFromGis(r, tipoRaw) ?? identified)
     );
     return {
       ...r,

@@ -1,4 +1,5 @@
 import { type Row, getVal, cleanVal, cleanText, removeCef, normCodigo, normKey } from "./parse";
+import { zonedDateTimeToIso } from "./date";
 
 export type Situacao = string;
 
@@ -345,21 +346,36 @@ function toIso(v: string): string | null {
   const serial = Number(s.replace(",", "."));
   if (Number.isFinite(serial) && serial > 20000 && serial < 60000) {
     const d = excelSerialToDate(serial);
-    return d ? d.toISOString() : null;
+    return d
+      ? zonedDateTimeToIso({
+          year: d.getUTCFullYear(),
+          month: d.getUTCMonth() + 1,
+          day: d.getUTCDate(),
+          hour: d.getUTCHours(),
+          minute: d.getUTCMinutes(),
+          second: d.getUTCSeconds(),
+        })
+      : null;
   }
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (m) {
-    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? "00"}`);
-    return isNaN(d.getTime()) ? null : d.toISOString();
+    return zonedDateTimeToIso({
+      year: Number(m[1]), month: Number(m[2]), day: Number(m[3]),
+      hour: Number(m[4]), minute: Number(m[5]), second: Number(m[6] ?? "00"),
+    });
   }
-  m = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})[ ,]+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})[ ,]+(\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (m) {
     const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
-    const d = new Date(`${yr}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6] ?? "00"}`);
-    return isNaN(d.getTime()) ? null : d.toISOString();
+    return zonedDateTimeToIso({
+      year: Number(yr), month: Number(m[2]), day: Number(m[1]),
+      hour: Number(m[4]), minute: Number(m[5]), second: Number(m[6] ?? "00"),
+    });
   }
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) return `${s}T00:00:00.000Z`;
+  if (m) {
+    return zonedDateTimeToIso({ year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) });
+  }
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
@@ -1273,6 +1289,9 @@ export function processControle(input: ProcessInput): ProcessResult {
     seenKeys.add(key);
 
     const designacao = gid.circuito;
+    const dataInicial = toIso(
+      getVal(r, "Data e Hora Incial", "Data e Hora Inicial", "Data/Hora Inicial"),
+    );
     const row: ControleRow = {
       data_referencia: dataReferencia,
       versao,
@@ -1284,20 +1303,11 @@ export function processControle(input: ProcessInput): ProcessResult {
       cidade: cleanText(getVal(r, "Cidade")) || null,
       designacao: designacao || null,
       ip_loopback: gid.ip || null,
-      data_hora_inicial: toIso(
-        getVal(r, "Data e Hora Incial", "Data e Hora Inicial", "Data/Hora Inicial"),
-      ),
+      data_hora_inicial: dataInicial,
       duracao_h: toNum(getVal(r, "Duração (h)", "Duracao (h)")),
       chamado: cleanText(getVal(r, "Chamado")) || null,
-      previsao_atendimento: toIso(
-        getVal(
-          r,
-          "Previsão de Atendimento",
-          "Previsao de Atendimento",
-          "Previsão Atendimento",
-          "Previsao Atendimento",
-        ),
-      ),
+      // Campo exibido como "Previsão de Atendimento": deve refletir a coluna I do GIS.
+      previsao_atendimento: dataInicial,
       ultimo_comentario: cleanSpreadsheetDisplayValue(
         getVal(r, "Último Comentário", "Ultimo Comentario"),
       ),

@@ -56,7 +56,7 @@ const DRILL_COLUMNS: DrillColumn[] = [
   },
   { header: "Chamado", render: (r) => (r as ControleRow).chamado },
   {
-    header: "Previsão",
+    header: "Previsão de Atendimento",
     className: "tabular-nums",
     render: (r) => formatDataHora((r as ControleRow).previsao_atendimento),
   },

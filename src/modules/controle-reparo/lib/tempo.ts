@@ -81,9 +81,6 @@ export function getAlertaDias(dias: number | null): AlertaDias | null {
 
 /** Formata uma data ISO como dd/MM/yyyy HH:mm:ss (item 10). */
 export function formatDataHora(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return formatDateTimeBR(iso);
 }
+import { formatDateTimeBR } from "./date";

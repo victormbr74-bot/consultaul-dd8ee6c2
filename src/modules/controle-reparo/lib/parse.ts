@@ -140,7 +140,10 @@ export function parseCsvText(text: string): Row[] {
   if (firstLine.startsWith("sep=")) {
     t = t.slice(t.indexOf("\n") + 1);
   }
-  const wb = XLSX.read(t, { type: "string", raw: false });
+  // Keep CSV fields exactly as supplied. With raw:false, SheetJS infers ISO-like
+  // datetimes (for example "2024-05-08 04:17:20") and formats them using a
+  // date-only mask ("5/8/24"), irreversibly discarding the time component.
+  const wb = XLSX.read(t, { type: "string", raw: true });
   const sn = wb.SheetNames[0];
-  return XLSX.utils.sheet_to_json<Row>(wb.Sheets[sn], { defval: "", raw: false });
+  return XLSX.utils.sheet_to_json<Row>(wb.Sheets[sn], { defval: "", raw: true });
 }

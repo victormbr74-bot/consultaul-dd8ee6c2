@@ -8,6 +8,7 @@ import {
   CONTROL_VERSION_SESSION_KEY,
   formatDateBR,
   processingDate,
+  zonedDateTimeToIso,
 } from "@/modules/controle-reparo/lib/date";
 import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { STATUS_PLANILHA_OPCOES, isLinkBackup } from "@/modules/controle-reparo/lib/processing";
@@ -113,7 +114,7 @@ const COLUMNS: ColumnDef[] = [
   { id: "chamado", label: "Chamado", kind: "text", text: (r) => r.chamado ?? "" },
   {
     id: "previsao",
-    label: "Previsão",
+    label: "Previsão de Atendimento",
     kind: "previsao",
     text: (r) => formatDataHora(r.previsao_atendimento),
     num: (r) => (r.previsao_atendimento ? new Date(r.previsao_atendimento).getTime() : 0),
@@ -274,15 +275,21 @@ function parseDateTimeInput(raw: string): string | null {
 
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
-    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4] ?? "00"}:${m[5] ?? "00"}:${m[6] ?? "00"}`);
-    if (!isNaN(d.getTime())) return d.toISOString();
+    const value = zonedDateTimeToIso({
+      year: Number(m[1]), month: Number(m[2]), day: Number(m[3]),
+      hour: Number(m[4] ?? "00"), minute: Number(m[5] ?? "00"), second: Number(m[6] ?? "00"),
+    });
+    if (value) return value;
   }
 
   m = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})(?:[ ,]+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
-    const d = new Date(`${yr}-${m[2]}-${m[1]}T${m[4] ?? "00"}:${m[5] ?? "00"}:${m[6] ?? "00"}`);
-    if (!isNaN(d.getTime())) return d.toISOString();
+    const value = zonedDateTimeToIso({
+      year: Number(yr), month: Number(m[2]), day: Number(m[1]),
+      hour: Number(m[4] ?? "00"), minute: Number(m[5] ?? "00"), second: Number(m[6] ?? "00"),
+    });
+    if (value) return value;
   }
 
   if (!isNaN(iso.getTime())) return iso.toISOString();

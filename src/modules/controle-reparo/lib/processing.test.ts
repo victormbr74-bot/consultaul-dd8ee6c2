@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { processControle } from "./processing";
+import { formatDataHora } from "./tempo";
 
 const profileNames = [
   "Rodrigo Nunes da Silva",
@@ -67,6 +68,43 @@ describe("processControle sem INC ate 24h", () => {
     expect(row.status_planilha).toBe("CEC ANALISANDO");
     expect(row.responsavel).toBe("Caroline Victoria Marques de Oliveira");
     expect(report.total).toBe(0);
+  });
+});
+
+describe("processControle data e hora inicial do GIS", () => {
+  it("mantem a hora informada na coluna I", () => {
+    const result = processControle({
+      gis1: [
+        {
+          "Cód. da Lotérica": "05-005778-2",
+          Lotérica: "LOTERIA SORTE GRANDE",
+          "Tipo de Link": "PRINCIPAL",
+          UF: "CE",
+          Cidade: "FORTALEZA",
+          Designação: "CEFFLA5979675",
+          "IP Loopback": "10.51.57.72",
+          "Data e Hora Incial": "2024-05-08 04:17:20",
+          "Duração (h)": "18845",
+          "Previsão de Atendimento": "2026-05-29 18:00:00",
+          "Último Comentário": "Comentário da coluna Q",
+          Empresa: "OI",
+        },
+      ],
+      gis2: [],
+      controleD1: [],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-07-02",
+      processadoEm: "2026-07-02T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(result.controle[0].data_hora_inicial).toBe("2024-05-08T07:17:20.000Z");
+    expect(result.controle[0].previsao_atendimento).toBe("2024-05-08T07:17:20.000Z");
+    expect(result.controle[0].ultimo_comentario).toBe("Comentário da coluna Q");
+    expect(formatDataHora(result.controle[0].data_hora_inicial)).toBe("08/05/2024 04:17:20");
   });
 });
 

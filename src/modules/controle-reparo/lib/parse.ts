@@ -88,7 +88,14 @@ export async function parseFile(file: File, tipo: string): Promise<ParseResult> 
     return { rows: parseCsvText(text) };
   }
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  // For GIS files we need to preserve date+time fractions on datetime cells.
+  // With raw:false, SheetJS formats cells using their number format, so a
+  // "dd/mm/yyyy" format strips the hour even when the underlying serial has
+  // a fractional (time) part. Reading with cellDates:true + raw:true keeps
+  // date cells as Date objects (with full time) that downstream toIso/cleanVal
+  // can serialize correctly.
+  const isGis = tipo === "gis1" || tipo === "gis2";
+  const wb = XLSX.read(buf, { type: "array", cellDates: isGis });
   const hints = SHEET_HINTS[tipo] ?? [];
   let target = wb.SheetNames[0];
   // pick sheet by hint
@@ -101,7 +108,10 @@ export async function parseFile(file: File, tipo: string): Promise<ParseResult> 
   }
   // if first sheet has very few columns, choose the widest
   const evalSheet = (sn: string) => {
-    const arr = XLSX.utils.sheet_to_json<Row>(wb.Sheets[sn], { defval: "", raw: false });
+    const arr = XLSX.utils.sheet_to_json<Row>(wb.Sheets[sn], {
+      defval: "",
+      raw: isGis ? true : false,
+    });
     return arr;
   };
   let rows = evalSheet(target);

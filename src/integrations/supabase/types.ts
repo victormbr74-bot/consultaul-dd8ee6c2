@@ -209,6 +209,84 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          browser: string | null
+          created_at: string
+          device_type: string
+          entity: string | null
+          entity_id: string | null
+          id: string
+          integrity_hash: string | null
+          ip_address: unknown
+          message: string | null
+          module: string | null
+          new_values: Json | null
+          observation: string | null
+          old_values: Json | null
+          origin: string | null
+          os: string | null
+          request_method: string | null
+          request_path: string | null
+          status: string
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          browser?: string | null
+          created_at?: string
+          device_type?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          integrity_hash?: string | null
+          ip_address?: unknown
+          message?: string | null
+          module?: string | null
+          new_values?: Json | null
+          observation?: string | null
+          old_values?: Json | null
+          origin?: string | null
+          os?: string | null
+          request_method?: string | null
+          request_path?: string | null
+          status?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          browser?: string | null
+          created_at?: string
+          device_type?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          integrity_hash?: string | null
+          ip_address?: unknown
+          message?: string | null
+          module?: string | null
+          new_values?: Json | null
+          observation?: string | null
+          old_values?: Json | null
+          origin?: string | null
+          os?: string | null
+          request_method?: string | null
+          request_path?: string | null
+          status?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       auditoria: {
         Row: {
           acao: string
@@ -597,9 +675,9 @@ export type Database = {
           posto: string
         }
         Insert: {
-          circuito?: string
+          circuito: string
           imported_at?: string
-          posto?: string
+          posto: string
         }
         Update: {
           circuito?: string
@@ -1617,6 +1695,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean | null
+          last_seen_at: string | null
           name: string
           nome: string | null
           updated_at: string
@@ -1634,6 +1713,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_active?: boolean | null
+          last_seen_at?: string | null
           name: string
           nome?: string | null
           updated_at?: string
@@ -1651,6 +1731,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean | null
+          last_seen_at?: string | null
           name?: string
           nome?: string | null
           updated_at?: string
@@ -1749,6 +1830,36 @@ export type Database = {
           },
         ]
       }
+      terms_versions: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          type: string
+          version: string
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          type: string
+          version: string
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          type?: string
+          version?: string
+        }
+        Relationships: []
+      }
       topologia: {
         Row: {
           comandos: string
@@ -1797,6 +1908,60 @@ export type Database = {
         }
         Relationships: []
       }
+      user_consents: {
+        Row: {
+          accepted_at: string
+          browser: string | null
+          device_type: string
+          id: string
+          ip_address: unknown
+          os: string | null
+          privacy_policy_version_id: string
+          terms_version_id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          browser?: string | null
+          device_type?: string
+          id?: string
+          ip_address?: unknown
+          os?: string | null
+          privacy_policy_version_id: string
+          terms_version_id: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          browser?: string | null
+          device_type?: string
+          id?: string
+          ip_address?: unknown
+          os?: string | null
+          privacy_policy_version_id?: string
+          terms_version_id?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_consents_privacy_policy_version_id_fkey"
+            columns: ["privacy_policy_version_id"]
+            isOneToOne: false
+            referencedRelation: "terms_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_consents_terms_version_id_fkey"
+            columns: ["terms_version_id"]
+            isOneToOne: false
+            referencedRelation: "terms_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -1820,11 +1985,48 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_anonymize_user: {
+        Args: { _target_user_id: string }
+        Returns: undefined
+      }
       apply_principal_updates: { Args: { payload: Json }; Returns: number }
+      audit_browser_from_ua: { Args: { _ua: string }; Returns: string }
+      audit_changed_fields: {
+        Args: { _new: Json; _old: Json }
+        Returns: string
+      }
+      audit_device_from_ua: { Args: { _ua: string }; Returns: string }
+      audit_jsonb_without_noise: { Args: { _value: Json }; Returns: Json }
+      audit_module_for_table: { Args: { _table_name: string }; Returns: string }
+      audit_observation_for_change: {
+        Args: {
+          _new: Json
+          _old: Json
+          _operation: string
+          _record_id: string
+          _table_name: string
+        }
+        Returns: string
+      }
+      audit_os_from_ua: { Args: { _ua: string }; Returns: string }
+      audit_redact_jsonb: { Args: { _value: Json }; Returns: Json }
+      audit_request_headers: { Args: never; Returns: Json }
+      audit_request_ip: { Args: never; Returns: unknown }
       can_manage_app_data: { Args: { _user_id: string }; Returns: boolean }
       can_manage_app_settings: { Args: never; Returns: boolean }
       can_write: { Args: { _user_id: string }; Returns: boolean }
       compat_role_text: { Args: { _user_id: string }; Returns: string }
+      controle_sync_first_filled: {
+        Args: { input_values: string[] }
+        Returns: string
+      }
+      controle_sync_json_value: {
+        Args: { aliases: string[]; raw: Json }
+        Returns: string
+      }
+      controle_sync_norm_codigo: { Args: { value: string }; Returns: string }
+      controle_sync_norm_key: { Args: { value: string }; Returns: string }
+      controle_sync_tipo_link: { Args: { value: string }; Returns: string }
       current_user_is_admin_master: { Args: never; Returns: boolean }
       has_role: {
         Args: {
@@ -1854,16 +2056,16 @@ export type Database = {
           uf: string
         }[]
       }
-      sync_controle_lotericas_export: {
-        Args: { _data_referencia: string; _versao: number }
-        Returns: Json
-      }
       set_user_app_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _target_user_id: string
         }
         Returns: undefined
+      }
+      sync_controle_lotericas_export: {
+        Args: { _data_referencia: string; _versao: number }
+        Returns: Json
       }
     }
     Enums: {

@@ -26,7 +26,6 @@ import {
   getJiraAlarmType,
   getJiraIncident,
   isJiraAlarmRow,
-  jiraRowsWithoutControleIncident,
 } from "@/modules/controle-reparo/lib/dashboardJira";
 import { FAIXAS, formatDataHora, getFaixa } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle, exportGenericRows } from "@/modules/controle-reparo/lib/controleExport";
@@ -301,8 +300,14 @@ function Indicadores({
   }, [jiraRows]);
 
   const incSemAlarmeRows = useMemo(() => {
-    return jiraRowsWithoutControleIncident(jiraRows, controleIncs);
-  }, [controleIncs, jiraRows]);
+    if (!jiraRows.length) return [] as Row[];
+    return jiraRows.filter((row) => {
+      const tipoLink = inferJiraLinkTypeForGisCompare(row);
+      if (!tipoLink) return false;
+      const key = buildCodeTypeDashboardKey(getJiraCodigoLoterica(row), tipoLink);
+      return !!key && !controleLinkKeys.has(key);
+    });
+  }, [controleLinkKeys, jiraRows]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [

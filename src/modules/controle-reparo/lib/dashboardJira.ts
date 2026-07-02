@@ -56,13 +56,3 @@ export function getJiraAlarmType(row: Row): string | null {
 export function isJiraAlarmRow(row: Row): boolean {
   return getJiraAlarmType(row) !== null;
 }
-
-export function jiraRowsWithoutControleIncident(
-  jiraRows: Row[],
-  controleIncs: ReadonlySet<string>,
-): Row[] {
-  return jiraRows.filter((row) => {
-    const inc = getJiraIncident(row);
-    return !!inc && !controleIncs.has(inc);
-  });
-}

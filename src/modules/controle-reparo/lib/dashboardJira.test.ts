@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getJiraAlarmType, jiraRowsWithoutControleIncident } from "./dashboardJira";
+import { getJiraAlarmType, getJiraIncident } from "./dashboardJira";
 
 describe("dashboard Jira", () => {
   it("aceita somente os dois tipos oficiais de alarme", () => {
@@ -9,15 +9,8 @@ describe("dashboard Jira", () => {
     expect(getJiraAlarmType({ Resumo: "REQ-123", "Tipo de Falha": "UL ISOLADA" })).toBeNull();
   });
 
-  it("calcula INC sem alarme pela INC normalizada", () => {
-    const rows = [
-      { "Número INC": "INC-100" },
-      { Chamado: "INC-101" },
-      { Chamado: "sem incidente" },
-    ];
-
-    expect(jiraRowsWithoutControleIncident(rows, new Set(["INC-100"]))).toEqual([
-      { Chamado: "INC-101" },
-    ]);
+  it("normaliza a INC usada nos indicadores", () => {
+    expect(getJiraIncident({ "Número INC": "INC-100" })).toBe("INC-100");
+    expect(getJiraIncident({ Chamado: "sem incidente" })).toBeNull();
   });
 });

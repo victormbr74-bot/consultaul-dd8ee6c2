@@ -106,6 +106,36 @@ describe("processControle data e hora inicial do GIS", () => {
     expect(result.controle[0].ultimo_comentario).toBe("Comentário da coluna Q");
     expect(formatDataHora(result.controle[0].data_hora_inicial)).toBe("08/05/2024 04:17:20");
   });
+
+  it("converte o serial XLSX mantendo a hora da celula", () => {
+    const serial = Date.UTC(2024, 4, 8, 4, 17, 20) / 86400000 + 25569;
+    const result = processControle({
+      gis1: [
+        {
+          "Cód. da Lotérica": "05-005778-2",
+          Lotérica: "LOTERIA SORTE GRANDE",
+          "Tipo de Link": "PRINCIPAL",
+          UF: "CE",
+          Designação: "CEFFLA5979675",
+          "IP Loopback": "10.51.57.72",
+          "Data e Hora Incial": serial,
+          "Duração (h)": "18845",
+        },
+      ],
+      gis2: [],
+      controleD1: [],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-07-02",
+      processadoEm: "2026-07-02T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(formatDataHora(result.controle[0].data_hora_inicial)).toBe("08/05/2024 04:17:20");
+    expect(formatDataHora(result.controle[0].previsao_atendimento)).toBe("08/05/2024 04:17:20");
+  });
 });
 
 describe("processControle Controle D-1", () => {

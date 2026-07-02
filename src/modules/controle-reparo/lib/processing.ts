@@ -327,6 +327,14 @@ const EDITAVEIS_ADMIN = [
 
 const MANUAIS_PRESERVAVEIS = Array.from(new Set([...EDITAVEIS, ...EDITAVEIS_ADMIN]));
 
+// Estes campos são fontes autoritativas do GIS e não podem ser substituídos
+// por valores antigos ao gerar uma nova versão.
+const CAMPOS_AUTORITATIVOS_GIS = new Set([
+  "data_hora_inicial",
+  "previsao_atendimento",
+  "ultimo_comentario",
+]);
+
 const HERDAVEIS_OPERACIONAIS = [...EDITAVEIS] as const;
 
 const STATUS_PLANILHA_FIELD = "status_planilha";
@@ -1348,6 +1356,7 @@ export function processControle(input: ProcessInput): ProcessResult {
     }
     let appliedD1Situacao = false;
     for (const f of MANUAIS_PRESERVAVEIS) {
+      if (CAMPOS_AUTORITATIVOS_GIS.has(f)) continue;
       if (!inheritedCurrent || !manualFields.has(f)) continue;
       const currentValue = inheritedCurrent[f] as unknown;
       (row as unknown as Record<string, unknown>)[f] =

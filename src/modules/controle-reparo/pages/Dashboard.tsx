@@ -22,6 +22,12 @@ import type { ControleRow } from "@/modules/controle-reparo/lib/processing";
 import { isLinkBackup, normalizeIncidentValue } from "@/modules/controle-reparo/lib/processing";
 import type { Row } from "@/modules/controle-reparo/lib/parse";
 import { getVal, cleanText } from "@/modules/controle-reparo/lib/parse";
+import {
+  getJiraAlarmType,
+  getJiraIncident,
+  isJiraAlarmRow,
+  jiraRowsWithoutControleIncident,
+} from "@/modules/controle-reparo/lib/dashboardJira";
 import { FAIXAS, formatDataHora, getFaixa } from "@/modules/controle-reparo/lib/tempo";
 import { exportControle, exportGenericRows } from "@/modules/controle-reparo/lib/controleExport";
 import { DrillDownDialog, type DrillData } from "@/modules/controle-reparo/components/controle/DrillDownDialog";
@@ -295,14 +301,8 @@ function Indicadores({
   }, [jiraRows]);
 
   const incSemAlarmeRows = useMemo(() => {
-    if (!jiraRows.length) return [] as Row[];
-    return jiraRows.filter((row) => {
-      const tipoLink = inferJiraLinkTypeForGisCompare(row);
-      if (!tipoLink) return false;
-      const key = buildCodeTypeDashboardKey(getJiraCodigoLoterica(row), tipoLink);
-      return !!key && !controleLinkKeys.has(key);
-    });
-  }, [controleLinkKeys, jiraRows]);
+    return jiraRowsWithoutControleIncident(jiraRows, controleIncs);
+  }, [controleIncs, jiraRows]);
 
   const metrics = useMemo<Metric[]>(() => {
     const general: Metric[] = [
@@ -1007,18 +1007,6 @@ function alarmNorm(v: string | null | undefined): string {
     .toUpperCase();
 }
 
-const JIRA_ALARM_TERMS = [
-  "LINK BACKUP INOPERANTE",
-  "LINK PRINCIPAL INOPERANTE",
-  "LINK BACKUP",
-  "LINK PRINCIPAL",
-  "UL ISOLADA",
-  "INTERMITENCIA PRINCIPAL",
-  "INTERMITENCIA BACKUP",
-  "INTERMITENCIA",
-  "INDISPONIBILIDADE",
-];
-
 const JIRA_GIS_COMPARE_TERMS = [
   "LINK BACKUP INOPERANTE",
   "LINK PRINCIPAL INOPERANTE",
@@ -1045,30 +1033,6 @@ function buildCodeTypeDashboardKey(
   const code = normalizeDashboardCode(codigo);
   const tipo = normalizeDashboardTipoLink(tipoLink);
   return code && tipo ? `${code}|${tipo}` : "";
-}
-
-function getJiraIncident(row: Row): string {
-  return normalizeIncidentValue(
-    getVal(
-      row,
-      "Nº INC Snow",
-      "N° INC Snow",
-      "Numero INC Snow",
-      "Número INC Snow",
-      "n_inc_snow",
-      "INC Snow",
-      "Incidente Snow",
-      "Nº INC",
-      "N° INC",
-      "Numero INC",
-      "Número INC",
-      "INC",
-      "Incidente",
-      "Chamado",
-      "Chave",
-      "Key",
-    ),
-  );
 }
 
 function getJiraCodigoLoterica(row: Row): string {
@@ -1131,26 +1095,6 @@ function inferJiraLinkTypeForGisCompare(row: Row): "PRINCIPAL" | "SECUNDÁRIO" |
   return normalizeDashboardTipoLink(getJiraTipoLink(row));
 }
 
-function isReqReference(texto: string): boolean {
-  return /^REQ[-\s]?\d+/.test(alarmNorm(texto));
-}
-
-function getJiraAlarmType(row: Row): string | null {
-  const joined = alarmNorm([getJiraTipoFalha(row), getJiraResumo(row), getJiraDescricao(row)].filter(Boolean).join(" | "));
-  const hit = JIRA_ALARM_TERMS.find((term) => joined.includes(term));
-  if (hit) return hit;
-
-  const resumo = getJiraResumo(row);
-  if (!isReqReference(resumo)) return null;
-
-  const tipoFalha = alarmNorm(getJiraTipoFalha(row));
-  return tipoFalha || null;
-}
-
-function isJiraAlarmRow(row: Row): boolean {
-  return getJiraAlarmType(row) !== null;
-}
-
 function ordemKey(v: string | null | undefined): string {
   return normTxt(v).replace(/[^A-Z0-9]+/g, "");
 }
@@ -1159,7 +1103,6 @@ const AGUARDANDO_ABERTURA_OS_KEYS = new Set([
   "AGUARDANDOABERTURADEOS",
   "DEFINICAOUN",
   "SOLICITARUN",
-  "SOICITARUN",
 ]);
 
 const MIGRACAO_EM_ANDAMENTO_KEYS = new Set([

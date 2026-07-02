@@ -197,11 +197,11 @@ describe("processControle Controle D-1", () => {
     expect(result.controle[0].status_planilha).toBe("PENDENCIA INFRA CLIENTE");
   });
 
-  it("prioriza Status Planilha do D-1 sobre CEC ANALISANDO preservado na versao do mesmo dia", () => {
+  it("preserva Status Planilha valido da versao anterior antes do D-1", () => {
     const sameDayPrior = {
       data_referencia: "2026-06-29",
       versao: 1,
-      chave: "21-001284-6|PRINCIPAL|105133193+SBO5011854+SBO5011854+SBO5011854+INC-475347+279875239",
+      chave: "21-001284-6|PRINCIPAL|105133193+SBO5011854+INC475347+279875239",
       codigo_loterica: "21-001284-6",
       loterica: "LOTERIC A MEGA PREMIUM",
       tipo_link: "PRINCIPAL",
@@ -223,7 +223,7 @@ describe("processControle Controle D-1", () => {
       ordem: "REPARO",
       novo_circuito: "SBO 5011854",
       situacao: "REPARO",
-      status_planilha: "CEC ANALISANDO",
+      status_planilha: "FIBRA",
       status_jira: "PENDENCIA INFRA CLIENTE",
       obs: "Em contato com o responsavel VIVO Jailson.",
       responsavel: "Caroline Victoria Marques de Oliveira",
@@ -235,6 +235,33 @@ describe("processControle Controle D-1", () => {
       tem_os_reparo: false,
       tipo_falha: null,
     };
+
+    sameDayPrior.chave = processControle({
+      gis1: [
+        {
+          "Cod. da Loterica": "21-001284-6",
+          Loterica: "LOTERIC A MEGA PREMIUM",
+          "Tipo de Link": "PRINCIPAL",
+          Cidade: "SAO BERNARDO DO CAMPO",
+          UF: "SP",
+          Designacao: "SBO5011854",
+          "IP Loopback": "10.51.33.193",
+          "Duracao (h)": "4030",
+          Empresa: "OI",
+          Chamado: "INC-475347",
+          "ID do Alarmes": "279875239",
+        },
+      ],
+      gis2: [],
+      controleD1: [],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-06-29",
+      processadoEm: "2026-06-29T12:00:00.000Z",
+      prior: [],
+    }).controle[0].chave;
 
     const result = processControle({
       gis1: [
@@ -275,8 +302,8 @@ describe("processControle Controle D-1", () => {
       versao: 2,
     });
 
-    expect(result.controle[0].status_planilha).toBe("PENDENCIA INFRA CLIENTE");
-    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(0);
+    expect(result.controle[0].status_planilha).toBe("FIBRA");
+    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(1);
   });
 
   it("usa CEC ANALISANDO somente quando Status Planilha do D-1 esta vazio ou invalido", () => {

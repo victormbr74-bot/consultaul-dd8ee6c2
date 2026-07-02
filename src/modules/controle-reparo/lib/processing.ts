@@ -1517,10 +1517,7 @@ export function processControle(input: ProcessInput): ProcessResult {
       const priorRow = sameDayPriorByChave.get(key);
       const priorStatus = normalizeStatusPlanilha(priorRow?.status_planilha ?? null);
       const d1Status = normalizeStatusPlanilha(inheritedD1?.status_planilha ?? null);
-      if (d1Status) {
-        row.status_planilha = d1Status;
-        statusPlanilhaRegraNormal++;
-      } else if (priorStatus) {
+      if (priorStatus) {
         row.status_planilha = priorStatus;
         statusPlanilhaPreservados++;
         if (exemplosPreservados.length < 10) {
@@ -1531,6 +1528,9 @@ export function processControle(input: ProcessInput): ProcessResult {
             responsavel: priorRow.responsavel,
           });
         }
+      } else if (d1Status) {
+        row.status_planilha = d1Status;
+        statusPlanilhaRegraNormal++;
       } else {
         row.status_planilha = STATUS_PLANILHA_PADRAO;
         statusPlanilhaRegraNormal++;

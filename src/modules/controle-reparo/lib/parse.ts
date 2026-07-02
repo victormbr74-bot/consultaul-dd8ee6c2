@@ -48,6 +48,7 @@ export function getVal(row: Row, ...candidates: string[]): string {
 
 export function cleanVal(v: unknown): string {
   if (v === undefined || v === null) return "";
+  if (v instanceof Date) return isNaN(v.getTime()) ? "" : v.toISOString();
   let s = typeof v === "string" ? fixMojibake(v) : String(v);
   s = s.trim();
   if (s.toLowerCase() === "null" || s.toLowerCase() === "nan") return "";

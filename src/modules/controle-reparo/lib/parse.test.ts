@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCsvText } from "./parse";
+import { cleanVal, parseCsvText } from "./parse";
 
 describe("parseCsvText", () => {
   it("preserva data e hora da coluna I do CSV GIS", () => {
@@ -13,5 +13,12 @@ describe("parseCsvText", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]["Data e Hora Incial"]).toBe("2024-05-08 04:17:20");
+  });
+});
+
+describe("cleanVal", () => {
+  it("serializa Date de forma deterministica", () => {
+    expect(cleanVal(new Date("2026-07-02T12:34:56.000Z"))).toBe("2026-07-02T12:34:56.000Z");
+    expect(cleanVal(new Date(Number.NaN))).toBe("");
   });
 });

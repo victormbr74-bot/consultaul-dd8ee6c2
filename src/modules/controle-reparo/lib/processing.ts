@@ -172,6 +172,7 @@ export interface ProcessReport {
     finalAtivos: number;
     diferenca: number;
     duplicadosReaisRemovidos: number;
+    duplicadosPorAlarmeRemovidos: number;
     colisoesEvitadas: number;
   };
   d1: {
@@ -1107,7 +1108,37 @@ export function processControle(input: ProcessInput): ProcessResult {
     versao = 1,
   } = input;
 
-  const gisAll = [...gis1, ...gis2];
+  const gisRawAll = [...gis1, ...gis2];
+  const gisPorAlarme = new Map<string, { row: Row; firstIndex: number; timestamp: number }>();
+  const gisSemIdentidade: Array<{ row: Row; firstIndex: number }> = [];
+  for (let index = 0; index < gisRawAll.length; index++) {
+    const row = gisRawAll[index];
+    const id = operationalId(row, [], [], [], { allowRowHashFallback: true });
+    if (!id.codeTypeKey) {
+      gisSemIdentidade.push({ row, firstIndex: index });
+      continue;
+    }
+    const tipoFalhaKey = normKey(getVal(row, "Mensagem"));
+    const chamadoKey = normKey(getVal(row, "Chamado"));
+    const alarmKey = `${id.codeTypeKey}|${tipoFalhaKey}|${chamadoKey}`;
+    const iso = toIso(getVal(row, "Data e Hora Incial", "Data e Hora Inicial", "Data/Hora Inicial"));
+    const timestamp = iso ? new Date(iso).getTime() : Number.POSITIVE_INFINITY;
+    const current = gisPorAlarme.get(alarmKey);
+    if (!current) {
+      gisPorAlarme.set(alarmKey, { row, firstIndex: index, timestamp });
+      continue;
+    }
+    if (timestamp < current.timestamp) {
+      gisPorAlarme.set(alarmKey, { row, firstIndex: current.firstIndex, timestamp });
+    }
+  }
+  const gisAll = [
+    ...Array.from(gisPorAlarme.values()).map(({ row, firstIndex }) => ({ row, firstIndex })),
+    ...gisSemIdentidade,
+  ]
+    .sort((a, b) => a.firstIndex - b.firstIndex)
+    .map(({ row }) => row);
+  const duplicadosPorAlarmeRemovidos = gisRawAll.length - gisAll.length;
   const plantaAll = [...planta];
   const responsaveis = resolveResponsaveis(profileNames);
   const normalizedProfileNames = Array.from(
@@ -1229,12 +1260,50 @@ export function processControle(input: ProcessInput): ProcessResult {
   for (const p of priorSorted) {
     if (p.data_referencia === dataReferencia && p.chave) currentByChave.set(p.chave, p);
   }
+  const sameDayCandidates = (sameDayPrior.length > 0 ? sameDayPrior : priorSorted).filter(
+    (p) => p.data_referencia === dataReferencia && (p.versao ?? 1) < versao,
+  );
+  const latestSameDayVersion = sameDayCandidates.length
+    ? Math.max(...sameDayCandidates.map((p) => p.versao ?? 1))
+    : null;
+  const latestSameDayRows = latestSameDayVersion == null
+    ? []
+    : sameDayCandidates.filter((p) => (p.versao ?? 1) === latestSameDayVersion);
   const sameDayPriorByChave = new Map<string, ControleRow>();
-  for (const p of priorSorted) {
-    if (p.data_referencia === dataReferencia && p.versao && (p.versao ?? 1) < versao && p.chave) {
-      sameDayPriorByChave.set(p.chave, p);
+  const sameDayPriorByCircuit = new Map<string, ControleRow>();
+  const sameDayPriorCircuitCounts = new Map<string, number>();
+  const sameDayPriorByCodeType = new Map<string, ControleRow>();
+  const sameDayPriorCodeTypeCounts = new Map<string, number>();
+  for (const p of latestSameDayRows) {
+    if (p.chave) sameDayPriorByChave.set(p.chave, p);
+    const codeTypeKey = buildCodeTypeKey(p.codigo_loterica, p.tipo_link ?? "");
+    if (codeTypeKey) {
+      sameDayPriorByCodeType.set(codeTypeKey, p);
+      addCount(sameDayPriorCodeTypeCounts, codeTypeKey);
+    }
+    for (const circuit of new Set([p.designacao, p.novo_circuito].filter(Boolean))) {
+      const circuitKey = buildCircuitKey(p.codigo_loterica, p.tipo_link ?? "", circuit ?? "");
+      if (!circuitKey) continue;
+      sameDayPriorByCircuit.set(circuitKey, p);
+      addCount(sameDayPriorCircuitCounts, circuitKey);
     }
   }
+  const findSameDayPrior = (id: OperationalId): ControleRow | undefined => {
+    const exact = sameDayPriorByChave.get(id.key);
+    if (exact) return exact;
+    if (id.circuitKey && sameDayPriorCircuitCounts.get(id.circuitKey) === 1) {
+      const byCircuit = sameDayPriorByCircuit.get(id.circuitKey);
+      if (byCircuit) return byCircuit;
+    }
+    if (
+      id.codeTypeKey &&
+      sameDayPriorCodeTypeCounts.get(id.codeTypeKey) === 1 &&
+      (gisCodeTypeCountsByKey.get(id.codeTypeKey) ?? 0) === 1
+    ) {
+      return sameDayPriorByCodeType.get(id.codeTypeKey);
+    }
+    return undefined;
+  };
 
   const controle: ControleRow[] = [];
   const seenKeys = new Set<string>();
@@ -1265,14 +1334,8 @@ export function processControle(input: ProcessInput): ProcessResult {
   const semIncAte24hKeys = new Set<string>();
   const filaJiraVaziaExemplos: ProcessReport["jira"]["filaJiraVaziaExemplos"] = [];
 
-  const versaoAnterior = sameDayPriorByChave.size > 0
-    ? prior
-        .filter((p) => p.data_referencia === dataReferencia && p.versao && (p.versao ?? 1) < versao)
-        .sort((a, b) => (a.versao ?? 1) - (b.versao ?? 1))
-    : [];
-  const maxVersaoAnterior = versaoAnterior.length > 0
-    ? Math.max(...versaoAnterior.map((p) => p.versao ?? 1))
-    : null;
+  const versaoAnterior = latestSameDayRows;
+  const maxVersaoAnterior = latestSameDayVersion;
   let statusPlanilhaPreservados = 0;
   let statusPlanilhaRegraNormal = 0;
   let responsavelPreservados = 0;
@@ -1338,7 +1401,7 @@ export function processControle(input: ProcessInput): ProcessResult {
       normalizado_em: null,
       pendente_enriquecimento: false,
       tem_os_reparo: false,
-      tipo_falha: null,
+      tipo_falha: cleanText(getVal(r, "Mensagem")) || null,
     };
 
     // Item 2: OS/Reparo removida do fluxo — não enriquece mais o Controle Operacional.
@@ -1419,7 +1482,6 @@ export function processControle(input: ProcessInput): ProcessResult {
       } else if (!manualFields.has("inc_snow")) {
         jiraIncSnowVazio++;
       }
-      if (!manualFields.has("tipo_falha")) row.tipo_falha = cleanText(getVal(jr, "Tipo de Falha", "Tipo Falha", "TIPO DE FALHA")) || null;
       const jiraStatusJira =
         cleanVal(getVal(jr, "Último comentário Cliente", "Ultimo comentario Cliente")) || null;
       const jiraObs = cleanJiraObs(
@@ -1523,7 +1585,7 @@ export function processControle(input: ProcessInput): ProcessResult {
 
     // Status Planilha: versão anterior do mesmo dia > D-1 > regra normal.
     if (!manualFields.has("status_planilha")) {
-      const priorRow = sameDayPriorByChave.get(key);
+      const priorRow = findSameDayPrior(gid);
       const priorStatus = normalizeStatusPlanilha(priorRow?.status_planilha ?? null);
       const d1Status = normalizeStatusPlanilha(inheritedD1?.status_planilha ?? null);
       if (priorStatus) {
@@ -1546,9 +1608,6 @@ export function processControle(input: ProcessInput): ProcessResult {
       }
     }
     row.status_planilha = normalizeStatusPlanilha(row.status_planilha) ?? STATUS_PLANILHA_PADRAO;
-    if (semIncAte24hKeys.has(row.chave)) {
-      row.status_planilha = STATUS_PLANILHA_PADRAO;
-    }
     if (row.status_planilha === STATUS_PLANILHA_PADRAO) {
       statusPlanilhaCec++;
     }
@@ -1742,10 +1801,11 @@ export function processControle(input: ProcessInput): ProcessResult {
     gis: {
       gis1: gis1.length,
       gis2: gis2.length,
-      bruto: gisAll.length,
+      bruto: gisRawAll.length,
       finalAtivos,
-      diferenca: gisAll.length - finalAtivos,
-      duplicadosReaisRemovidos: gisAll.length - finalAtivos,
+      diferenca: gisRawAll.length - finalAtivos,
+      duplicadosReaisRemovidos: duplicadosPorAlarmeRemovidos,
+      duplicadosPorAlarmeRemovidos,
       colisoesEvitadas,
     },
     d1: {

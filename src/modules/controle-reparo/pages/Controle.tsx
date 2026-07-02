@@ -112,6 +112,7 @@ const COLUMNS: ColumnDef[] = [
     num: (r) => computeHoras(r.data_hora_inicial, r.duracao_h),
   },
   { id: "chamado", label: "Chamado", kind: "text", text: (r) => r.chamado ?? "" },
+  { id: "tipo_falha", label: "Tipo de Falha", kind: "text", text: (r) => r.tipo_falha ?? "" },
   {
     id: "previsao",
     label: "Previsão de Atendimento",
@@ -408,6 +409,7 @@ const COLUMN_LAYOUT: Record<string, string> = {
   inicio: "min-w-[178px]",
   tempo: "min-w-[104px]",
   chamado: "min-w-[124px]",
+  tipo_falha: "min-w-[220px]",
   previsao: "min-w-[178px]",
   ultimo_comentario: "min-w-[380px] max-w-[560px]",
   ordem: "min-w-[140px]",
@@ -437,6 +439,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, string> = {
   inicio: "178px",
   tempo: "104px",
   chamado: "124px",
+  tipo_falha: "220px",
   previsao: "178px",
   ultimo_comentario: "380px",
   ordem: "140px",

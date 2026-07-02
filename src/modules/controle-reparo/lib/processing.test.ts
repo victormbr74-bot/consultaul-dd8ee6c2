@@ -42,6 +42,58 @@ function runCase(duracao: string) {
   return { row: result.controle[0], report: result.stats.report.jira.semIncAte24h };
 }
 
+function runStatusVersionMerge(
+  systemStatus: string | null,
+  importedStatus: string,
+  newChamado = "INC-9002",
+) {
+  const gisBase = {
+    "Código da Lotérica": "21-009999-1",
+    Lotérica: "UL MERGE STATUS",
+    "Tipo de Link": "PRINCIPAL",
+    UF: "SP",
+    Cidade: "SAO PAULO",
+    Designação: "CEFSTATUSMERGE",
+    "IP Loopback": "10.51.99.99",
+    Chamado: "INC-9001",
+    "Duração (h)": "24",
+    Empresa: "OI",
+  };
+  const common = {
+    gis2: [],
+    jira: [],
+    grafana: [],
+    planta: [],
+    profileNames,
+    dataReferencia: "2026-07-02",
+    processadoEm: "2026-07-02T12:00:00.000Z",
+  };
+  const seed = processControle({
+    ...common,
+    gis1: [gisBase],
+    controleD1: [],
+    prior: [],
+    versao: 1,
+  }).controle[0];
+  const previous = { ...seed, versao: 1, status_planilha: systemStatus };
+
+  return processControle({
+    ...common,
+    gis1: [{ ...gisBase, Chamado: newChamado }],
+    controleD1: [
+      {
+        "Código da Lotérica": gisBase["Código da Lotérica"],
+        "Tipo de Link": gisBase["Tipo de Link"],
+        Designação: gisBase.Designação,
+        "STATUS PLANILHA": importedStatus,
+      },
+    ],
+    prior: [previous],
+    sameDayPrior: [previous],
+    versao: 2,
+  });
+}
+
 describe("processControle sem INC ate 24h", () => {
   it("preenche apenas os campos permitidos com SEM INC e nao distribui responsavel", () => {
     const { row, report } = runCase("24");
@@ -138,7 +190,129 @@ describe("processControle data e hora inicial do GIS", () => {
   });
 });
 
+describe("processControle deduplicacao GIS e tipo de falha", () => {
+  it("deduplica por codigo, link, falha e chamado mantendo o registro mais antigo", () => {
+    const base = {
+      "Cód. da Lotérica": "19-024574-3",
+      Lotérica: "LOTERIA GARDENIA AZUL",
+      UF: "RJ",
+      Chamado: "INC-537052",
+      Empresa: "OI",
+    };
+    const result = processControle({
+      gis1: [],
+      gis2: [
+        {
+          ...base,
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "SNT19-024574-3",
+          "Data e Hora Incial": "2026-06-08 06:30:07",
+          "Duração (h)": "579",
+          Mensagem: " INTERFACE DOWN ",
+        },
+        {
+          ...base,
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "SNT19-024574-3",
+          "Data e Hora Incial": "2026-06-16 08:00:00",
+          "Duração (h)": "385",
+          Mensagem: " ELEMENTO INDISPONIVEL ",
+        },
+        {
+          ...base,
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "SNT19-024574-3",
+          "Data e Hora Incial": "2026-06-17 09:12:03",
+          "Duração (h)": "360",
+          Mensagem: " ELEMENTO INDISPONIVEL ",
+        },
+        {
+          ...base,
+          Chamado: "INC-537099",
+          "Tipo de Link": "SECUNDARIO",
+          Designação: "SNT19-024574-3",
+          "Data e Hora Incial": "2026-06-15 07:00:00",
+          "Duração (h)": "410",
+          Mensagem: " ELEMENTO INDISPONIVEL ",
+        },
+        {
+          ...base,
+          "Tipo de Link": "PRINCIPAL",
+          Designação: "CEFRJO60018839",
+          "Data e Hora Incial": "2026-06-17 09:17:31",
+          "Duração (h)": "360",
+          Mensagem: " INTERFACE DOWN ",
+        },
+        {
+          ...base,
+          "Tipo de Link": "PRINCIPAL",
+          Designação: "CEFRJO60018839",
+          "Data e Hora Incial": "2026-06-18 15:21:53",
+          "Duração (h)": "330",
+          Mensagem: " ELEMENTO INDISPONIVEL ",
+        },
+        {
+          "Cód. da Lotérica": "19-099999-9",
+          Lotérica: "UL SOMENTE INTERFACE",
+          "Tipo de Link": "PRINCIPAL",
+          Designação: "CEFIGNORAR",
+          Mensagem: "interface down",
+        },
+      ],
+      controleD1: [],
+      jira: [],
+      grafana: [],
+      planta: [],
+      profileNames,
+      dataReferencia: "2026-07-02",
+      processadoEm: "2026-07-02T12:00:00.000Z",
+      prior: [],
+    });
+
+    expect(result.controle).toHaveLength(6);
+    expect(result.controle.filter((row) => row.codigo_loterica === "19-024574-3")).toHaveLength(5);
+    expect(result.controle.find((row) => row.codigo_loterica === "19-099999-9")?.tipo_falha).toBe("interface down");
+    const secondaryElement = result.controle.filter(
+      (row) =>
+        row.codigo_loterica === "19-024574-3" &&
+        row.tipo_link === "SECUNDÁRIO" &&
+        row.tipo_falha === "ELEMENTO INDISPONIVEL",
+    );
+    expect(secondaryElement).toHaveLength(2);
+    expect(secondaryElement.map((row) => row.chamado).sort()).toEqual(["INC-537052", "INC-537099"]);
+    expect(formatDataHora(secondaryElement.find((row) => row.chamado === "INC-537052")?.data_hora_inicial ?? null)).toBe(
+      "16/06/2026 08:00:00",
+    );
+    expect(result.stats.report.gis).toMatchObject({
+      bruto: 7,
+      finalAtivos: 6,
+      duplicadosPorAlarmeRemovidos: 1,
+    });
+  });
+});
+
 describe("processControle Controle D-1", () => {
+  it("mantem o status do sistema quando a nova importacao traz valor diferente", () => {
+    const result = runStatusVersionMerge("FIBRA", "PENDENCIA INFRA CLIENTE", "");
+
+    expect(result.controle[0].status_planilha).toBe("FIBRA");
+    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(1);
+  });
+
+  it("adiciona o status importado quando o sistema ainda nao possui valor", () => {
+    const result = runStatusVersionMerge(null, "PENDENCIA INFRA CLIENTE");
+
+    expect(result.controle[0].status_planilha).toBe("PENDENCIA INFRA CLIENTE");
+    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(0);
+  });
+
+  it("mantem o status sem alteracao quando sistema e importacao sao iguais", () => {
+    const result = runStatusVersionMerge("FIBRA", "FIBRA");
+
+    expect(result.controle[0].status_planilha).toBe("FIBRA");
+    expect(result.stats.report.versionamento.statusPlanilhaPreservados).toBe(1);
+  });
+
   it("herda Ordem e Situacao do Controle D-1 pelos cabecalhos exportados", () => {
     const result = processControle({
       gis1: [
